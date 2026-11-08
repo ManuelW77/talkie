@@ -35,7 +35,7 @@
   {{with .D.Code}}<p class="bigcode">Offener Geräte-Code: <code id="devcode">{{.Code}}</code>
     <button type="button" class="link" data-copy="devcode">Kopieren</button>
     <span class="muted">gültig bis {{dt .Expires}}</span></p>{{end}}
-  {{if lt (len .D.Devices) .D.MaxDevices}}
+  {{if not .Can.admin}}{{else if lt (len .D.Devices) .D.MaxDevices}}
   <form method="post" action="/users/{{$u.ID}}/device_code"><input type="hidden" name="csrf" value="{{.CSRF}}">
     <button>{{if .D.Code}}Neuen Geräte-Code erstellen{{else}}Geräte-Code erstellen{{end}}</button></form>
   <p class="muted small">Auf dem neuen Gerät: Talkie starten → „Ich nutze Talkie schon auf einem anderen Gerät“ → Code eingeben.</p>

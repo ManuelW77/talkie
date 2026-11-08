@@ -598,4 +598,26 @@ func TestDevicesMigration(t *testing.T) {
 	if err != nil || u.Name != "Alt" {
 		t.Fatalf("migration: %v %+v", err, u)
 	}
+	// Erstgerät entfernen (es gibt ein zweites) → darf nach Neustart nicht zurückkommen
+	c, _ := s.CreateDeviceCode(u.ID, time.Hour)
+	pk2 := make([]byte, 32)
+	pk2[0] = 8
+	if _, err := s.RegisterDevice(c.Code, "", pk2, "iOS"); err != nil {
+		t.Fatal(err)
+	}
+	d, _ := s.DeviceByPubKey(pk)
+	if err := s.DeleteDevice(u.ID, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	s, err = OpenStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UserByPubKey(pk); err == nil {
+		t.Fatal("entferntes Erstgerät ist nach Neustart wieder da")
+	}
+	if _, err := s.UserByPubKey(pk2); err != nil {
+		t.Fatal("zweites Gerät fehlt")
+	}
 }
