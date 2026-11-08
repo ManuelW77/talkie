@@ -357,6 +357,7 @@ func (w *webApp) handler() http.Handler {
 	mux.HandleFunc("POST /rooms", w.auth(PermRooms, w.addRoom))
 	mux.HandleFunc("POST /rooms/{id}/{action}", w.auth(PermRooms, w.roomAction))
 	mux.HandleFunc("GET /chat", w.auth(PermChat, w.chatPage))
+	mux.HandleFunc("POST /chat/clear", w.auth(permAdmin, w.chatClear))
 	mux.HandleFunc("GET /accounts", w.auth(permAdmin, w.accountsPage))
 	mux.HandleFunc("GET /accounts/new", w.auth(permAdmin, w.accountForm))
 	mux.HandleFunc("POST /accounts/new", w.auth(permAdmin, w.accountSave))

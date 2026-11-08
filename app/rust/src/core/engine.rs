@@ -52,6 +52,10 @@ pub struct Snapshot {
     pub deaf: bool,
     /// Darf andere rauswerfen/sperren (verknüpftes Webkonto mit Recht).
     pub moderator: bool,
+    /// Verknüpftes Admin-Konto (darf den Chat leeren).
+    pub admin: bool,
+    /// So viele Stunden bleibt der Chat erhalten (0 = unbegrenzt).
+    pub chat_hours: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +78,8 @@ struct NetState {
     users: BTreeMap<i64, WireUser>,
     talking: Vec<i64>,
     moderator: bool,
+    admin: bool,
+    chat_hours: i64,
 }
 
 struct Inner {
@@ -152,6 +158,8 @@ impl Inner {
             muted,
             deaf: self.deaf.load(Ordering::Relaxed),
             moderator: n.moderator,
+            admin: n.admin,
+            chat_hours: n.chat_hours,
         }
     }
 
@@ -297,6 +305,8 @@ impl Engine {
                 users: BTreeMap::new(),
                 talking: Vec::new(),
                 moderator: false,
+                admin: false,
+                chat_hours: 0,
             }),
             muted: AtomicBool::new(false),
             deaf: AtomicBool::new(false),
@@ -460,6 +470,13 @@ impl Engine {
         }
         self.inner.send_cmd(self.inner.ignore_envelope());
         self.inner.emit_state();
+    }
+
+    /// Chat leeren (room 0 = alle Räume). Nur mit verknüpftem Admin-Konto, prüft der Server.
+    pub fn clear_chat(&self, room: i64) {
+        let mut e = Envelope::new("clear_chat");
+        e.room = room;
+        self.inner.send_cmd(e);
     }
 
     /// Jemanden rauswerfen (`ban` = auch sperren). Der Server prüft das Recht.
@@ -688,6 +705,8 @@ async fn run_session(inner: &Arc<Inner>, sess: net::Session, generation: u64) ->
         }
         n.talking.clear();
         n.moderator = welcome.r#mod.unwrap_or(false);
+        n.admin = welcome.admin.unwrap_or(false);
+        n.chat_hours = welcome.chat_hours;
         n.status = Status::Connected;
         n.message.clear();
         n.error_code.clear();
@@ -843,6 +862,8 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
             return Some(SessionEnd::Kicked(if e.reason.is_empty() { "Du wurdest getrennt.".into() } else { e.reason }))
         }
         "error" | "info" => inner.emit(CoreEvent::Notice(e.reason)),
+        // Chat geleert: leerer Verlauf (Raum 0 = alle Räume)
+        "chat_cleared" => inner.emit(CoreEvent::History(e.room, Vec::new())),
         _ => {}
     }
     None

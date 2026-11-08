@@ -34,16 +34,16 @@ Future<void> _loadFonts() async {
     await loader.load();
   }
 
-  await load('Roboto', ['/System/Library/Fonts/Supplemental/Arial.ttf', '/System/Library/Fonts/Supplemental/Arial Bold.ttf']);
+  await load('Roboto', [
+    '/System/Library/Fonts/Supplemental/Arial.ttf',
+    '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
+  ]);
   final flutterRoot = Platform.environment['FLUTTER_ROOT'] ?? '';
   await load('MaterialIcons', ['$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf']);
 }
 
-Widget _wrap(Widget child) => MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(Brightness.dark),
-      home: child,
-    );
+Widget _wrap(Widget child) =>
+    MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(Brightness.dark), home: child);
 
 TalkieController _mainController() {
   final c = _controller()
@@ -53,7 +53,11 @@ TalkieController _mainController() {
       errorCode: '',
       me: 1,
       room: 10,
-      rooms: [RoomDto(id: 10, name: 'Lobby'), RoomDto(id: 11, name: 'Zocken 1'), RoomDto(id: 12, name: 'Zocken 2')],
+      rooms: [
+        RoomDto(id: 10, name: 'Lobby'),
+        RoomDto(id: 11, name: 'Zocken 1'),
+        RoomDto(id: 12, name: 'Zocken 2'),
+      ],
       users: [
         UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true, localMuted: false),
         UserDto(id: 2, name: 'Lena', room: 10, muted: true, deaf: false, talking: false, localMuted: false),
@@ -63,6 +67,8 @@ TalkieController _mainController() {
       muted: false,
       deaf: false,
       moderator: false,
+      admin: false,
+      chatHours: 0,
     );
   c.chats[10] = const [
     ChatDto(room: 10, from: 2, name: 'Lena', text: 'Wer ist dabei? Runde startet gleich!', ts: 1762500000),
@@ -126,6 +132,8 @@ void main() {
         muted: false,
         deaf: false,
         moderator: false,
+        admin: false,
+        chatHours: 0,
       );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     expect(find.text('Du wurdest vom Admin rausgeworfen.'), findsOneWidget);
@@ -148,6 +156,8 @@ void main() {
         muted: false,
         deaf: false,
         moderator: false,
+        admin: false,
+        chatHours: 0,
       );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     await tester.pump(const Duration(milliseconds: 300));
@@ -163,7 +173,14 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final c = _mainController()..unreadHere = 1;
-    await tester.pumpWidget(_wrap(ListenableBuilder(listenable: c, builder: (_, _) => MainScreen(controller: c))));
+    await tester.pumpWidget(
+      _wrap(
+        ListenableBuilder(
+          listenable: c,
+          builder: (_, _) => MainScreen(controller: c),
+        ),
+      ),
+    );
     await tester.pump(const Duration(milliseconds: 300));
     // Start: Räume mit allen Leuten (wer spricht, sieht man hier)
     expect(find.text('Zocken 1'), findsOneWidget);
@@ -202,6 +219,8 @@ void main() {
       muted: s.muted,
       deaf: s.deaf,
       moderator: true,
+      admin: true,
+      chatHours: 0,
     );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     await tester.pump(const Duration(milliseconds: 300));
@@ -219,5 +238,45 @@ void main() {
     await tester.tap(find.text('Abbrechen'));
     await tester.pumpAndSettle();
     expect(find.text('Lena sperren?'), findsNothing);
+  });
+
+  testWidgets('Admin: Chat-leeren-Menü; alte Nachrichten fallen nach der Frist weg', (tester) async {
+    tester.view.physicalSize = const Size(1000, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final c = _mainController();
+    final s = c.state!;
+    c.state = StateDto(
+      status: s.status,
+      message: s.message,
+      errorCode: s.errorCode,
+      me: s.me,
+      room: s.room,
+      rooms: s.rooms,
+      users: s.users,
+      muted: s.muted,
+      deaf: s.deaf,
+      moderator: false,
+      admin: true,
+      chatHours: 24,
+    );
+    c.chats[10] = [
+      ChatDto(room: 10, from: 2, name: 'Lena', text: 'von vorgestern', ts: now - 48 * 3600),
+      ChatDto(room: 10, from: 2, name: 'Lena', text: 'von eben', ts: now - 60),
+    ];
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('von eben'), findsOneWidget);
+    expect(find.text('von vorgestern'), findsNothing);
+
+    await tester.tap(find.byTooltip('Chat leeren'));
+    await tester.pumpAndSettle();
+    expect(find.text('„Lobby“ leeren'), findsOneWidget);
+    await tester.tap(find.text('Alle Räume leeren'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chat in allen Räumen leeren?'), findsOneWidget);
+    await tester.tap(find.text('Abbrechen'));
+    await tester.pumpAndSettle();
   });
 }

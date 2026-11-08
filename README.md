@@ -57,7 +57,8 @@ docker exec talkie talkie-server web-admin du@example.org   # Admin für die Ver
 
 Alles, was die Befehle oben können, geht auch bequem im Browser, auch für andere Eltern:
 Kids einladen (auch per Mail), Nutzer umbenennen, rauswerfen, sperren und entfernen, Räume anlegen,
-umbenennen, sortieren und löschen, den Chat mitlesen. Ein Protokoll zeigt, wer was geändert hat.
+umbenennen, sortieren und löschen, den Chat mitlesen und (Admins) leeren. Ein Protokoll zeigt, wer was geändert hat.
+Chatnachrichten werden nach 24 Stunden automatisch gelöscht (`TALKIE_CHAT_HOURS`, 0 = nie).
 
 **Konten und Rechte:** Die Web-Konten (mit E-Mail-Adresse) sind getrennt von den Talkie-Nutzern der Kids.
 Es gibt zwei Gruppen:

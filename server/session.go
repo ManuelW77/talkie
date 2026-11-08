@@ -157,6 +157,8 @@ func (s *Session) controlLoop() {
 			s.hub.SetIgnored(s, e.IDs)
 		case "kick", "ban":
 			s.hub.Moderate(s, e.ID, e.T == "ban")
+		case "clear_chat":
+			s.hub.ClearChatFrom(s, e.Room)
 		}
 	}
 }

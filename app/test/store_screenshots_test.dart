@@ -86,6 +86,8 @@ TalkieController _mainController() {
       muted: false,
       deaf: false,
       moderator: false,
+      admin: false,
+      chatHours: 0,
     );
   c.chats[10] = const [
     ChatDto(room: 10, from: 2, name: 'Lena', text: 'Wer ist dabei? Die Runde startet gleich!', ts: 1762500000),

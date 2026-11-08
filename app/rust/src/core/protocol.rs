@@ -87,6 +87,12 @@ pub struct Envelope {
     /// welcome: darf rauswerfen/sperren
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#mod: Option<bool>,
+    /// welcome: verknüpftes Admin-Konto (darf den Chat leeren)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admin: Option<bool>,
+    /// welcome: so viele Stunden bleibt der Chat erhalten (0 = unbegrenzt)
+    #[serde(default, skip_serializing_if = "is_zero_i64")]
+    pub chat_hours: i64,
 
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub code: String,

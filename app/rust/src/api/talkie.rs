@@ -62,6 +62,10 @@ pub struct StateDto {
     pub deaf: bool,
     /// Darf andere rauswerfen/sperren.
     pub moderator: bool,
+    /// Verknüpftes Admin-Konto (darf den Chat leeren).
+    pub admin: bool,
+    /// So viele Stunden bleibt der Chat erhalten (0 = unbegrenzt).
+    pub chat_hours: i64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -137,6 +141,8 @@ fn state_dto(s: Snapshot) -> StateDto {
         muted: s.muted,
         deaf: s.deaf,
         moderator: s.moderator,
+        admin: s.admin,
+        chat_hours: s.chat_hours,
     }
 }
 
@@ -253,6 +259,13 @@ pub fn talkie_set_muted(muted: bool) -> Result<()> {
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_set_user_muted(user: i64, muted: bool) -> Result<()> {
     engine()?.set_user_muted(user, muted);
+    Ok(())
+}
+
+/// Chat leeren (room 0 = alle Räume). Ergebnis kommt als Hinweis zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_clear_chat(room: i64) -> Result<()> {
+    engine()?.clear_chat(room);
     Ok(())
 }
 

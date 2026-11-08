@@ -52,6 +52,10 @@ type Envelope struct {
 
 	// welcome: darf rauswerfen/sperren (verknüpftes Webkonto mit Recht)
 	Mod *bool `json:"mod,omitempty"`
+	// welcome: verknüpftes Admin-Konto (darf u. a. den Chat leeren)
+	Admin *bool `json:"admin,omitempty"`
+	// welcome: so viele Stunden bleibt der Chat erhalten (0 = unbegrenzt)
+	ChatHours int `json:"chat_hours,omitempty"`
 
 	// error / kicked
 	Code   string `json:"code,omitempty"`
