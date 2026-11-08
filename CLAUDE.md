@@ -34,6 +34,17 @@ Das Repo ist **öffentlich** (github.com/ManuelW77/talkie). Keine Geheimnisse co
 keine Server-Adressen, Tokens oder Schlüssel. Server-Adresse und Fingerabdruck kommen als
 Repo-Variablen `TALKIE_SERVER` / `TALKIE_FINGERPRINT` in die CI.
 
+## Obsidian-Notizen (Vault „Manuel“, Ordner `Development/Talkie/`)
+
+- `Testserver.md` – Links und Zugang zum lokalen Docker-Testbetrieb
+- `Befehle und Installation.md` – Installation, Verwaltungsbefehle, Builds, Verteilung
+- `ToDo Build.md` – alles, was noch zu bauen ist. **Neue Ideen und Aufträge von Manuel hier eintragen.**
+- `ToDo Tests.md` – was Manuel aktiv testen soll
+
+Pflege: Ist eine Aufgabe gebaut, kommt sie aus `ToDo Build` raus und mit konkreten Testschritten
+(Abschnitt mit Branch-Namen) nach `ToDo Tests`. Ändern sich Befehle, Ports oder Links, die beiden
+anderen Notizen mitziehen. Bearbeiten über die Obsidian-MCP-Tools.
+
 ## Aufbau
 
 ```
