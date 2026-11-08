@@ -128,7 +128,6 @@ Am einfachsten über **GitHub Actions** (`.github/workflows/build.yml`). Jeder P
 | `Talkie-Windows.zip` | Windows 10 und 11 (64 Bit), Laufzeit-DLLs liegen bei |
 | `Talkie-Linux-x64.tar.gz` | Linux x64 (braucht GTK 3 und ALSA, ist auf gängigen Desktops vorhanden) |
 | `Talkie-Android.apk` | Android ab 8.0, direkt installierbar (nicht über den Play Store) |
-| `Talkie-iOS-unsigniert.zip` | nur Prüf-Build: Für iPhone/iPad braucht es eine Apple-Signatur (siehe unten) |
 
 **Tipp:** Unter *Settings → Secrets and variables → Actions → Variables* im Repo
 `TALKIE_SERVER` (z. B. `talkie.example.org:7777`) und `TALKIE_FINGERPRINT` (aus `talkie-server status`) setzen.
@@ -153,9 +152,10 @@ tool/build_ios_sim.sh                                                 # iOS-Simu
 
 > **Android/iOS:** Dieselbe App läuft auch auf Handy und Tablet (Android ab 8.0, iOS ab 15).
 > Rust-Ziele vorher installieren: `rustup target add aarch64-linux-android armv7-linux-androideabi
-> x86_64-linux-android aarch64-apple-ios aarch64-apple-ios-sim`. Auf ein echtes iPhone kommt die App nur
-> mit Apple-Entwicklerkonto: `app/ios/Runner.xcworkspace` in Xcode öffnen, unter *Signing* das Team wählen,
-> iPhone anschließen und starten (oder über TestFlight verteilen).
+> x86_64-linux-android aarch64-apple-ios aarch64-apple-ios-sim`. iOS baut und signiert man in Xcode
+> (nicht in der CI): einmal `cd app && flutter build ios --config-only --release`, dann
+> `app/ios/Runner.xcworkspace` öffnen, Team unter *Signing* prüfen, *Product → Archive* und über den
+> Organizer zu App Store Connect/TestFlight hochladen.
 
 > **macOS mit Xcode 27:** Apple erlaubt damit nur noch macOS 12+ als Ziel, und das neue `lipo` verträgt
 > Flutters Universal-Prüfung nicht. `tool/build_macos.sh` baut dann nur für den eigenen Mac.
