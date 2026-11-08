@@ -330,3 +330,52 @@ func TestHistoryFitsFrame(t *testing.T) {
 		t.Fatal("text verändert")
 	}
 }
+
+// recvVoice wartet kurz auf ein Sprachpaket und liefert die Absender-ID (0 = nichts kam).
+func recvVoice(t *testing.T, c *testClient, wait time.Duration) int64 {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	d, err := c.conn.ReceiveDatagram(ctx)
+	if err != nil {
+		return 0
+	}
+	return int64(binary.BigEndian.Uint32(d[1:5]))
+}
+
+func TestIgnoreOnlyForSelf(t *testing.T) {
+	srv := startTestServer(t)
+	inv, err := srv.store.CreateInvite(3, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, wa := login(t, srv.addr, newKey(t), "Anna", inv.Code)
+	b, _ := login(t, srv.addr, newKey(t), "Ben", inv.Code)
+	c, wc := login(t, srv.addr, newKey(t), "Cleo", inv.Code)
+	b.expect("user_joined")
+	pkt := []byte{DatagramVoice, 0, 1, 0xAA}
+
+	// Ben schaltet Anna für sich stumm (eigene ID und Unsinn werden ignoriert)
+	writeEnv(t, b.stream, &Envelope{T: "ignore", IDs: []int64{wa.You.ID, -5, 0}})
+	time.Sleep(150 * time.Millisecond)
+	_ = a.conn.SendDatagram(pkt)
+	if got := recvVoice(t, c, 2*time.Second); got != wa.You.ID {
+		t.Fatalf("Cleo muss Anna weiter hören, bekam %d", got)
+	}
+	if got := recvVoice(t, b, 300*time.Millisecond); got != 0 {
+		t.Fatalf("Ben hört Anna trotz Stummschaltung (%d)", got)
+	}
+	// Cleo hört Ben weiterhin
+	_ = c.conn.SendDatagram(pkt)
+	if got := recvVoice(t, b, 2*time.Second); got != wc.You.ID {
+		t.Fatalf("Ben muss Cleo hören, bekam %d", got)
+	}
+
+	// Leere Liste hebt die Stummschaltung auf
+	writeEnv(t, b.stream, &Envelope{T: "ignore"})
+	time.Sleep(150 * time.Millisecond)
+	_ = a.conn.SendDatagram(pkt)
+	if got := recvVoice(t, b, 2*time.Second); got != wa.You.ID {
+		t.Fatalf("Ben hört Anna nach Aufheben nicht (%d)", got)
+	}
+}

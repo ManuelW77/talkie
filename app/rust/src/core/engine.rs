@@ -35,6 +35,8 @@ pub struct UserView {
     pub muted: bool,
     pub deaf: bool,
     pub talking: bool,
+    /// Nur für mich stumm geschaltet.
+    pub local_muted: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +118,8 @@ impl Inner {
     }
 
     fn snapshot(&self) -> Snapshot {
+        // Mixer vor net sperren (nie beide verschachtelt in umgekehrter Reihenfolge)
+        let ignored = self.mixer.lock().ignored.clone();
         let n = self.net.lock();
         let muted = self.muted.load(Ordering::Relaxed);
         let self_talking = self.self_talking.load(Ordering::Relaxed) && !muted;
@@ -129,6 +133,7 @@ impl Inner {
                 muted: u.muted,
                 deaf: u.deaf,
                 talking: if u.id == n.me { self_talking } else { n.talking.binary_search(&u.id).is_ok() },
+                local_muted: ignored.contains(&u.id),
             })
             .collect();
         Snapshot {
@@ -187,6 +192,12 @@ impl Inner {
         }
     }
 
+    fn ignore_envelope(&self) -> Envelope {
+        let mut e = Envelope::new("ignore");
+        e.ids = self.config.lock().muted_users.clone();
+        e
+    }
+
     fn start_audio(&self) {
         if !self.audio_enabled {
             return;
@@ -196,7 +207,8 @@ impl Inner {
             return;
         }
         let s = self.config.lock().settings.clone();
-        let (io, warnings) = device::start(s.input_device, s.output_device, self.capture_tx.clone(), self.mixer.clone());
+        let (io, warnings) =
+            device::start(s.input_device, s.output_device, self.capture_tx.clone(), self.mixer.clone());
         *a = Some(io);
         drop(a);
         for w in warnings {
@@ -259,7 +271,11 @@ impl Engine {
         let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build()?;
         let (capture_tx, capture_rx) = mpsc::channel();
         let mixer = Arc::new(Mutex::new(Mixer::default()));
-        mixer.lock().volume = config.settings.output_volume;
+        {
+            let mut m = mixer.lock();
+            m.volume = config.settings.output_volume;
+            m.ignored = config.muted_users.iter().copied().collect();
+        }
         let params = params_from(&config.settings, false);
         let inner = Arc::new(Inner {
             storage,
@@ -381,7 +397,9 @@ impl Engine {
             let mut c = self.inner.config.lock();
             c.registered = false;
             c.last_room = 0;
+            c.muted_users.clear(); // IDs gelten nur auf diesem Server
         }
+        self.inner.mixer.lock().ignored.clear();
         self.inner.save_config();
         Ok(())
     }
@@ -409,6 +427,30 @@ impl Engine {
         }
         self.inner.params.lock().muted = muted;
         self.inner.send_cmd(self.inner.state_envelope());
+        self.inner.emit_state();
+    }
+
+    /// Schaltet einen anderen Nutzer nur für mich stumm (oder wieder laut).
+    /// Bleibt gespeichert; der Server schickt seine Sprache dann gar nicht erst.
+    pub fn set_user_muted(&self, user: i64, muted: bool) {
+        {
+            let mut c = self.inner.config.lock();
+            c.muted_users.retain(|&id| id != user);
+            if muted {
+                c.muted_users.push(user);
+            }
+        }
+        self.inner.save_config();
+        {
+            let mut m = self.inner.mixer.lock();
+            if muted {
+                m.ignored.insert(user);
+                m.remove(user);
+            } else {
+                m.ignored.remove(&user);
+            }
+        }
+        self.inner.send_cmd(self.inner.ignore_envelope());
         self.inner.emit_state();
     }
 
@@ -487,7 +529,9 @@ async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
     let mut first = true;
     loop {
         if first {
-            if !inner.is_current(generation) { return; }
+            if !inner.is_current(generation) {
+                return;
+            }
             inner.set_status(Status::Connecting, "Verbinde …", "");
         }
         let (server, pinned, register) = {
@@ -498,7 +542,9 @@ async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
         };
         if register.as_ref().is_some_and(|(_, inv)| inv.is_empty()) {
             inner.stop_audio();
-            if !inner.is_current(generation) { return; }
+            if !inner.is_current(generation) {
+                return;
+            }
             inner.set_status(Status::Failed, "Für dieses Gerät brauchst du einen Einladungscode.", "need_invite");
             return;
         }
@@ -522,13 +568,17 @@ async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
                 match run_session(&inner, sess, generation).await {
                     SessionEnd::Kicked(reason) => {
                         inner.stop_audio();
-                        if !inner.is_current(generation) { return; }
-            inner.set_status(Status::Failed, reason, "kicked");
+                        if !inner.is_current(generation) {
+                            return;
+                        }
+                        inner.set_status(Status::Failed, reason, "kicked");
                         return;
                     }
                     SessionEnd::Lost(msg) => {
-                        if !inner.is_current(generation) { return; }
-            inner.set_status(Status::Reconnecting, msg, "");
+                        if !inner.is_current(generation) {
+                            return;
+                        }
+                        inner.set_status(Status::Reconnecting, msg, "");
                     }
                 }
             }
@@ -538,13 +588,17 @@ async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
                     inner.save_config();
                 }
                 inner.stop_audio();
-                if !inner.is_current(generation) { return; }
-            inner.set_status(Status::Failed, message, &code);
+                if !inner.is_current(generation) {
+                    return;
+                }
+                inner.set_status(Status::Failed, message, &code);
                 return;
             }
             Err(ConnectError::Temporary(e)) => {
-                if !inner.is_current(generation) { return; }
-            inner.set_status(Status::Reconnecting, format!("{e} — versuche es gleich nochmal …"), "");
+                if !inner.is_current(generation) {
+                    return;
+                }
+                inner.set_status(Status::Reconnecting, format!("{e} — versuche es gleich nochmal …"), "");
             }
         }
         first = false;
@@ -588,6 +642,9 @@ async fn run_session(inner: &Arc<Inner>, sess: net::Session, generation: u64) ->
     }
     if inner.muted.load(Ordering::Relaxed) || inner.deaf.load(Ordering::Relaxed) {
         let _ = tx.send(inner.state_envelope());
+    }
+    if !inner.config.lock().muted_users.is_empty() {
+        let _ = tx.send(inner.ignore_envelope());
     }
     if last_room != 0 && last_room != my_room && welcome.rooms.iter().any(|r| r.id == last_room) {
         let mut j = Envelope::new("join");
@@ -715,7 +772,9 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
                 inner.emit(CoreEvent::Chat(m));
             }
         }
-        "kicked" => return Some(SessionEnd::Kicked(if e.reason.is_empty() { "Du wurdest getrennt.".into() } else { e.reason })),
+        "kicked" => {
+            return Some(SessionEnd::Kicked(if e.reason.is_empty() { "Du wurdest getrennt.".into() } else { e.reason }))
+        }
         "error" => inner.emit(CoreEvent::Notice(e.reason)),
         _ => {}
     }

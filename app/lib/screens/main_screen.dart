@@ -204,13 +204,21 @@ class _RoomTile extends StatelessWidget {
                           child: Text(
                             u.id == controller.me ? '${u.name} (du)' : u.name,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: u.talking ? kTalking : null),
+                            style: TextStyle(
+                              color: u.localMuted
+                                  ? theme.colorScheme.onSurfaceVariant
+                                  : (u.talking ? kTalking : null),
+                            ),
                           ),
                         ),
                         if (u.deaf)
                           const Icon(Icons.headset_off_rounded, size: 16, color: kDanger)
                         else if (u.muted)
                           const Icon(Icons.mic_off_rounded, size: 16, color: kDanger),
+                        if (u.id != controller.me)
+                          _UserMuteButton(controller: controller, user: u)
+                        else
+                          const SizedBox(width: 30, height: 30),
                       ],
                     ),
                   ),
@@ -219,6 +227,29 @@ class _RoomTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Lautsprecher neben einem Namen: schaltet die Person nur für mich stumm.
+class _UserMuteButton extends StatelessWidget {
+  const _UserMuteButton({required this.controller, required this.user});
+
+  final TalkieController controller;
+  final UserDto user;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = user.localMuted;
+    return IconButton(
+      onPressed: () => controller.toggleUserMuted(user),
+      tooltip: muted ? '${user.name} wieder hören' : '${user.name} für mich stumm schalten',
+      icon: Icon(muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
+      iconSize: 18,
+      color: muted ? kDanger : Theme.of(context).colorScheme.onSurfaceVariant,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
     );
   }
 }

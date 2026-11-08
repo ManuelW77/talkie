@@ -43,6 +43,8 @@ pub struct Config {
     /// Hex-SHA-256 des Server-Zertifikats (Trust on First Use).
     pub pinned_fingerprint: String,
     pub last_room: i64,
+    /// Nutzer-IDs, die man nur für sich selbst stumm geschaltet hat.
+    pub muted_users: Vec<i64>,
     pub settings: Settings,
 }
 
@@ -71,10 +73,7 @@ impl Storage {
     }
 
     pub fn load_config(&self) -> Config {
-        fs::read(self.config_path())
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default()
+        fs::read(self.config_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
     }
 
     pub fn save_config(&self, c: &Config) -> Result<()> {
