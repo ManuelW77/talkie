@@ -96,7 +96,7 @@ export PATH=/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbi
 | macOS-App bauen | `app/tool/build_macos.sh` |
 | Android-APK bauen | `cd app && flutter build apk --release` (mit PATH wie oben) |
 | iOS-App für den Simulator | `app/tool/build_ios_sim.sh` |
-| iOS fürs iPhone | macht Manuel selbst in Xcode (signieren, Archive, Upload). Vorher `flutter build ios --config-only --release`. Nicht in die CI einbauen. Buildnummer setzt Xcode automatisch (Datum/Uhrzeit). |
+| iOS fürs iPhone | macht Manuel selbst in Xcode (signieren, Archive, Upload). Vorher `flutter build ios --config-only --release`. Nicht in die CI einbauen. Buildnummer zählt Xcode bei jedem Archive in `pubspec.yaml` hoch (+N), danach committen. |
 | Handy-Ende-zu-Ende (Simulator/Emulator) | `flutter test integration_test -d <gerät> --dart-define=TEST_SERVER=127.0.0.1:7777 --dart-define=TEST_INVITE=<CODE>` (Android-Emulator: `10.0.2.2:7777`, Mikrofon vorher erlauben, siehe Kopf von `integration_test/app_test.dart`) |
 | Icons neu erzeugen | `app/tool/make_icons.sh` |
 | Lokaler Testbetrieb mit Verwaltung + Mailpit | `server/dev.sh up` → http://localhost:8090 (admin@talkie.local), Mails: http://localhost:8026 |
