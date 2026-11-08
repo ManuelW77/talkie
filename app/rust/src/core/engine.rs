@@ -72,6 +72,8 @@ pub enum CoreEvent {
     History(i64, Vec<WireChat>),
     Level(f32),
     Notice(String),
+    /// Geräte-Code für ein weiteres Gerät desselben Nutzers.
+    DeviceCode(String),
 }
 
 pub type Emitter = Arc<dyn Fn(CoreEvent) + Send + Sync>;
@@ -557,6 +559,11 @@ impl Engine {
         self.inner.emit_state();
     }
 
+    /// Geräte-Code anfordern (kommt als CoreEvent::DeviceCode zurück).
+    pub fn request_device_code(&self) {
+        self.inner.send_cmd(Envelope::new("device_code"));
+    }
+
     /// Push-to-Talk-Knopf in der App gedrückt/losgelassen.
     pub fn set_ptt_pressed(&self, down: bool) {
         self.inner.ptt_ui.store(down, Ordering::Relaxed);
@@ -994,6 +1001,7 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
             return Some(SessionEnd::Kicked(if e.reason.is_empty() { "Du wurdest getrennt.".into() } else { e.reason }))
         }
         "error" | "info" => inner.emit(CoreEvent::Notice(e.reason)),
+        "device_code" => inner.emit(CoreEvent::DeviceCode(e.code)),
         // Chat geleert: leerer Verlauf (Raum 0 = alle Räume)
         "chat_cleared" => inner.emit(CoreEvent::History(e.room, Vec::new())),
         _ => {}

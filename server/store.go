@@ -42,6 +42,7 @@ var (
 	ErrNotFound      = errors.New("nicht gefunden")
 	ErrNameTaken     = errors.New("name vergeben")
 	ErrInviteInvalid = errors.New("einladung ungültig")
+	ErrNameMissing   = errors.New("name fehlt")
 )
 
 const schema = `
@@ -86,6 +87,10 @@ func OpenStore(path string) (*Store, error) {
 		return nil, fmt.Errorf("schema: %w", err)
 	}
 	s := &Store{db: db}
+	if err := s.initDevices(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("schema geräte: %w", err)
+	}
 	if err := s.initWeb(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("schema web: %w", err)
@@ -128,8 +133,9 @@ func scanUser(row interface{ Scan(...any) error }) (*DBUser, error) {
 
 const userCols = "id, name, pubkey, banned, created, last_seen"
 
+// UserByPubKey findet den Nutzer zu einem Geräteschlüssel (jedes seiner Geräte).
 func (s *Store) UserByPubKey(pk []byte) (*DBUser, error) {
-	return scanUser(s.db.QueryRow("SELECT "+userCols+" FROM users WHERE pubkey = ?", pk))
+	return scanUser(s.db.QueryRow("SELECT "+userCols+" FROM users WHERE id = (SELECT user_id FROM devices WHERE pubkey = ?)", pk))
 }
 
 func (s *Store) UserByName(name string) (*DBUser, error) {
@@ -153,8 +159,14 @@ func (s *Store) Users() ([]DBUser, error) {
 	return out, rows.Err()
 }
 
-// Register verbraucht eine Einladung und legt den Nutzer an — atomar.
+// Register verbraucht eine Einladung und legt den Nutzer an — atomar. Ist die Einladung ein
+// Geräte-Code (an einen Nutzer gebunden), kommt stattdessen dieses Gerät zum Nutzer dazu;
+// der Name wird dann nicht gebraucht.
 func (s *Store) Register(invite, name string, pk []byte) (*DBUser, error) {
+	return s.RegisterDevice(invite, name, pk, "")
+}
+
+func (s *Store) RegisterDevice(invite, name string, pk []byte, label string) (*DBUser, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
@@ -170,6 +182,23 @@ func (s *Store) Register(invite, name string, pk []byte) (*DBUser, error) {
 	if n, _ := res.RowsAffected(); n != 1 {
 		return nil, ErrInviteInvalid
 	}
+	var owner sql.NullInt64
+	if err := tx.QueryRow("SELECT user_id FROM invites WHERE code = ?", invite).Scan(&owner); err != nil {
+		return nil, err
+	}
+	if owner.Valid {
+		u, err := addDevice(tx, owner.Int64, pk, label)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := tx.Exec("DELETE FROM invites WHERE uses_left <= 0"); err != nil {
+			return nil, err
+		}
+		return u, tx.Commit()
+	}
+	if name == "" {
+		return nil, ErrNameMissing
+	}
 	var exists int
 	if err := tx.QueryRow("SELECT COUNT(*) FROM users WHERE name = ?", name).Scan(&exists); err != nil {
 		return nil, err
@@ -180,6 +209,11 @@ func (s *Store) Register(invite, name string, pk []byte) (*DBUser, error) {
 	now := time.Now().Unix()
 	r, err := tx.Exec("INSERT INTO users(name, pubkey, created, last_seen) VALUES(?,?,?,?)", name, pk, now, now)
 	if err != nil {
+		return nil, err
+	}
+	uid, _ := r.LastInsertId()
+	if _, err := tx.Exec("INSERT INTO devices(user_id, pubkey, label, created, last_seen) VALUES(?,?,?,?,?)",
+		uid, pk, label, now, now); err != nil {
 		return nil, err
 	}
 	if _, err := tx.Exec("DELETE FROM invites WHERE uses_left <= 0"); err != nil {
@@ -284,7 +318,7 @@ func (s *Store) Invites() ([]DBInvite, error) {
 	if _, err := s.db.Exec("DELETE FROM invites WHERE expires <= ?", time.Now().Unix()); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query("SELECT code, uses_left, expires FROM invites ORDER BY expires")
+	rows, err := s.db.Query("SELECT code, uses_left, expires FROM invites WHERE user_id IS NULL ORDER BY expires")
 	if err != nil {
 		return nil, err
 	}

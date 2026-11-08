@@ -185,6 +185,10 @@ tool/build_ios_sim.sh                                                 # iOS-Simu
 - **Windows:** Bei „Der Computer wurde durch Windows geschützt“ → **Weitere Informationen → Trotzdem ausführen**.
 - **Linux:** Archiv entpacken, im Ordner `Talkie` einmal `./install.sh` ausführen → Talkie steht im
   Startmenü und hat sein Icon im Dock. Starten geht auch direkt mit `./talkie`.
+- **Gleicher Name auf mehreren Geräten** (z. B. Laptop und iPhone): auf dem ersten Gerät unter
+  „Einstellungen“/„Mehr“ → „Auf weiterem Gerät nutzen“ einen Code holen, auf dem neuen Gerät
+  „Ich nutze Talkie schon auf einem anderen Gerät“ antippen und den Code eingeben. Geht auch auf der
+  Verwaltungsseite beim Nutzer. Höchstens 5 Geräte, verbunden ist immer eins.
 - **iPhone/iPad:** App „TestFlight“ installieren, dann https://testflight.apple.com/join/zfBAJJNK öffnen
   und „Annehmen“ / „Installieren“. Updates kommen über TestFlight von selbst.
 - **Android:** APK aufs Handy schicken und öffnen, Installation aus dieser Quelle erlauben.

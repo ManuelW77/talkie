@@ -56,6 +56,9 @@ pub struct Envelope {
     pub name: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub invite: String,
+    /// register: Art des Geräts (nur zur Anzeige)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub device: String,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub you: Option<WireUser>,

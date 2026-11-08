@@ -169,6 +169,18 @@ mod route_tests {
     }
 }
 
+/// Art des Geräts für die Geräteliste auf der Verwaltungsseite.
+pub fn device_label() -> &'static str {
+    match std::env::consts::OS {
+        "macos" => "Mac",
+        "windows" => "Windows",
+        "linux" => "Linux",
+        "android" => "Android",
+        "ios" => "iPhone/iPad",
+        _ => "Gerät",
+    }
+}
+
 pub fn parse_fingerprint(s: &str) -> Option<Vec<u8>> {
     let clean: String = s.chars().filter(|c| c.is_ascii_hexdigit()).collect();
     let b = hex::decode(clean).ok()?;
@@ -251,6 +263,7 @@ pub async fn connect(
                 let mut r = Envelope::new("register");
                 r.name = name.clone();
                 r.invite = invite.clone();
+                r.device = device_label().into();
                 r
             }
             _ => Envelope::new("auth"),

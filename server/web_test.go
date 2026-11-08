@@ -610,3 +610,50 @@ func TestWebChatClearAndRetention(t *testing.T) {
 		t.Fatalf("Protokoll: %+v", log)
 	}
 }
+
+func TestWebDevices(t *testing.T) {
+	wt := newWebTest(t, nil)
+	wt.account("chef@x.de", RoleAdmin, 0)
+	inv, _ := wt.store.CreateInvite(1, time.Hour)
+	pk1 := make([]byte, 32)
+	pk1[0] = 1
+	u, err := wt.store.Register(inv.Code, "Mia", pk1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := wt.browser()
+	b.login("chef@x.de")
+	if _, _, body := b.get("/users/" + itoa(u.ID)); !strings.Contains(body, "Geräte-Code erstellen") {
+		t.Fatal("Geräte-Abschnitt fehlt")
+	}
+	b.post("/users/"+itoa(u.ID)+"/device_code", url.Values{"csrf": {b.csrf()}})
+	code := wt.store.DeviceCode(u.ID)
+	if code == nil {
+		t.Fatal("kein Code")
+	}
+	if _, _, body := b.get("/users/" + itoa(u.ID)); !strings.Contains(body, code.Code) {
+		t.Fatal("Code wird nicht angezeigt")
+	}
+	pk2 := make([]byte, 32)
+	pk2[0] = 2
+	if _, err := wt.store.RegisterDevice(code.Code, "", pk2, "iOS"); err != nil {
+		t.Fatal(err)
+	}
+	devs, _ := wt.store.Devices(u.ID)
+	if len(devs) != 2 {
+		t.Fatalf("geräte: %d", len(devs))
+	}
+	if _, _, body := b.get("/users/" + itoa(u.ID)); !strings.Contains(body, "iOS") {
+		t.Fatal("Gerätename fehlt")
+	}
+	var ios int64
+	for _, d := range devs {
+		if d.Label == "iOS" {
+			ios = d.ID
+		}
+	}
+	b.post("/users/"+itoa(u.ID)+"/device_delete", url.Values{"csrf": {b.csrf()}, "device": {itoa(ios)}})
+	if devs, _ := wt.store.Devices(u.ID); len(devs) != 1 {
+		t.Fatalf("nicht entfernt: %d", len(devs))
+	}
+}

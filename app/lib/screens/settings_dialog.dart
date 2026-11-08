@@ -154,6 +154,54 @@ class _SettingsDialogState extends State<SettingsDialog> {
     );
   }
 
+  /// Code für ein weiteres Gerät (z. B. iPhone zum Laptop) anzeigen.
+  Future<void> _showDeviceCode() async {
+    final c = widget.controller;
+    c.requestDeviceCode();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Auf weiterem Gerät nutzen'),
+        content: SizedBox(
+          width: 380,
+          child: ValueListenableBuilder<String?>(
+            valueListenable: c.deviceCode,
+            builder: (ctx, code, _) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Öffne Talkie auf dem anderen Gerät, tippe auf „Ich nutze Talkie schon auf einem anderen Gerät“ '
+                  'und gib diesen Code ein:',
+                ),
+                const SizedBox(height: 16),
+                if (code == null)
+                  const Center(child: CircularProgressIndicator())
+                else
+                  SelectableText(
+                    code,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(
+                          letterSpacing: 4,
+                          fontWeight: FontWeight.w700,
+                          color: kAccent,
+                        ),
+                  ),
+                const SizedBox(height: 16),
+                Text(
+                  'Der Code gilt 15 Minuten und nur einmal. Verbunden ist immer nur ein Gerät gleichzeitig – '
+                  'meldest du dich auf dem neuen an, wird dieses getrennt.',
+                  style: Theme.of(ctx).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fertig'))],
+      ),
+    );
+  }
+
   Future<void> _confirmLogout() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -279,6 +327,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 onChangeEnd: (v) => _update(_copy(volume: v)),
               ),
               const Divider(height: 32),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: c.status == ConnStatus.connected ? _showDeviceCode : null,
+                  icon: const Icon(Icons.devices_rounded),
+                  label: const Text('Auf weiterem Gerät nutzen'),
+                ),
+              ),
               Text('Server: ${c.config.server}', style: theme.textTheme.bodySmall),
               const SizedBox(height: 8),
               Align(

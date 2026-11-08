@@ -80,6 +80,8 @@ pub enum EventKind {
     History,
     Level,
     Notice,
+    /// Geräte-Code (steht in `notice`).
+    DeviceCode,
 }
 
 /// Ein Ereignis an die Oberfläche; welche Felder gefüllt sind, hängt von `kind` ab.
@@ -196,6 +198,10 @@ fn ui_event(e: CoreEvent) -> UiEvent {
             ev.level = l;
         }
         CoreEvent::Notice(n) => ev.notice = n,
+        CoreEvent::DeviceCode(c) => {
+            ev.kind = EventKind::DeviceCode;
+            ev.notice = c;
+        }
     }
     ev
 }
@@ -291,6 +297,13 @@ pub fn talkie_set_user_volume(user: i64, volume: f32) -> Result<()> {
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_set_user_muted(user: i64, muted: bool) -> Result<()> {
     engine()?.set_user_muted(user, muted);
+    Ok(())
+}
+
+/// Code für ein weiteres Gerät anfordern; kommt als Ereignis DeviceCode zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_request_device_code() -> Result<()> {
+    engine()?.request_device_code();
     Ok(())
 }
 

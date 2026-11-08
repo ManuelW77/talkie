@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/mail"
@@ -93,7 +94,14 @@ func (w *webApp) userPage(rw http.ResponseWriter, r *http.Request) {
 		w.fail(rw, r, "/users", err)
 		return
 	}
-	w.render(rw, r, "user", u.Name, map[string]any{"U": userRow{*u, w.hub.OnlineIDs()[u.ID]}})
+	devs, err := w.store.Devices(u.ID)
+	if err != nil {
+		w.fail(rw, r, "/users", err)
+		return
+	}
+	w.render(rw, r, "user", u.Name, map[string]any{
+		"U": userRow{*u, w.hub.OnlineIDs()[u.ID]}, "Devices": devs, "Code": w.store.DeviceCode(u.ID), "MaxDevices": MaxDevices,
+	})
 }
 
 func (w *webApp) userAction(rw http.ResponseWriter, r *http.Request) {
@@ -155,6 +163,31 @@ func (w *webApp) userAction(rw http.ResponseWriter, r *http.Request) {
 			w.audit(r, "Talkie-Nutzer "+u.Name+" entsperrt")
 		}
 		w.done(rw, r, back, msg, false)
+	case "device_code":
+		inv, err := w.store.CreateDeviceCode(u.ID, 24*time.Hour)
+		if errors.Is(err, ErrTooManyDevices) {
+			w.done(rw, r, back, fmt.Sprintf("%s hat schon %d Geräte. Erst eins entfernen.", u.Name, MaxDevices), true)
+			return
+		}
+		if err != nil {
+			w.fail(rw, r, back, err)
+			return
+		}
+		w.audit(r, "Geräte-Code für "+u.Name+" erstellt")
+		w.done(rw, r, back, "Geräte-Code "+inv.Code+" erstellt (24 Stunden gültig).", false)
+	case "device_delete":
+		did, _ := strconv.ParseInt(r.PostFormValue("device"), 10, 64)
+		pk, err := w.store.DevicePubKey(u.ID, did)
+		if err == nil {
+			err = w.store.DeleteDevice(u.ID, did)
+		}
+		if err != nil {
+			w.fail(rw, r, back, err)
+			return
+		}
+		w.hub.KickDevice(u.ID, pk, "Dieses Gerät wurde entfernt.")
+		w.audit(r, "Gerät von "+u.Name+" entfernt")
+		w.done(rw, r, back, "Gerät entfernt.", false)
 	case "delete":
 		if _, err := w.store.DeleteUser(u.Name); err != nil {
 			w.fail(rw, r, back, err)
