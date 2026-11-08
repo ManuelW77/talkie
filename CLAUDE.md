@@ -103,7 +103,7 @@ export PATH=/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbi
 | Browser-Smoke-Test der Verwaltungsseite (echter Chrome, braucht `dev.sh up`) | `node server/tool/browser_smoke.mjs` |
 | Lokaler Server ohne Webseite | `cd server && docker compose up -d --build` |
 | Einladung (lokal) | `docker exec talkie talkie-server invite 3` |
-| Screenshots der Verwaltungsseite | `TALKIE_SNAPSHOT=<ordner> go test -run Snapshot ./...` in `server/`, dann Headless-Chrome |
+| README-Bilder (`docs/screenshots/`) | App: `TALKIE_STORE_SHOTS=<ordner> flutter test test/store_screenshots_test.dart` (Handy, iPad, Desktop); Verwaltung: `TALKIE_SNAPSHOT=<ordner> go test -run Snapshot ./...` in `server/`, dann Headless-Chrome `--screenshot` auf die HTML-Dateien |
 
 Nach dem Ende-zu-Ende-Test die Testnutzer (`Anna…`, `Ben…`) und die Test-Einladung vom lokalen Server
 wieder löschen (`user-del`, `invite-del`).
