@@ -1,6 +1,6 @@
 name: Build
 
-# Baut Server + Desktop-Clients. Optional in den Repo-Einstellungen unter
+# Baut Server + Desktop- und Handy-Clients. Optional in den Repo-Einstellungen unter
 # Settings → Secrets and variables → Actions → Variables setzen:
 #   TALKIE_SERVER       z. B. talkie.example.org:7777  (dann müssen die Kids nur Name + Code eingeben)
 #   TALKIE_FINGERPRINT  Fingerabdruck aus "talkie-server status" (fest eingebautes Zertifikats-Pinning)
@@ -152,10 +152,70 @@ jobs:
           name: Talkie-Linux
           path: app/Talkie-Linux-x64.tar.gz
 
+  android:
+    name: Android (ab 8.0)
+    if: ${{ !(github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/feature/') || startsWith(github.ref, 'refs/heads/chore/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Bauen
+        working-directory: app
+        # Signiert mit dem Debug-Schlüssel: zum direkten Installieren, nicht für den Play Store
+        run: flutter build apk --release $DART_DEFINES
+      - name: Paket
+        working-directory: app
+        run: cp build/app/outputs/flutter-apk/app-release.apk Talkie-Android.apk
+      - uses: actions/upload-artifact@v5
+        with:
+          name: Talkie-Android
+          path: app/Talkie-Android.apk
+
+  ios:
+    name: iOS (ab 15, ohne Signatur)
+    if: ${{ !(github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/feature/') || startsWith(github.ref, 'refs/heads/chore/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    needs: test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: "16"
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          targets: aarch64-apple-ios
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Bauen (prüft nur, dass alles kompiliert; Installation braucht eine Apple-Signatur)
+        working-directory: app
+        run: flutter build ios --release --no-codesign $DART_DEFINES
+      - name: Paket
+        working-directory: app
+        run: cd build/ios/iphoneos && zip -qr ../../../Talkie-iOS-unsigniert.zip Runner.app
+      - uses: actions/upload-artifact@v5
+        with:
+          name: Talkie-iOS-unsigniert
+          path: app/Talkie-iOS-unsigniert.zip
+
   release:
     name: Release anlegen
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [macos, windows, linux]
+    needs: [macos, windows, linux, android]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

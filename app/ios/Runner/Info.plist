@@ -15,7 +15,13 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>talkie</string>
+	<string>Talkie</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Talkie braucht das Mikrofon, damit deine Freunde dich hören.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
