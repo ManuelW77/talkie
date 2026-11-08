@@ -176,7 +176,18 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 ),
                 const SizedBox(height: 16),
                 if (code == null)
-                  const Center(child: CircularProgressIndicator())
+                  // Alte Server kennen Geräte-Codes nicht und antworten gar nicht
+                  FutureBuilder<void>(
+                    future: Future<void>.delayed(const Duration(seconds: 6)),
+                    builder: (ctx, snap) => snap.connectionState == ConnectionState.done
+                        ? const Text(
+                            'Der Server antwortet nicht. Vermutlich läuft dort noch eine ältere Talkie-Version '
+                            'ohne Geräte-Codes – bitte den Server aktualisieren.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: kDanger),
+                          )
+                        : const Center(child: CircularProgressIndicator()),
+                  )
                 else
                   SelectableText(
                     code,
