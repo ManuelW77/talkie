@@ -1,4 +1,4 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, Process;
 
 import 'package:flutter/services.dart';
 
@@ -41,6 +41,26 @@ class TalkiePlatform {
       await _ch.invokeMethod<void>('openSettings');
     } on PlatformException {
       // nichts zu tun
+    }
+  }
+
+  static bool get isIOS => Platform.isIOS;
+
+  /// Öffnet eine Internetadresse im Browser.
+  static Future<void> openUrl(String url) async {
+    if (!url.startsWith('https://') && !url.startsWith('http://')) return;
+    try {
+      if (isMobile) {
+        await _ch.invokeMethod<void>('openUrl', url);
+      } else if (Platform.isMacOS) {
+        await Process.run('open', [url]);
+      } else if (Platform.isWindows) {
+        await Process.run('rundll32', ['url.dll,FileProtocolHandler', url]);
+      } else {
+        await Process.run('xdg-open', [url]);
+      }
+    } catch (_) {
+      // kein Browser? Dann eben nicht.
     }
   }
 

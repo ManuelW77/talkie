@@ -59,6 +59,8 @@ Alles, was die Befehle oben können, geht auch bequem im Browser, auch für ande
 Kids einladen (auch per Mail), Nutzer umbenennen, rauswerfen, sperren und entfernen, Räume anlegen,
 umbenennen, sortieren und löschen, den Chat mitlesen und (Admins) leeren. Ein Protokoll zeigt, wer was geändert hat.
 Chatnachrichten werden nach 24 Stunden automatisch gelöscht (`TALKIE_CHAT_HOURS`, 0 = nie).
+Gibt es ein neueres GitHub-Release, zeigen die Apps einen Hinweis „Neue Version“. Dafür fragt nur der Server
+einmal täglich bei GitHub nach (`TALKIE_UPDATE_REPO`, leer = aus, oder fest: `TALKIE_LATEST_VERSION`).
 
 **Konten und Rechte:** Die Web-Konten (mit E-Mail-Adresse) sind getrennt von den Talkie-Nutzern der Kids.
 Es gibt zwei Gruppen:

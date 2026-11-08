@@ -68,6 +68,9 @@ pub struct StateDto {
     pub admin: bool,
     /// So viele Stunden bleibt der Chat erhalten (0 = unbegrenzt).
     pub chat_hours: i64,
+    /// Neueste App-Version laut Server ("" = unbekannt) und Download-Adresse.
+    pub latest_version: String,
+    pub latest_url: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,6 +151,8 @@ fn state_dto(s: Snapshot) -> StateDto {
         moderator: s.moderator,
         admin: s.admin,
         chat_hours: s.chat_hours,
+        latest_version: s.latest_version,
+        latest_url: s.latest_url,
     }
 }
 

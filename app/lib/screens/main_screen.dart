@@ -63,6 +63,7 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     _StatusBanner(controller: c),
                     if (c.micDenied) _MicBanner(controller: c),
+                    if (c.updateVersion != null) _UpdateBanner(controller: c),
                     if (narrow) _PhoneTabs(controller: c),
                     Expanded(
                       child: narrow
@@ -131,6 +132,40 @@ class _StatusBanner extends StatelessWidget {
               )
             else
               TextButton(onPressed: controller.cancelConnect, child: const Text('Abbrechen')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Neue App-Version verfügbar: Laden oder wegklicken.
+class _UpdateBanner extends StatelessWidget {
+  const _UpdateBanner({required this.controller});
+
+  final TalkieController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: kAccent.withValues(alpha: 0.15),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
+        child: Row(
+          children: [
+            const Icon(Icons.system_update_rounded, color: kAccent),
+            const SizedBox(width: 12),
+            Expanded(child: Text('Neue Talkie-Version ${controller.updateVersion} ist da.')),
+            if (controller.updateUrl.isNotEmpty)
+              TextButton(
+                onPressed: () => TalkiePlatform.openUrl(controller.updateUrl),
+                child: const Text('Laden'),
+              ),
+            IconButton(
+              onPressed: controller.dismissUpdate,
+              tooltip: 'Ausblenden',
+              icon: const Icon(Icons.close_rounded, size: 20),
+            ),
           ],
         ),
       ),

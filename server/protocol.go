@@ -56,6 +56,9 @@ type Envelope struct {
 	Admin *bool `json:"admin,omitempty"`
 	// welcome: so viele Stunden bleibt der Chat erhalten (0 = unbegrenzt)
 	ChatHours int `json:"chat_hours,omitempty"`
+	// welcome: neueste App-Version und wo es sie gibt
+	Latest    string `json:"latest,omitempty"`
+	LatestURL string `json:"latest_url,omitempty"`
 
 	// error / kicked
 	Code   string `json:"code,omitempty"`

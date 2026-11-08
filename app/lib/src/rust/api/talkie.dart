@@ -238,6 +238,10 @@ class StateDto {
   /// So viele Stunden bleibt der Chat erhalten (0 = unbegrenzt).
   final PlatformInt64 chatHours;
 
+  /// Neueste App-Version laut Server ("" = unbekannt) und Download-Adresse.
+  final String latestVersion;
+  final String latestUrl;
+
   const StateDto({
     required this.status,
     required this.message,
@@ -251,6 +255,8 @@ class StateDto {
     required this.moderator,
     required this.admin,
     required this.chatHours,
+    required this.latestVersion,
+    required this.latestUrl,
   });
 
   @override
@@ -266,7 +272,9 @@ class StateDto {
       deaf.hashCode ^
       moderator.hashCode ^
       admin.hashCode ^
-      chatHours.hashCode;
+      chatHours.hashCode ^
+      latestVersion.hashCode ^
+      latestUrl.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -284,7 +292,9 @@ class StateDto {
           deaf == other.deaf &&
           moderator == other.moderator &&
           admin == other.admin &&
-          chatHours == other.chatHours;
+          chatHours == other.chatHours &&
+          latestVersion == other.latestVersion &&
+          latestUrl == other.latestUrl;
 }
 
 /// Ein Ereignis an die Oberfläche; welche Felder gefüllt sind, hängt von `kind` ab.

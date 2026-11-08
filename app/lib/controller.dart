@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleListener;
 
 import 'platform.dart';
+import 'version.dart';
 import 'src/rust/api/talkie.dart';
 
 /// Beim Bauen festlegbar: flutter build ... --dart-define=TALKIE_SERVER=talkie.example.org
@@ -76,6 +77,23 @@ class TalkieController extends ChangeNotifier {
   bool get deaf => state?.deaf ?? false;
   /// Darf andere rauswerfen/sperren (verknüpftes Webkonto mit Recht).
   bool get moderator => state?.moderator ?? false;
+  String? _dismissedUpdate;
+
+  /// Neuere App-Version, auf die hingewiesen werden soll (null = keine).
+  /// Auf dem iPhone kommen Updates über TestFlight/App Store von selbst.
+  String? get updateVersion {
+    final v = state?.latestVersion ?? '';
+    if (v.isEmpty || TalkiePlatform.isIOS || v == _dismissedUpdate) return null;
+    return isNewerVersion(v, kAppVersion) ? v : null;
+  }
+
+  String get updateUrl => state?.latestUrl ?? '';
+
+  void dismissUpdate() {
+    _dismissedUpdate = state?.latestVersion;
+    notifyListeners();
+  }
+
   /// Darf den Chat leeren (verknüpftes Admin-Konto).
   bool get admin => state?.admin ?? false;
 

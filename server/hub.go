@@ -9,6 +9,8 @@ import (
 
 // Hub hält alle verbundenen Sessions und die Raumliste.
 type Hub struct {
+	// Updates kennt die neueste App-Version (nil = keine Hinweise).
+	Updates  *UpdateChecker
 	store    *Store
 	certHash []byte
 	maxUsers int
@@ -99,6 +101,9 @@ func (h *Hub) Add(s *Session) (old *Session, ok bool) {
 		welcome.Admin = boolPtr(true)
 	}
 	welcome.ChatHours = int(h.store.ChatKeep / time.Hour)
+	if up := h.Updates.Get(); up.Version != "" {
+		welcome.Latest, welcome.LatestURL = up.Version, up.URL
+	}
 	s.send(welcome)
 	h.broadcastLocked(&Envelope{T: "user_joined", User: ptr(s.wireLocked())}, s)
 	return old, true

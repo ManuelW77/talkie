@@ -93,6 +93,11 @@ pub struct Envelope {
     /// welcome: so viele Stunden bleibt der Chat erhalten (0 = unbegrenzt)
     #[serde(default, skip_serializing_if = "is_zero_i64")]
     pub chat_hours: i64,
+    /// welcome: neueste App-Version und wo es sie gibt
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub latest: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub latest_url: String,
 
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub code: String,
