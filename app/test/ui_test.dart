@@ -22,6 +22,7 @@ const _settings = SettingsDto(
   sounds: true,
   ptt: false,
   pttKey: 'f8',
+  echoCancel: true,
 );
 
 TalkieController _controller({bool registered = true}) =>
@@ -360,6 +361,7 @@ void main() {
         sounds: true,
         ptt: true,
         pttKey: 'f8',
+        echoCancel: true,
       ),
     );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));

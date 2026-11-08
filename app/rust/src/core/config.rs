@@ -25,6 +25,8 @@ pub struct Settings {
     pub ptt: bool,
     /// Taste für Push-to-Talk (siehe ptt::KEYS).
     pub ptt_key: String,
+    /// Handy: Echo-Unterdrückung des Systems nutzen (ohne Kopfhörer wichtig).
+    pub echo_cancel: bool,
 }
 
 impl Default for Settings {
@@ -39,6 +41,7 @@ impl Default for Settings {
             sounds: true,
             ptt: false,
             ptt_key: crate::core::ptt::DEFAULT_KEY.into(),
+            echo_cancel: true,
         }
     }
 }

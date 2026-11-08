@@ -107,6 +107,8 @@ pub struct SettingsDto {
     /// Push-to-Talk statt Sprach-Erkennung, und die Taste dafür.
     pub ptt: bool,
     pub ptt_key: String,
+    /// Handy: Echo-Unterdrückung des Systems (ohne Kopfhörer wichtig).
+    pub echo_cancel: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -209,6 +211,7 @@ fn settings_dto(s: &Settings) -> SettingsDto {
         sounds: s.sounds,
         ptt: s.ptt,
         ptt_key: s.ptt_key.clone(),
+        echo_cancel: s.echo_cancel,
     }
 }
 
@@ -358,6 +361,7 @@ pub fn talkie_set_settings(s: SettingsDto) -> Result<()> {
         sounds: s.sounds,
         ptt: s.ptt,
         ptt_key: s.ptt_key,
+        echo_cancel: s.echo_cancel,
     });
     Ok(())
 }

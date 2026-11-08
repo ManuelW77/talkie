@@ -190,7 +190,8 @@ tool/build_ios_sim.sh                                                 # iOS-Simu
 - **Android:** APK aufs Handy schicken und öffnen, Installation aus dieser Quelle erlauben.
   Mikrofon und Benachrichtigungen erlauben: Die Benachrichtigung „Talkie ist verbunden“ hält Talkie
   im Hintergrund am Leben, während gezockt wird.
-- **Handy allgemein:** Am besten mit Kopfhörern. Über den Lautsprecher hören die anderen sich sonst als Echo.
+- **Handy allgemein:** Talkie nutzt die Echo-Unterdrückung von iOS/Android, damit es auch über den
+  Lautsprecher geht (abschaltbar unter „Mehr“). Mit Kopfhörern klingt es trotzdem am besten.
 
 **Push-to-Talk:** In den Einstellungen unter „Sprechen“ auf „Taste halten“ stellen und eine Taste wählen
 (F1–F12, Strg/Alt/Umschalt, Maus-Seitentasten). Die Taste wirkt auch, während ein Spiel im Vordergrund ist

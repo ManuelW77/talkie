@@ -222,6 +222,9 @@ class SettingsDto {
   final bool ptt;
   final String pttKey;
 
+  /// Handy: Echo-Unterdrückung des Systems (ohne Kopfhörer wichtig).
+  final bool echoCancel;
+
   const SettingsDto({
     required this.vadThresholdDb,
     required this.noiseSuppression,
@@ -232,6 +235,7 @@ class SettingsDto {
     required this.sounds,
     required this.ptt,
     required this.pttKey,
+    required this.echoCancel,
   });
 
   @override
@@ -244,7 +248,8 @@ class SettingsDto {
       outputVolume.hashCode ^
       sounds.hashCode ^
       ptt.hashCode ^
-      pttKey.hashCode;
+      pttKey.hashCode ^
+      echoCancel.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -259,7 +264,8 @@ class SettingsDto {
           outputVolume == other.outputVolume &&
           sounds == other.sounds &&
           ptt == other.ptt &&
-          pttKey == other.pttKey;
+          pttKey == other.pttKey &&
+          echoCancel == other.echoCancel;
 }
 
 class StateDto {

@@ -221,6 +221,7 @@ class TalkieController extends ChangeNotifier {
     if (on == _active) return;
     _active = on;
     TalkiePlatform.setActive(on);
+    TalkiePlatform.setVoiceMode(on && config.settings.echoCancel);
   }
 
   // --- Aktionen ---
@@ -277,6 +278,7 @@ class TalkieController extends ChangeNotifier {
   Future<void> saveSettings(SettingsDto s) async {
     await talkieSetSettings(s: s);
     config = talkieConfig();
+    if (_active) TalkiePlatform.setVoiceMode(config.settings.echoCancel);
     notifyListeners();
   }
 

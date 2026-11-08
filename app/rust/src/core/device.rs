@@ -197,6 +197,7 @@ pub fn start(
     output_name: String,
     capture_tx: mpsc::Sender<Vec<f32>>,
     mixer: Arc<Mutex<Mixer>>,
+    echo_cancel: bool,
 ) -> (AudioIo, Vec<String>) {
     let (stop_tx, stop_rx) = mpsc::channel::<()>();
     let failed = Arc::new(AtomicBool::new(false));
@@ -206,6 +207,18 @@ pub fn start(
         .name("talkie-audio".into())
         .spawn(move || {
             let mut warnings = Vec::new();
+            // Handy: erst die Sprachverarbeitung des Systems (Echo-Unterdrückung), sonst cpal
+            if echo_cancel && crate::core::voice::AVAILABLE {
+                match crate::core::voice::open(capture_tx.clone(), mixer.clone(), f_in.clone()) {
+                    Ok(voice) => {
+                        let _ = res_tx.send(warnings);
+                        let _ = stop_rx.recv();
+                        drop(voice);
+                        return;
+                    }
+                    Err(e) => log::warn!("sprachverarbeitung: {e} – nehme normalen weg"),
+                }
+            }
             let input = open_input(&input_name, capture_tx, f_in)
                 .map_err(|e| warnings.push(format!("Mikrofon: {e}")))
                 .ok();
