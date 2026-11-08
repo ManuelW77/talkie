@@ -11,6 +11,11 @@ NEW_PATH=`echo $PATH | tr ":" "\n" | grep -v "Contents/Developer/" | tr "\n" ":"
 
 export PATH=${NEW_PATH%?} # remove trailing :
 
+# Talkie: Xcode startet ohne Shell-PATH. rustup und cmake (für libopus) von Homebrew ergänzen,
+# kaputte swiftly-Shims (cc, lipo) entfernen.
+PATH=`echo $PATH | tr ":" "\n" | grep -v "/.swiftly/" | tr "\n" ":"`
+export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:${PATH%?}:/opt/homebrew/bin:/usr/local/bin"
+
 env
 
 # Platform name (macosx, iphoneos, iphonesimulator)

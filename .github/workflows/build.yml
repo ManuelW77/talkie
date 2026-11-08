@@ -162,7 +162,7 @@ jobs:
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: stable
@@ -182,35 +182,6 @@ jobs:
         with:
           name: Talkie-Android
           path: app/Talkie-Android.apk
-
-  ios:
-    name: iOS (ab 15, ohne Signatur)
-    if: ${{ !(github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/feature/') || startsWith(github.ref, 'refs/heads/chore/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
-    needs: test
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
-        with:
-          xcode-version: "16"
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
-        with:
-          toolchain: stable
-          targets: aarch64-apple-ios
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-      - name: Bauen (prüft nur, dass alles kompiliert; Installation braucht eine Apple-Signatur)
-        working-directory: app
-        run: flutter build ios --release --no-codesign $DART_DEFINES
-      - name: Paket
-        working-directory: app
-        run: cd build/ios/iphoneos && zip -qr ../../../Talkie-iOS-unsigniert.zip Runner.app
-      - uses: actions/upload-artifact@v5
-        with:
-          name: Talkie-iOS-unsigniert
-          path: app/Talkie-iOS-unsigniert.zip
 
   release:
     name: Release anlegen
