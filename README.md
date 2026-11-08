@@ -87,11 +87,11 @@ Es gibt zwei Gruppen:
    wird nicht committet.
 2. `docker compose up -d` startet den Server neu. Das Admin-Konto aus `TALKIE_ADMIN_EMAIL` wird angelegt,
    solange es noch keinen Admin gibt.
-3. Die Seite lauscht nur lokal auf Port 8080. Von außen erreichst du sie über einen Reverse-Proxy mit HTTPS,
+3. Die Seite lauscht nur lokal auf Port 8003. Von außen erreichst du sie über einen Reverse-Proxy mit HTTPS,
    zum Beispiel Caddy:
    ```
    talkie.example.org {
-       reverse_proxy 127.0.0.1:8080
+       reverse_proxy 127.0.0.1:8003
    }
    ```
    `TALKIE_PUBLIC_URL` muss genau die Adresse sein, die im Browser steht.
