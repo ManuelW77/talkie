@@ -7,7 +7,7 @@ services:
     ports:
       - "7777:7777/udp"
       # Verwaltungsseite: nur lokal freigeben, von außen über einen Reverse-Proxy mit HTTPS
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8003:8080"
     volumes:
       - talkie-data:/data
     environment:

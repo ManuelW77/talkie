@@ -57,7 +57,7 @@ anderen Notizen mitziehen. Bearbeiten über die Obsidian-MCP-Tools.
 ## Aufbau
 
 ```
-server/            Go-Server (QUIC/UDP 7777), Admin-CLI, Verwaltungsseite (HTTP 8080)
+server/            Go-Server (QUIC/UDP 7777), Admin-CLI, Verwaltungsseite (HTTP 8080 im Container, außen 127.0.0.1:8003)
   web/             HTML-Vorlagen und CSS/JS der Verwaltungsseite (per go:embed eingebettet)
 app/lib/           Flutter-Oberfläche (ChangeNotifier-Controller, deutsche UI, dunkles Theme)
 app/rust/src/core/ Rust-Kern: Netzwerk (quinn), Audio (cpal), Opus, Rauschfilter, Jitter-Puffer
