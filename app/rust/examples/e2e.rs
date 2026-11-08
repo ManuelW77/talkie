@@ -169,6 +169,21 @@ fn main() {
     d.connect(&server, "Niemand", "", "").expect("connect");
     check(wait_status(&d, Status::Failed, 5) && d.snapshot().error_code == "need_invite", "ohne Einladung kein Zugang");
 
+    // Server nicht erreichbar → gibt nach der Frist auf (statt endlos zu drehen)
+    let (u, _) = engine(&base.join("u"));
+    u.set_give_up(Duration::from_secs(2), Duration::from_secs(2));
+    u.connect("127.0.0.1:9", "Niemand", "ABCD-EFGH", "").expect("connect");
+    // (ein Versuch dauert bis zu 8 s, danach ist die 2-s-Frist um)
+    check(wait_status(&u, Status::Failed, 25), "nicht erreichbar: gibt nach der Frist auf");
+    check(u.snapshot().error_code == "unreachable", "Fehlercode unreachable");
+
+    // Abbrechen während des Verbindens
+    let (v, _) = engine(&base.join("v"));
+    v.connect("127.0.0.1:9", "Niemand", "ABCD-EFGH", "").expect("connect");
+    std::thread::sleep(Duration::from_millis(300));
+    v.disconnect();
+    check(wait_status(&v, Status::Idle, 3), "Abbrechen beendet den Verbindungsversuch");
+
     let _ = std::fs::remove_dir_all(&base);
     println!("Alles bestanden.");
 }

@@ -91,6 +91,8 @@ struct Inner {
     capture_tx: mpsc::Sender<Vec<f32>>,
     seq: AtomicU16,
     audio_enabled: bool,
+    /// Aufgeben nach (erster Verbindungsaufbau, nach Abbruch). Für Tests verkürzbar.
+    give_up: Mutex<(Duration, Duration)>,
     /// Wird bei jedem Verbinden/Trennen erhöht; alte Sitzungs-Tasks erkennen daran, dass sie veraltet sind.
     generation: AtomicU64,
 }
@@ -304,6 +306,7 @@ impl Engine {
             seq: AtomicU16::new(0),
             audio_enabled,
             generation: AtomicU64::new(0),
+            give_up: Mutex::new((GIVE_UP_FIRST, GIVE_UP_LOST)),
         });
         let weak = Arc::downgrade(&inner);
         std::thread::Builder::new().name("talkie-capture".into()).spawn(move || capture_loop(weak, capture_rx))?;
@@ -491,6 +494,11 @@ impl Engine {
         let _ = self.inner.capture_tx.send(samples);
     }
 
+    /// Für Tests: schneller aufgeben.
+    pub fn set_give_up(&self, first: Duration, lost: Duration) {
+        *self.inner.give_up.lock() = (first, lost);
+    }
+
     pub fn mixer_stats(&self) -> (u64, u64) {
         let m = self.inner.mixer.lock();
         (m.packets, m.lost)
@@ -524,9 +532,18 @@ impl Drop for AbortOnDrop {
     }
 }
 
+/// So lange wird es beim Start versucht, bevor „nicht erreichbar“ kommt.
+pub const GIVE_UP_FIRST: Duration = Duration::from_secs(45);
+/// So lange nach einem Verbindungsabbruch (WLAN weg, Laptop zugeklappt …).
+pub const GIVE_UP_LOST: Duration = Duration::from_secs(180);
+
 async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
     let mut backoff = 1u64;
     let mut first = true;
+    let mut ever_connected = false;
+    // Seit wann es nicht klappt (ab Start bzw. ab dem letzten Abbruch)
+    let mut failing_since = std::time::Instant::now();
+    let mut attempt = 0u32;
     loop {
         if first {
             if !inner.is_current(generation) {
@@ -556,6 +573,8 @@ async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
                     return;
                 }
                 backoff = 1;
+                attempt = 0;
+                ever_connected = true;
                 {
                     let mut c = inner.config.lock();
                     c.registered = true;
@@ -578,6 +597,7 @@ async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
                         if !inner.is_current(generation) {
                             return;
                         }
+                        failing_since = std::time::Instant::now();
                         inner.set_status(Status::Reconnecting, msg, "");
                     }
                 }
@@ -594,16 +614,42 @@ async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
                 inner.set_status(Status::Failed, message, &code);
                 return;
             }
-            Err(ConnectError::Temporary(e)) => {
+            Err(err @ (ConnectError::Temporary(_) | ConnectError::Offline)) => {
                 if !inner.is_current(generation) {
                     return;
                 }
-                inner.set_status(Status::Reconnecting, format!("{e} — versuche es gleich nochmal …"), "");
+                attempt += 1;
+                let offline = matches!(err, ConnectError::Offline);
+                let limit = if ever_connected { inner.give_up.lock().1 } else { inner.give_up.lock().0 };
+                if failing_since.elapsed() >= limit {
+                    inner.stop_audio();
+                    let msg = if offline {
+                        "Kein Netzwerk. Prüfe WLAN oder Kabel und tippe dann auf „Nochmal verbinden“."
+                    } else {
+                        "Der Server ist nicht erreichbar. Läuft er? Stimmt die Adresse?"
+                    };
+                    inner.set_status(Status::Failed, msg, if offline { "offline" } else { "unreachable" });
+                    return;
+                }
+                let wait = backoff;
+                match err {
+                    ConnectError::Offline => inner.set_status(
+                        Status::Reconnecting,
+                        "Kein Netzwerk – prüfe WLAN oder Kabel. Talkie verbindet sich dann von selbst.",
+                        "offline",
+                    ),
+                    ConnectError::Temporary(e) => inner.set_status(
+                        Status::Reconnecting,
+                        format!("{e} – neuer Versuch in {wait} s (Versuch {attempt})"),
+                        "",
+                    ),
+                    ConnectError::Fatal { .. } => unreachable!(),
+                }
             }
         }
         first = false;
         tokio::time::sleep(Duration::from_secs(backoff)).await;
-        backoff = (backoff * 2).min(15);
+        backoff = (backoff * 2).min(10);
     }
 }
 

@@ -114,6 +114,7 @@ class _StatusBanner extends StatelessWidget {
     if (status == ConnStatus.connected) return const SizedBox.shrink();
 
     final failed = status == ConnStatus.failed || status == ConnStatus.idle;
+    final offline = s?.errorCode == 'offline';
     final text = switch (status) {
       ConnStatus.connecting => 'Verbinde mit dem Server …',
       ConnStatus.reconnecting =>
@@ -127,8 +128,8 @@ class _StatusBanner extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
-            if (failed)
-              const Icon(Icons.wifi_off_rounded, color: kDanger)
+            if (failed || offline)
+              Icon(offline ? Icons.wifi_off_rounded : Icons.cloud_off_rounded, color: kDanger)
             else
               const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
             const SizedBox(width: 12),
@@ -138,7 +139,9 @@ class _StatusBanner extends StatelessWidget {
                 onPressed: controller.reconnect,
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 36)),
                 child: const Text('Nochmal verbinden'),
-              ),
+              )
+            else
+              TextButton(onPressed: controller.cancelConnect, child: const Text('Abbrechen')),
           ],
         ),
       ),
