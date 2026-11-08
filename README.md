@@ -143,7 +143,8 @@ iPhone/iPad (ab iOS 15): über TestFlight, siehe oben – nicht über die Action
 Dann ist der Server fest eingebaut und die Kids geben **nur Name und Einladungscode** ein.
 Mit dem Fingerabdruck ist der Client sogar beim allerersten Verbinden gegen fremde Server geschützt.
 
-Ein Tag `v1.0.0` pushen → die Dateien landen automatisch in einem GitHub-Release.
+Ein Tag `v1.0.0` pushen → die Dateien landen automatisch in einem GitHub-Release, die Mac-App
+signiert und notarisiert (siehe [docs/RELEASE.md](docs/RELEASE.md)).
 
 ### Lokal bauen
 
@@ -180,7 +181,8 @@ tool/build_ios_sim.sh                                                 # iOS-Simu
 
 **Erster Start, weil die App nicht bei Apple/Microsoft registriert ist:**
 
-- **macOS:** Talkie in „Programme“ ziehen, dann **Rechtsklick → Öffnen → Öffnen**. Nur beim ersten Mal nötig.
+- **macOS:** Talkie in „Programme“ ziehen und starten (Release-Versionen sind notarisiert; nur bei
+  Test-Builds aus den Actions: **Rechtsklick → Öffnen → Öffnen**).
   Beim ersten Verbinden fragt macOS nach dem Mikrofon → „Erlauben“.
 - **Windows:** Bei „Der Computer wurde durch Windows geschützt“ → **Weitere Informationen → Trotzdem ausführen**.
 - **Linux:** Archiv entpacken, im Ordner `Talkie` einmal `./install.sh` ausführen → Talkie steht im

@@ -35,6 +35,7 @@ Sitzungen sonst gegenseitig den Branch weg. Beim Committen nur eigene Dateien hi
 4. Merge `devel` → `main` und Release-Tags **nur auf ausdrückliche Anweisung von Manuel**.
    Versionsnummer: `version:` in `app/pubspec.yaml` und `kAppVersion` in `app/lib/version.dart` gleich halten
    (Test prüft das), Tag heißt `v<version>`. Der Server meldet den Apps das neueste GitHub-Release.
+   Ablauf und Secrets für die Mac-Notarisierung: `docs/RELEASE.md`.
 5. Nie direkt auf `main` committen. Kein Force-Push auf `main` oder `devel`.
 6. Commit-Nachrichten auf Deutsch: kurze Betreffzeile, darunter Stichpunkte.
 
