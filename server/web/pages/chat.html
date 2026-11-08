@@ -1,0 +1,14 @@
+{{define "content"}}
+<h1>Chat</h1>
+<form method="get" action="/chat" class="row">
+  <select name="room" data-autosubmit aria-label="Raum">
+    {{range .D.Rooms}}<option value="{{.ID}}" {{if eq .ID $.D.Room.ID}}selected{{end}}>{{.Name}}</option>{{end}}
+  </select>
+  <noscript><button>Anzeigen</button></noscript>
+</form>
+{{if .D.Messages}}
+<ul class="chat">
+  {{range .D.Messages}}<li><time>{{unix .TS}}</time> <b>{{.Name}}</b> <span>{{.Text}}</span></li>{{end}}
+</ul>
+{{else}}<p class="muted">In „{{.D.Room.Name}}“ wurde noch nichts geschrieben.</p>{{end}}
+{{end}}

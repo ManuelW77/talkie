@@ -1,0 +1,10 @@
+{{define "content"}}
+<h1>Protokoll</h1>
+<p class="muted">Wer hat wann was geändert (die letzten 300 Einträge).</p>
+{{if .D.Log}}
+<table>
+  <thead><tr><th>Zeit</th><th>Wer</th><th>Was</th></tr></thead>
+  <tbody>{{range .D.Log}}<tr><td class="nowrap">{{dt .TS}}</td><td>{{.Who}}</td><td>{{.Action}}</td></tr>{{end}}</tbody>
+</table>
+{{else}}<p class="muted">Noch keine Einträge.</p>{{end}}
+{{end}}

@@ -1,0 +1,10 @@
+{{define "content"}}
+<div class="card login">
+  <img class="logo" src="/static/icon.svg" alt="">
+  <h1>Anmelden</h1>
+  <form method="post" action="/login/link">
+    <input type="hidden" name="t" value="{{.D.T}}">
+    <button class="primary wide" autofocus>Jetzt anmelden</button>
+  </form>
+</div>
+{{end}}

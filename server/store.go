@@ -84,6 +84,10 @@ func OpenStore(path string) (*Store, error) {
 		return nil, fmt.Errorf("schema: %w", err)
 	}
 	s := &Store{db: db}
+	if err := s.initWeb(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("schema web: %w", err)
+	}
 	rooms, err := s.Rooms()
 	if err != nil {
 		db.Close()

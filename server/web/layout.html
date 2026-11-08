@@ -1,0 +1,36 @@
+{{define "layout"}}<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · Talkie</title>
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+{{if .Me}}
+<header class="top">
+  <a class="brand" href="/"><img src="/static/icon.svg" alt=""> Talkie</a>
+  <nav>
+    <a href="/" {{if eq .Nav "dashboard"}}class="on"{{end}}>Übersicht</a>
+    <a href="/users" {{if or (eq .Nav "users") (eq .Nav "user")}}class="on"{{end}}>Nutzer</a>
+    {{if .Can.invite}}<a href="/invites" {{if eq .Nav "invites"}}class="on"{{end}}>Einladungen</a>{{end}}
+    <a href="/rooms" {{if eq .Nav "rooms"}}class="on"{{end}}>Räume</a>
+    {{if .Can.chat}}<a href="/chat" {{if eq .Nav "chat"}}class="on"{{end}}>Chat</a>{{end}}
+    {{if .Can.admin}}<a href="/accounts" {{if or (eq .Nav "accounts") (eq .Nav "account")}}class="on"{{end}}>Web-Konten</a>
+    <a href="/audit" {{if eq .Nav "audit"}}class="on"{{end}}>Protokoll</a>{{end}}
+  </nav>
+  <form method="post" action="/logout" class="who">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <span title="{{.Me.Email}}">{{.Me.Name}}{{if .Me.IsAdmin}} <small class="tag">Admin</small>{{end}}</span>
+    <button class="link">Abmelden</button>
+  </form>
+</header>
+{{end}}
+<main {{if not .Me}}class="narrow"{{end}}>
+{{if .Flash}}<div class="flash {{if .FlashErr}}err{{end}}">{{.Flash}}</div>{{end}}
+{{template "content" .}}
+</main>
+</body>
+</html>{{end}}

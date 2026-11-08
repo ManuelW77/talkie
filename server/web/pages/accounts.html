@@ -1,0 +1,21 @@
+{{define "content"}}
+<h1>Web-Konten</h1>
+<p class="muted">Wer sich hier auf der Verwaltungsseite anmelden darf. Admins dürfen alles, Benutzer nur das, was angehakt ist.</p>
+<p><a class="button primary" href="/accounts/new">Neues Konto</a></p>
+<table>
+  <thead><tr><th>Name</th><th>E-Mail</th><th>Gruppe</th><th>Rechte</th><th>Zuletzt angemeldet</th><th></th></tr></thead>
+  <tbody>
+  {{range .D.Accounts}}{{$a := .}}
+  <tr {{if .Disabled}}class="off"{{end}}>
+    <td>{{.Name}}{{if .Disabled}} <span class="tag bad">deaktiviert</span>{{end}}
+      {{with index $.D.TalkieNames .TalkieID}}<br><small class="muted">Talkie: {{.}}</small>{{end}}</td>
+    <td>{{.Email}}</td>
+    <td>{{if .IsAdmin}}<span class="tag">Admin</span>{{else}}Benutzer{{end}}</td>
+    <td class="small">{{if .IsAdmin}}alles{{else}}{{range $.D.Perms}}{{if $a.Has .P}}<span class="perm">{{.Label}}</span>{{end}}{{end}}{{end}}</td>
+    <td>{{dt .LastLogin}}</td>
+    <td class="right"><a href="/accounts/{{.ID}}">Bearbeiten</a></td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}

@@ -1,0 +1,48 @@
+{{define "content"}}
+<h1>Einladungen</h1>
+{{with .D.New}}
+<div class="card highlight">
+  <p>Neuer Einladungscode:</p>
+  <p class="bigcode"><code id="newcode">{{.}}</code> <button type="button" data-copy="newcode">Kopieren</button></p>
+  <p class="muted">Gib den Code weiter. In der App: Name ausdenken, Code eingeben, fertig.</p>
+</div>
+{{end}}
+
+<section class="card">
+  <h2>Neue Einladung</h2>
+  <form method="post" action="/invites" class="grid">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label>Für wie viele Personen
+      <input type="number" name="uses" value="1" min="1" max="100">
+    </label>
+    <label>Gültig (Tage)
+      <input type="number" name="days" value="7" min="1" max="365">
+    </label>
+    {{if .MailOn}}
+    <label class="full">Per Mail schicken an (optional)
+      <input type="email" name="email" placeholder="eltern@example.org">
+    </label>
+    {{end}}
+    <div class="full"><button class="primary">Einladung erstellen</button></div>
+  </form>
+</section>
+
+<h2>Offene Einladungen</h2>
+{{if .D.Invites}}
+<table>
+  <thead><tr><th>Code</th><th>Noch für</th><th>Gültig bis</th><th></th></tr></thead>
+  <tbody>
+  {{range .D.Invites}}
+  <tr>
+    <td><code>{{.Code}}</code></td>
+    <td>{{.UsesLeft}} Person(en)</td>
+    <td>{{dt .Expires}}</td>
+    <td class="right"><form method="post" action="/invites/{{.Code}}/delete">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      <button class="link bad" data-confirm="Einladung {{.Code}} löschen?">Löschen</button></form></td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}<p class="muted">Keine offenen Einladungen.</p>{{end}}
+{{end}}

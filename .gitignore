@@ -5,3 +5,5 @@ app/.dart_tool/
 app/rust/target/
 *.dmg
 .claude/
+.env
+server/server

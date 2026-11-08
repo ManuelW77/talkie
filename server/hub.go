@@ -188,6 +188,13 @@ func (h *Hub) OnlineIDs() map[int64]bool {
 	return out
 }
 
+// Online liefert alle verbundenen Nutzer mit Raum und Status.
+func (h *Hub) Online() []WireUser {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.usersLocked()
+}
+
 func (h *Hub) OnlineCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
