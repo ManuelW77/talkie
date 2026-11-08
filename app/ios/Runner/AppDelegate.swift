@@ -22,6 +22,11 @@ import UIKit
         result(TalkieAudio.dataDir())
       case "requestMic":
         TalkieAudio.requestMic { ok in DispatchQueue.main.async { result(ok) } }
+      case "openUrl":
+        if let s = call.arguments as? String, let url = URL(string: s), s.hasPrefix("https://") {
+          UIApplication.shared.open(url)
+        }
+        result(nil)
       case "micStatus":
         result(TalkieAudio.micStatus())
       case "openSettings":

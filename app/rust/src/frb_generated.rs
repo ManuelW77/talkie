@@ -935,6 +935,8 @@ impl SseDecode for crate::api::talkie::StateDto {
         let mut var_moderator = <bool>::sse_decode(deserializer);
         let mut var_admin = <bool>::sse_decode(deserializer);
         let mut var_chatHours = <i64>::sse_decode(deserializer);
+        let mut var_latestVersion = <String>::sse_decode(deserializer);
+        let mut var_latestUrl = <String>::sse_decode(deserializer);
         return crate::api::talkie::StateDto {
             status: var_status,
             message: var_message,
@@ -948,6 +950,8 @@ impl SseDecode for crate::api::talkie::StateDto {
             moderator: var_moderator,
             admin: var_admin,
             chat_hours: var_chatHours,
+            latest_version: var_latestVersion,
+            latest_url: var_latestUrl,
         };
     }
 }
@@ -1206,6 +1210,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::talkie::StateDto {
             self.moderator.into_into_dart().into_dart(),
             self.admin.into_into_dart().into_dart(),
             self.chat_hours.into_into_dart().into_dart(),
+            self.latest_version.into_into_dart().into_dart(),
+            self.latest_url.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1482,6 +1488,8 @@ impl SseEncode for crate::api::talkie::StateDto {
         <bool>::sse_encode(self.moderator, serializer);
         <bool>::sse_encode(self.admin, serializer);
         <i64>::sse_encode(self.chat_hours, serializer);
+        <String>::sse_encode(self.latest_version, serializer);
+        <String>::sse_encode(self.latest_url, serializer);
     }
 }
 

@@ -821,8 +821,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   StateDto dco_decode_state_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 12)
-      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    if (arr.length != 14)
+      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
     return StateDto(
       status: dco_decode_conn_status(arr[0]),
       message: dco_decode_String(arr[1]),
@@ -836,6 +836,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       moderator: dco_decode_bool(arr[9]),
       admin: dco_decode_bool(arr[10]),
       chatHours: dco_decode_i_64(arr[11]),
+      latestVersion: dco_decode_String(arr[12]),
+      latestUrl: dco_decode_String(arr[13]),
     );
   }
 
@@ -1119,6 +1121,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_moderator = sse_decode_bool(deserializer);
     var var_admin = sse_decode_bool(deserializer);
     var var_chatHours = sse_decode_i_64(deserializer);
+    var var_latestVersion = sse_decode_String(deserializer);
+    var var_latestUrl = sse_decode_String(deserializer);
     return StateDto(
       status: var_status,
       message: var_message,
@@ -1132,6 +1136,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       moderator: var_moderator,
       admin: var_admin,
       chatHours: var_chatHours,
+      latestVersion: var_latestVersion,
+      latestUrl: var_latestUrl,
     );
   }
 
@@ -1407,6 +1413,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self.moderator, serializer);
     sse_encode_bool(self.admin, serializer);
     sse_encode_i_64(self.chatHours, serializer);
+    sse_encode_String(self.latestVersion, serializer);
+    sse_encode_String(self.latestUrl, serializer);
   }
 
   @protected

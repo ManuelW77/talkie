@@ -70,6 +70,8 @@ TalkieController _mainController() {
       moderator: false,
       admin: false,
       chatHours: 0,
+        latestVersion: '',
+        latestUrl: '',
     );
   c.chats[10] = const [
     ChatDto(room: 10, from: 2, name: 'Lena', text: 'Wer ist dabei? Runde startet gleich!', ts: 1762500000),
@@ -135,6 +137,8 @@ void main() {
         moderator: false,
         admin: false,
         chatHours: 0,
+        latestVersion: '',
+        latestUrl: '',
       );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     expect(find.text('Du wurdest vom Admin rausgeworfen.'), findsOneWidget);
@@ -159,6 +163,8 @@ void main() {
         moderator: false,
         admin: false,
         chatHours: 0,
+        latestVersion: '',
+        latestUrl: '',
       );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     await tester.pump(const Duration(milliseconds: 300));
@@ -222,6 +228,8 @@ void main() {
       moderator: true,
       admin: true,
       chatHours: 0,
+        latestVersion: '',
+        latestUrl: '',
     );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     await tester.pump(const Duration(milliseconds: 300));
@@ -261,6 +269,8 @@ void main() {
       moderator: false,
       admin: true,
       chatHours: 24,
+      latestVersion: '',
+      latestUrl: '',
     );
     c.chats[10] = [
       ChatDto(room: 10, from: 2, name: 'Lena', text: 'von vorgestern', ts: now - 48 * 3600),
@@ -296,5 +306,36 @@ void main() {
     expect(find.text('Für mich stumm'), findsOneWidget);
     expect(find.text('Rauswerfen'), findsNothing);
     await expectLater(find.byType(Overlay).first, matchesGoldenFile('goldens/phone_person.png'));
+  });
+
+  testWidgets('Neue Version: Hinweis mit Laden, wegklickbar', (tester) async {
+    tester.view.physicalSize = const Size(1000, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    final s = c.state!;
+    c.state = StateDto(
+      status: s.status,
+      message: s.message,
+      errorCode: s.errorCode,
+      me: s.me,
+      room: s.room,
+      rooms: s.rooms,
+      users: s.users,
+      muted: s.muted,
+      deaf: s.deaf,
+      moderator: false,
+      admin: false,
+      chatHours: 0,
+      latestVersion: '99.0.0',
+      latestUrl: 'https://github.com/ManuelW77/talkie/releases/latest',
+    );
+    await tester.pumpWidget(_wrap(ListenableBuilder(listenable: c, builder: (_, _) => MainScreen(controller: c))));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Neue Talkie-Version 99.0.0 ist da.'), findsOneWidget);
+    expect(find.text('Laden'), findsOneWidget);
+    await tester.tap(find.byTooltip('Ausblenden'));
+    await tester.pump();
+    expect(find.textContaining('Neue Talkie-Version'), findsNothing);
   });
 }

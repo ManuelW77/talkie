@@ -61,11 +61,16 @@ func serve(dataDir, addr, adminAddr string, maxUsers int) error {
 		store.ChatKeep = time.Duration(h) * time.Hour
 	}
 	go purgeChatLoop(store)
+	// Neueste App-Version für den Hinweis in den Apps (TALKIE_UPDATE_REPO leer = aus)
+	updates := NewUpdateChecker(env("TALKIE_LATEST_VERSION", ""), env("TALKIE_DOWNLOAD_URL", ""),
+		env("TALKIE_UPDATE_REPO", "ManuelW77/talkie"))
+	go updates.Run(context.Background())
 	hash := CertHash(cert)
 	hub, err := NewHub(store, hash, maxUsers)
 	if err != nil {
 		return err
 	}
+	hub.Updates = updates
 	token, err := loadOrCreateToken(dataDir)
 	if err != nil {
 		return fmt.Errorf("admin-token: %w", err)

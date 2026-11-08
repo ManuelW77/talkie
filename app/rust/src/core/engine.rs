@@ -59,6 +59,9 @@ pub struct Snapshot {
     pub admin: bool,
     /// So viele Stunden bleibt der Chat erhalten (0 = unbegrenzt).
     pub chat_hours: i64,
+    /// Neueste App-Version laut Server ("" = unbekannt) und Download-Adresse.
+    pub latest_version: String,
+    pub latest_url: String,
 }
 
 #[derive(Debug, Clone)]
@@ -83,6 +86,8 @@ struct NetState {
     moderator: bool,
     admin: bool,
     chat_hours: i64,
+    latest_version: String,
+    latest_url: String,
 }
 
 struct Inner {
@@ -167,6 +172,8 @@ impl Inner {
             moderator: n.moderator,
             admin: n.admin,
             chat_hours: n.chat_hours,
+            latest_version: n.latest_version.clone(),
+            latest_url: n.latest_url.clone(),
         }
     }
 
@@ -317,6 +324,8 @@ impl Engine {
                 moderator: false,
                 admin: false,
                 chat_hours: 0,
+                latest_version: String::new(),
+                latest_url: String::new(),
             }),
             muted: AtomicBool::new(false),
             deaf: AtomicBool::new(false),
@@ -740,6 +749,8 @@ async fn run_session(inner: &Arc<Inner>, sess: net::Session, generation: u64) ->
         n.moderator = welcome.r#mod.unwrap_or(false);
         n.admin = welcome.admin.unwrap_or(false);
         n.chat_hours = welcome.chat_hours;
+        n.latest_version = welcome.latest.clone();
+        n.latest_url = welcome.latest_url.clone();
         n.status = Status::Connected;
         n.message.clear();
         n.error_code.clear();

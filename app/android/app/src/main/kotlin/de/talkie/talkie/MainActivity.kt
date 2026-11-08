@@ -22,6 +22,17 @@ class MainActivity : FlutterActivity() {
                     if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) "granted"
                     else "undetermined"
                 )
+                "openUrl" -> {
+                    val url = call.arguments as? String
+                    if (url != null && url.startsWith("https://")) {
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                        } catch (e: Exception) {
+                            android.util.Log.w("Talkie", "Browser fehlt: $e")
+                        }
+                    }
+                    result.success(null)
+                }
                 "openSettings" -> {
                     startActivity(
                         Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
