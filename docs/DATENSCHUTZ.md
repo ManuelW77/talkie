@@ -7,10 +7,8 @@ Talkie ist ein Sprach- und Text-Chat für eine geschlossene Gruppe aus Freunden 
 ## Das Wichtigste in Kürze
 
 - **Wir betreiben keinen Talkie-Server.** Es gibt keinen öffentlichen Server von uns.
-- **Jeder Talkie-Server wird von jemandem selbst betrieben** – meist von einer Familie oder einem
-  Freundeskreis auf eigener Hardware.
-- **Alle Daten liegen beim jeweiligen Serverbetreiber.** Die App spricht nur mit dem Server, den du
-  eingetragen hast bzw. von dem du deinen Einladungscode bekommen hast.
+- **Jeder Talkie-Server wird von jemandem selbst betrieben** – meist von einer Familie oder einem Freundeskreis auf eigener Hardware.
+- **Alle Daten liegen beim jeweiligen Serverbetreiber.** Die App spricht nur mit dem Server, den du eingetragen hast bzw. von dem du deinen Einladungscode bekommen hast.
 - **Wir erhalten keine Daten** – weder von der App noch von irgendeinem Talkie-Server.
 - Keine Werbung, kein Tracking, keine Analyse- oder Absturzdienste.
 
@@ -18,17 +16,14 @@ Talkie ist ein Sprach- und Text-Chat für eine geschlossene Gruppe aus Freunden 
 
 **Für die App** (Herausgeber):
 
-Manuel Weiser\
-Wehrmannstr. 3\
-04157 Leipzig\
+Manuel Weiser
+Wehrmannstr. 3
+04157 Leipzig
 E-Mail: manuel.weiser@me.com
 
-Als Herausgeber stellen wir nur die Software bereit. Wir verarbeiten dabei keine personenbezogenen
-Daten von dir.
+Als Herausgeber stellen wir nur die Software bereit. Wir verarbeiten dabei keine personenbezogenen Daten von dir.
 
-**Für den Server, mit dem du verbunden bist:** der Betreiber dieses Servers – also die Person, die dir
-den Einladungscode gegeben hat. Sie entscheidet, was dort gespeichert wird und wie lange, und ist
-deine Ansprechperson für alle Fragen zu deinen Daten.
+**Für den Server, mit dem du verbunden bist:** der Betreiber dieses Servers – also die Person, die dir den Einladungscode gegeben hat. Sie entscheidet, was dort gespeichert wird und wie lange, und ist deine Ansprechperson für alle Fragen zu deinen Daten.
 
 ## Was speichert die App auf deinem Gerät?
 
@@ -36,8 +31,7 @@ deine Ansprechperson für alle Fragen zu deinen Daten.
 - einen Geräteschlüssel, den die App selbst erzeugt (damit dich der Server ohne Passwort wiedererkennt)
 - deine Einstellungen (z. B. Lautstärke, Rauschfilter, wen du stummgeschaltet hast)
 
-Diese Daten bleiben auf deinem Gerät. Nur dein Name und der öffentliche Teil des Geräteschlüssels
-werden an den Server übertragen, den du eingetragen hast.
+Diese Daten bleiben auf deinem Gerät. Nur dein Name und der öffentliche Teil des Geräteschlüssels werden an den Server übertragen, den du eingetragen hast.
 
 ## Was fällt auf einem Talkie-Server an?
 
@@ -73,14 +67,10 @@ keine Daten über dich.
 
 ## Löschen und deine Rechte
 
-- In der App unter **„Mehr“ → „Gerät abmelden“** werden der Geräteschlüssel und deine Anmeldung auf
-  deinem Gerät gelöscht. Wenn du die App löschst, sind auch alle Daten auf dem Gerät weg.
+- In der App unter **„Mehr“ → „Gerät abmelden“** werden der Geräteschlüssel und deine Anmeldung auf deinem Gerät gelöscht. Wenn du die App löschst, sind auch alle Daten auf dem Gerät weg.
 - Deine Daten auf einem Server löscht der **Serverbetreiber**. Wende dich dafür an ihn.
 
-Deine Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und
-Widerspruch richten sich an den jeweiligen Serverbetreiber. Da wir selbst keine Daten von dir haben,
-können wir dazu keine Auskunft geben. Du kannst dich außerdem bei einer Datenschutz-Aufsichtsbehörde
-beschweren.
+Deine Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch richten sich an den jeweiligen Serverbetreiber. Da wir selbst keine Daten von dir haben, können wir dazu keine Auskunft geben. Du kannst dich außerdem bei einer Datenschutz-Aufsichtsbehörde beschweren.
 
 ## Kinder
 
@@ -89,7 +79,4 @@ Serverbetreiber eingeladen wurde. Eltern wenden sich mit Fragen an den Betreiber
 
 ## Hinweis für Serverbetreiber
 
-Wer einen Talkie-Server betreibt, ist für die Daten auf diesem Server selbst verantwortlich. Die
-Server-Software speichert Namen, Geräteschlüssel und die letzten 200 Chatnachrichten pro Raum und
-schreibt beim Verbinden Name und IP-Adresse ins Protokoll. Lege fest, wie lange das Protokoll
-aufbewahrt wird, und informiere deine Nutzer bzw. deren Eltern.
+Wer einen Talkie-Server betreibt, ist für die Daten auf diesem Server selbst verantwortlich. Die Server-Software speichert Namen, Geräteschlüssel und die letzten 200 Chatnachrichten pro Raum und schreibt beim Verbinden Name und IP-Adresse ins Protokoll. Lege fest, wie lange das Protokoll aufbewahrt wird, und informiere deine Nutzer bzw. deren Eltern.
