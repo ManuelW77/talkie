@@ -100,6 +100,27 @@ fn main() {
     let rms = b.mixer_drain_rms(4800);
     check(rms > 0.02, &format!("Ben hört den Ton (Pegel {rms:.3})"));
 
+    // Nur für Ben stumm: Annas Sprache kommt bei ihm nicht mehr an, nach dem Aufheben wieder
+    let speak = |n: usize| {
+        for k in 0..n {
+            let buf: Vec<f32> = (0..1920).map(|s| 0.3 * ((k * 1920 + s) as f32 * 0.04).sin()).collect();
+            a.inject_capture(buf);
+            std::thread::sleep(Duration::from_millis(40));
+        }
+        std::thread::sleep(Duration::from_millis(300));
+    };
+    b.set_user_muted(sa.me, true);
+    std::thread::sleep(Duration::from_millis(200));
+    check(b.snapshot().users.iter().any(|u| u.id == sa.me && u.local_muted), "Ben hat Anna für sich stumm");
+    check(!a.snapshot().users.iter().any(|u| u.local_muted), "Anna merkt davon nichts");
+    let (s0, _) = b.mixer_stats();
+    speak(25);
+    check(b.mixer_stats().0 == s0, "Annas Sprache kommt bei Ben nicht an");
+    b.set_user_muted(sa.me, false);
+    std::thread::sleep(Duration::from_millis(200));
+    speak(25);
+    check(b.mixer_stats().0 > s0 + 15, "nach dem Aufheben hört Ben Anna wieder");
+
     // Raumwechsel: Ben in Raum 2 → keine Sprache mehr
     let room2 = sa.rooms.get(1).map(|r| r.id).expect("zweiter raum");
     b.join(room2);
@@ -147,6 +168,21 @@ fn main() {
     let (d, _) = engine(&base.join("d"));
     d.connect(&server, "Niemand", "", "").expect("connect");
     check(wait_status(&d, Status::Failed, 5) && d.snapshot().error_code == "need_invite", "ohne Einladung kein Zugang");
+
+    // Server nicht erreichbar → gibt nach der Frist auf (statt endlos zu drehen)
+    let (u, _) = engine(&base.join("u"));
+    u.set_give_up(Duration::from_secs(2), Duration::from_secs(2));
+    u.connect("127.0.0.1:9", "Niemand", "ABCD-EFGH", "").expect("connect");
+    // (ein Versuch dauert bis zu 8 s, danach ist die 2-s-Frist um)
+    check(wait_status(&u, Status::Failed, 25), "nicht erreichbar: gibt nach der Frist auf");
+    check(u.snapshot().error_code == "unreachable", "Fehlercode unreachable");
+
+    // Abbrechen während des Verbindens
+    let (v, _) = engine(&base.join("v"));
+    v.connect("127.0.0.1:9", "Niemand", "ABCD-EFGH", "").expect("connect");
+    std::thread::sleep(Duration::from_millis(300));
+    v.disconnect();
+    check(wait_status(&v, Status::Idle, 3), "Abbrechen beendet den Verbindungsversuch");
 
     let _ = std::fs::remove_dir_all(&base);
     println!("Alles bestanden.");

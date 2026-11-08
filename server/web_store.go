@@ -407,6 +407,55 @@ func (s *Store) LoginByCode(pend, code string) (int64, error) {
 
 // --- Talkie-Nutzer per ID (für die Webseite) ---
 
+// LinkedAccounts liefert die aktiven Webkonten, die mit dem Talkie-Nutzer verknüpft sind.
+func (s *Store) LinkedAccounts(talkieID int64) ([]Account, error) {
+	rows, err := s.db.Query("SELECT "+accountCols+" FROM accounts WHERE talkie_id = ? AND disabled = 0 ORDER BY id", talkieID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Account
+	for rows.Next() {
+		a, err := scanAccount(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *a)
+	}
+	return out, rows.Err()
+}
+
+// Moderator liefert das verknüpfte Webkonto, mit dem dieser Talkie-Nutzer in der App
+// rauswerfen und sperren darf (Recht „Talkie-Nutzer bearbeiten“, Admins immer).
+func (s *Store) Moderator(talkieID int64) (*Account, bool) {
+	accs, err := s.LinkedAccounts(talkieID)
+	if err != nil {
+		return nil, false
+	}
+	for i := range accs {
+		if accs[i].IsAdmin() {
+			return &accs[i], true
+		}
+	}
+	for i := range accs {
+		if accs[i].Can(PermUsersEdit) {
+			return &accs[i], true
+		}
+	}
+	return nil, false
+}
+
+// LinkedToAdmin meldet, ob ein aktives Admin-Webkonto mit dem Talkie-Nutzer verknüpft ist.
+func (s *Store) LinkedToAdmin(talkieID int64) bool {
+	accs, _ := s.LinkedAccounts(talkieID)
+	for _, a := range accs {
+		if a.IsAdmin() {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Store) UserByID(id int64) (*DBUser, error) {
 	return scanUser(s.db.QueryRow("SELECT "+userCols+" FROM users WHERE id = ?", id))
 }

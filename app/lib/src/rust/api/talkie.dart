@@ -48,6 +48,17 @@ void talkieChat({required String text}) =>
 void talkieSetMuted({required bool muted}) =>
     RustLib.instance.api.crateApiTalkieTalkieSetMuted(muted: muted);
 
+/// Einen anderen Nutzer nur für mich stumm schalten (bleibt gespeichert).
+void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
+    RustLib.instance.api.crateApiTalkieTalkieSetUserMuted(
+      user: user,
+      muted: muted,
+    );
+
+/// Jemanden rauswerfen (`ban` = auch sperren). Ergebnis kommt als Hinweis zurück.
+void talkieModerate({required PlatformInt64 user, required bool ban}) =>
+    RustLib.instance.api.crateApiTalkieTalkieModerate(user: user, ban: ban);
+
 void talkieSetDeaf({required bool deaf}) =>
     RustLib.instance.api.crateApiTalkieTalkieSetDeaf(deaf: deaf);
 
@@ -195,6 +206,9 @@ class StateDto {
   final bool muted;
   final bool deaf;
 
+  /// Darf andere rauswerfen/sperren.
+  final bool moderator;
+
   const StateDto({
     required this.status,
     required this.message,
@@ -205,6 +219,7 @@ class StateDto {
     required this.users,
     required this.muted,
     required this.deaf,
+    required this.moderator,
   });
 
   @override
@@ -217,7 +232,8 @@ class StateDto {
       rooms.hashCode ^
       users.hashCode ^
       muted.hashCode ^
-      deaf.hashCode;
+      deaf.hashCode ^
+      moderator.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -232,7 +248,8 @@ class StateDto {
           rooms == other.rooms &&
           users == other.users &&
           muted == other.muted &&
-          deaf == other.deaf;
+          deaf == other.deaf &&
+          moderator == other.moderator;
 }
 
 /// Ein Ereignis an die Oberfläche; welche Felder gefüllt sind, hängt von `kind` ab.
@@ -287,6 +304,9 @@ class UserDto {
   final bool deaf;
   final bool talking;
 
+  /// Nur für mich stumm geschaltet.
+  final bool localMuted;
+
   const UserDto({
     required this.id,
     required this.name,
@@ -294,6 +314,7 @@ class UserDto {
     required this.muted,
     required this.deaf,
     required this.talking,
+    required this.localMuted,
   });
 
   @override
@@ -303,7 +324,8 @@ class UserDto {
       room.hashCode ^
       muted.hashCode ^
       deaf.hashCode ^
-      talking.hashCode;
+      talking.hashCode ^
+      localMuted.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -315,5 +337,6 @@ class UserDto {
           room == other.room &&
           muted == other.muted &&
           deaf == other.deaf &&
-          talking == other.talking;
+          talking == other.talking &&
+          localMuted == other.localMuted;
 }

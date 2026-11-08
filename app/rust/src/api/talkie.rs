@@ -30,6 +30,8 @@ pub struct UserDto {
     pub muted: bool,
     pub deaf: bool,
     pub talking: bool,
+    /// Nur für mich stumm geschaltet.
+    pub local_muted: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -58,6 +60,8 @@ pub struct StateDto {
     pub users: Vec<UserDto>,
     pub muted: bool,
     pub deaf: bool,
+    /// Darf andere rauswerfen/sperren.
+    pub moderator: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,10 +124,19 @@ fn state_dto(s: Snapshot) -> StateDto {
         users: s
             .users
             .into_iter()
-            .map(|u| UserDto { id: u.id, name: u.name, room: u.room, muted: u.muted, deaf: u.deaf, talking: u.talking })
+            .map(|u| UserDto {
+                id: u.id,
+                name: u.name,
+                room: u.room,
+                muted: u.muted,
+                deaf: u.deaf,
+                talking: u.talking,
+                local_muted: u.local_muted,
+            })
             .collect(),
         muted: s.muted,
         deaf: s.deaf,
+        moderator: s.moderator,
     }
 }
 
@@ -180,11 +193,7 @@ pub fn init_app() {
 /// `data_dir` leer = Standardordner des Systems.
 pub fn talkie_init(data_dir: String) -> Result<ConfigDto> {
     if ENGINE.get().is_none() {
-        let dir = if data_dir.is_empty() {
-            crate::core::config::Storage::default_dir()
-        } else {
-            data_dir.into()
-        };
+        let dir = if data_dir.is_empty() { crate::core::config::Storage::default_dir() } else { data_dir.into() };
         let e = Engine::new(dir, true)?;
         let _ = ENGINE.set(e);
     }
@@ -237,6 +246,20 @@ pub fn talkie_chat(text: String) -> Result<()> {
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_set_muted(muted: bool) -> Result<()> {
     engine()?.set_muted(muted);
+    Ok(())
+}
+
+/// Einen anderen Nutzer nur für mich stumm schalten (bleibt gespeichert).
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_set_user_muted(user: i64, muted: bool) -> Result<()> {
+    engine()?.set_user_muted(user, muted);
+    Ok(())
+}
+
+/// Jemanden rauswerfen (`ban` = auch sperren). Ergebnis kommt als Hinweis zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_moderate(user: i64, ban: bool) -> Result<()> {
+    engine()?.moderate(user, ban);
     Ok(())
 }
 

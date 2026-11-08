@@ -35,6 +35,8 @@ pub struct UserView {
     pub muted: bool,
     pub deaf: bool,
     pub talking: bool,
+    /// Nur für mich stumm geschaltet.
+    pub local_muted: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +50,8 @@ pub struct Snapshot {
     pub users: Vec<UserView>,
     pub muted: bool,
     pub deaf: bool,
+    /// Darf andere rauswerfen/sperren (verknüpftes Webkonto mit Recht).
+    pub moderator: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +73,7 @@ struct NetState {
     rooms: Vec<WireRoom>,
     users: BTreeMap<i64, WireUser>,
     talking: Vec<i64>,
+    moderator: bool,
 }
 
 struct Inner {
@@ -89,6 +94,8 @@ struct Inner {
     capture_tx: mpsc::Sender<Vec<f32>>,
     seq: AtomicU16,
     audio_enabled: bool,
+    /// Aufgeben nach (erster Verbindungsaufbau, nach Abbruch). Für Tests verkürzbar.
+    give_up: Mutex<(Duration, Duration)>,
     /// Wird bei jedem Verbinden/Trennen erhöht; alte Sitzungs-Tasks erkennen daran, dass sie veraltet sind.
     generation: AtomicU64,
 }
@@ -116,6 +123,8 @@ impl Inner {
     }
 
     fn snapshot(&self) -> Snapshot {
+        // Mixer vor net sperren (nie beide verschachtelt in umgekehrter Reihenfolge)
+        let ignored = self.mixer.lock().ignored.clone();
         let n = self.net.lock();
         let muted = self.muted.load(Ordering::Relaxed);
         let self_talking = self.self_talking.load(Ordering::Relaxed) && !muted;
@@ -129,6 +138,7 @@ impl Inner {
                 muted: u.muted,
                 deaf: u.deaf,
                 talking: if u.id == n.me { self_talking } else { n.talking.binary_search(&u.id).is_ok() },
+                local_muted: ignored.contains(&u.id),
             })
             .collect();
         Snapshot {
@@ -141,6 +151,7 @@ impl Inner {
             users,
             muted,
             deaf: self.deaf.load(Ordering::Relaxed),
+            moderator: n.moderator,
         }
     }
 
@@ -187,6 +198,12 @@ impl Inner {
         }
     }
 
+    fn ignore_envelope(&self) -> Envelope {
+        let mut e = Envelope::new("ignore");
+        e.ids = self.config.lock().muted_users.clone();
+        e
+    }
+
     fn start_audio(&self) {
         if !self.audio_enabled {
             return;
@@ -196,7 +213,8 @@ impl Inner {
             return;
         }
         let s = self.config.lock().settings.clone();
-        let (io, warnings) = device::start(s.input_device, s.output_device, self.capture_tx.clone(), self.mixer.clone());
+        let (io, warnings) =
+            device::start(s.input_device, s.output_device, self.capture_tx.clone(), self.mixer.clone());
         *a = Some(io);
         drop(a);
         for w in warnings {
@@ -259,7 +277,11 @@ impl Engine {
         let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build()?;
         let (capture_tx, capture_rx) = mpsc::channel();
         let mixer = Arc::new(Mutex::new(Mixer::default()));
-        mixer.lock().volume = config.settings.output_volume;
+        {
+            let mut m = mixer.lock();
+            m.volume = config.settings.output_volume;
+            m.ignored = config.muted_users.iter().copied().collect();
+        }
         let params = params_from(&config.settings, false);
         let inner = Arc::new(Inner {
             storage,
@@ -274,6 +296,7 @@ impl Engine {
                 rooms: Vec::new(),
                 users: BTreeMap::new(),
                 talking: Vec::new(),
+                moderator: false,
             }),
             muted: AtomicBool::new(false),
             deaf: AtomicBool::new(false),
@@ -288,6 +311,7 @@ impl Engine {
             seq: AtomicU16::new(0),
             audio_enabled,
             generation: AtomicU64::new(0),
+            give_up: Mutex::new((GIVE_UP_FIRST, GIVE_UP_LOST)),
         });
         let weak = Arc::downgrade(&inner);
         std::thread::Builder::new().name("talkie-capture".into()).spawn(move || capture_loop(weak, capture_rx))?;
@@ -381,7 +405,9 @@ impl Engine {
             let mut c = self.inner.config.lock();
             c.registered = false;
             c.last_room = 0;
+            c.muted_users.clear(); // IDs gelten nur auf diesem Server
         }
+        self.inner.mixer.lock().ignored.clear();
         self.inner.save_config();
         Ok(())
     }
@@ -410,6 +436,37 @@ impl Engine {
         self.inner.params.lock().muted = muted;
         self.inner.send_cmd(self.inner.state_envelope());
         self.inner.emit_state();
+    }
+
+    /// Schaltet einen anderen Nutzer nur für mich stumm (oder wieder laut).
+    /// Bleibt gespeichert; der Server schickt seine Sprache dann gar nicht erst.
+    pub fn set_user_muted(&self, user: i64, muted: bool) {
+        {
+            let mut c = self.inner.config.lock();
+            c.muted_users.retain(|&id| id != user);
+            if muted {
+                c.muted_users.push(user);
+            }
+        }
+        self.inner.save_config();
+        {
+            let mut m = self.inner.mixer.lock();
+            if muted {
+                m.ignored.insert(user);
+                m.remove(user);
+            } else {
+                m.ignored.remove(&user);
+            }
+        }
+        self.inner.send_cmd(self.inner.ignore_envelope());
+        self.inner.emit_state();
+    }
+
+    /// Jemanden rauswerfen (`ban` = auch sperren). Der Server prüft das Recht.
+    pub fn moderate(&self, user: i64, ban: bool) {
+        let mut e = Envelope::new(if ban { "ban" } else { "kick" });
+        e.id = user;
+        self.inner.send_cmd(e);
     }
 
     /// Taub schalten: hört niemanden und ist dabei auch stumm.
@@ -449,6 +506,11 @@ impl Engine {
         let _ = self.inner.capture_tx.send(samples);
     }
 
+    /// Für Tests: schneller aufgeben.
+    pub fn set_give_up(&self, first: Duration, lost: Duration) {
+        *self.inner.give_up.lock() = (first, lost);
+    }
+
     pub fn mixer_stats(&self) -> (u64, u64) {
         let m = self.inner.mixer.lock();
         (m.packets, m.lost)
@@ -482,12 +544,23 @@ impl Drop for AbortOnDrop {
     }
 }
 
+/// So lange wird es beim Start versucht, bevor „nicht erreichbar“ kommt.
+pub const GIVE_UP_FIRST: Duration = Duration::from_secs(45);
+/// So lange nach einem Verbindungsabbruch (WLAN weg, Laptop zugeklappt …).
+pub const GIVE_UP_LOST: Duration = Duration::from_secs(180);
+
 async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
     let mut backoff = 1u64;
     let mut first = true;
+    let mut ever_connected = false;
+    // Seit wann es nicht klappt (ab Start bzw. ab dem letzten Abbruch)
+    let mut failing_since = std::time::Instant::now();
+    let mut attempt = 0u32;
     loop {
         if first {
-            if !inner.is_current(generation) { return; }
+            if !inner.is_current(generation) {
+                return;
+            }
             inner.set_status(Status::Connecting, "Verbinde …", "");
         }
         let (server, pinned, register) = {
@@ -498,7 +571,9 @@ async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
         };
         if register.as_ref().is_some_and(|(_, inv)| inv.is_empty()) {
             inner.stop_audio();
-            if !inner.is_current(generation) { return; }
+            if !inner.is_current(generation) {
+                return;
+            }
             inner.set_status(Status::Failed, "Für dieses Gerät brauchst du einen Einladungscode.", "need_invite");
             return;
         }
@@ -510,6 +585,8 @@ async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
                     return;
                 }
                 backoff = 1;
+                attempt = 0;
+                ever_connected = true;
                 {
                     let mut c = inner.config.lock();
                     c.registered = true;
@@ -522,13 +599,18 @@ async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
                 match run_session(&inner, sess, generation).await {
                     SessionEnd::Kicked(reason) => {
                         inner.stop_audio();
-                        if !inner.is_current(generation) { return; }
-            inner.set_status(Status::Failed, reason, "kicked");
+                        if !inner.is_current(generation) {
+                            return;
+                        }
+                        inner.set_status(Status::Failed, reason, "kicked");
                         return;
                     }
                     SessionEnd::Lost(msg) => {
-                        if !inner.is_current(generation) { return; }
-            inner.set_status(Status::Reconnecting, msg, "");
+                        if !inner.is_current(generation) {
+                            return;
+                        }
+                        failing_since = std::time::Instant::now();
+                        inner.set_status(Status::Reconnecting, msg, "");
                     }
                 }
             }
@@ -538,18 +620,48 @@ async fn session_loop(inner: Arc<Inner>, invite: String, generation: u64) {
                     inner.save_config();
                 }
                 inner.stop_audio();
-                if !inner.is_current(generation) { return; }
-            inner.set_status(Status::Failed, message, &code);
+                if !inner.is_current(generation) {
+                    return;
+                }
+                inner.set_status(Status::Failed, message, &code);
                 return;
             }
-            Err(ConnectError::Temporary(e)) => {
-                if !inner.is_current(generation) { return; }
-            inner.set_status(Status::Reconnecting, format!("{e} — versuche es gleich nochmal …"), "");
+            Err(err @ (ConnectError::Temporary(_) | ConnectError::Offline)) => {
+                if !inner.is_current(generation) {
+                    return;
+                }
+                attempt += 1;
+                let offline = matches!(err, ConnectError::Offline);
+                let limit = if ever_connected { inner.give_up.lock().1 } else { inner.give_up.lock().0 };
+                if failing_since.elapsed() >= limit {
+                    inner.stop_audio();
+                    let msg = if offline {
+                        "Kein Netzwerk. Prüfe WLAN oder Kabel und tippe dann auf „Nochmal verbinden“."
+                    } else {
+                        "Der Server ist nicht erreichbar. Läuft er? Stimmt die Adresse?"
+                    };
+                    inner.set_status(Status::Failed, msg, if offline { "offline" } else { "unreachable" });
+                    return;
+                }
+                let wait = backoff;
+                match err {
+                    ConnectError::Offline => inner.set_status(
+                        Status::Reconnecting,
+                        "Kein Netzwerk – prüfe WLAN oder Kabel. Talkie verbindet sich dann von selbst.",
+                        "offline",
+                    ),
+                    ConnectError::Temporary(e) => inner.set_status(
+                        Status::Reconnecting,
+                        format!("{e} – neuer Versuch in {wait} s (Versuch {attempt})"),
+                        "",
+                    ),
+                    ConnectError::Fatal { .. } => unreachable!(),
+                }
             }
         }
         first = false;
         tokio::time::sleep(Duration::from_secs(backoff)).await;
-        backoff = (backoff * 2).min(15);
+        backoff = (backoff * 2).min(10);
     }
 }
 
@@ -567,6 +679,7 @@ async fn run_session(inner: &Arc<Inner>, sess: net::Session, generation: u64) ->
             my_room = you.room;
         }
         n.talking.clear();
+        n.moderator = welcome.r#mod.unwrap_or(false);
         n.status = Status::Connected;
         n.message.clear();
         n.error_code.clear();
@@ -588,6 +701,9 @@ async fn run_session(inner: &Arc<Inner>, sess: net::Session, generation: u64) ->
     }
     if inner.muted.load(Ordering::Relaxed) || inner.deaf.load(Ordering::Relaxed) {
         let _ = tx.send(inner.state_envelope());
+    }
+    if !inner.config.lock().muted_users.is_empty() {
+        let _ = tx.send(inner.ignore_envelope());
     }
     if last_room != 0 && last_room != my_room && welcome.rooms.iter().any(|r| r.id == last_room) {
         let mut j = Envelope::new("join");
@@ -715,8 +831,10 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
                 inner.emit(CoreEvent::Chat(m));
             }
         }
-        "kicked" => return Some(SessionEnd::Kicked(if e.reason.is_empty() { "Du wurdest getrennt.".into() } else { e.reason })),
-        "error" => inner.emit(CoreEvent::Notice(e.reason)),
+        "kicked" => {
+            return Some(SessionEnd::Kicked(if e.reason.is_empty() { "Du wurdest getrennt.".into() } else { e.reason }))
+        }
+        "error" | "info" => inner.emit(CoreEvent::Notice(e.reason)),
         _ => {}
     }
     None

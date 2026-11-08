@@ -45,6 +45,35 @@ Widget _wrap(Widget child) => MaterialApp(
       home: child,
     );
 
+TalkieController _mainController() {
+  final c = _controller()
+    ..state = const StateDto(
+      status: ConnStatus.connected,
+      message: '',
+      errorCode: '',
+      me: 1,
+      room: 10,
+      rooms: [RoomDto(id: 10, name: 'Lobby'), RoomDto(id: 11, name: 'Zocken 1'), RoomDto(id: 12, name: 'Zocken 2')],
+      users: [
+        UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true, localMuted: false),
+        UserDto(id: 2, name: 'Lena', room: 10, muted: true, deaf: false, talking: false, localMuted: false),
+        UserDto(id: 3, name: 'Jonas', room: 11, muted: false, deaf: false, talking: true, localMuted: true),
+        UserDto(id: 4, name: 'Emil', room: 11, muted: false, deaf: true, talking: false, localMuted: false),
+      ],
+      muted: false,
+      deaf: false,
+      moderator: false,
+    );
+  c.chats[10] = const [
+    ChatDto(room: 10, from: 2, name: 'Lena', text: 'Wer ist dabei? Runde startet gleich!', ts: 1762500000),
+    ChatDto(room: 10, from: 2, name: 'Lena', text: 'Lobby-Code: 4711', ts: 1762500030),
+    ChatDto(room: 10, from: 1, name: 'Max', text: 'Bin in 2 Minuten da 👍', ts: 1762500100),
+  ];
+  c.unread[11] = 2;
+  c.levelNotifier.value = 0.62;
+  return c;
+}
+
 void main() {
   setUpAll(_loadFonts);
 
@@ -68,30 +97,7 @@ void main() {
   testWidgets('Hauptfenster zeigt Räume, Sprecher und Chat', (tester) async {
     tester.view.physicalSize = const Size(1000, 640);
     tester.view.devicePixelRatio = 1;
-    final c = _controller()
-      ..state = const StateDto(
-        status: ConnStatus.connected,
-        message: '',
-        errorCode: '',
-        me: 1,
-        room: 10,
-        rooms: [RoomDto(id: 10, name: 'Lobby'), RoomDto(id: 11, name: 'Zocken 1'), RoomDto(id: 12, name: 'Zocken 2')],
-        users: [
-          UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true),
-          UserDto(id: 2, name: 'Lena', room: 10, muted: true, deaf: false, talking: false),
-          UserDto(id: 3, name: 'Jonas', room: 11, muted: false, deaf: false, talking: true),
-          UserDto(id: 4, name: 'Emil', room: 11, muted: false, deaf: true, talking: false),
-        ],
-        muted: false,
-        deaf: false,
-      );
-    c.chats[10] = const [
-      ChatDto(room: 10, from: 2, name: 'Lena', text: 'Wer ist dabei? Runde startet gleich!', ts: 1762500000),
-      ChatDto(room: 10, from: 2, name: 'Lena', text: 'Lobby-Code: 4711', ts: 1762500030),
-      ChatDto(room: 10, from: 1, name: 'Max', text: 'Bin in 2 Minuten da 👍', ts: 1762500100),
-    ];
-    c.unread[11] = 2;
-    c.levelNotifier.value = 0.62;
+    final c = _mainController();
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -119,9 +125,95 @@ void main() {
         users: [],
         muted: false,
         deaf: false,
+        moderator: false,
       );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     expect(find.text('Du wurdest vom Admin rausgeworfen.'), findsOneWidget);
     expect(find.text('Nochmal verbinden'), findsOneWidget);
+  });
+
+  testWidgets('Kein Netzwerk: Banner mit WLAN-Symbol und Abbrechen', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController()
+      ..state = const StateDto(
+        status: ConnStatus.reconnecting,
+        message: 'Kein Netzwerk – prüfe WLAN oder Kabel. Talkie verbindet sich dann von selbst.',
+        errorCode: 'offline',
+        me: 1,
+        room: 10,
+        rooms: [RoomDto(id: 10, name: 'Lobby')],
+        users: [],
+        muted: false,
+        deaf: false,
+        moderator: false,
+      );
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('Kein Netzwerk'), findsOneWidget);
+    expect(find.byIcon(Icons.wifi_off_rounded), findsOneWidget);
+    expect(find.text('Abbrechen'), findsOneWidget);
+    expect(find.text('Nochmal verbinden'), findsNothing);
+    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_offline.png'));
+  });
+
+  testWidgets('Handy: Chat vorn, Räume in der Seitenleiste', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Lobby-Code: 4711'), findsOneWidget);
+    expect(find.text('Zocken 1'), findsNothing); // Räume erst in der Seitenleiste
+    expect(find.text('Mehr'), findsOneWidget);
+    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_chat.png'));
+
+    await tester.tap(find.byTooltip('Räume'));
+    await tester.pumpAndSettle();
+    expect(find.text('Zocken 1'), findsOneWidget);
+    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_rooms.png'));
+
+    // Raum antippen schließt die Seitenleiste (aktueller Raum: kein Aufruf an den Rust-Kern)
+    await tester.tap(find.descendant(of: find.byType(Drawer), matching: find.text('Lobby')));
+    await tester.pumpAndSettle();
+    expect(find.byType(Drawer), findsNothing);
+  });
+
+  testWidgets('Moderator sieht Menü mit Rauswerfen und Sperren', (tester) async {
+    tester.view.physicalSize = const Size(1000, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    final s = c.state!;
+    c.state = StateDto(
+      status: s.status,
+      message: s.message,
+      errorCode: s.errorCode,
+      me: s.me,
+      room: s.room,
+      rooms: s.rooms,
+      users: s.users,
+      muted: s.muted,
+      deaf: s.deaf,
+      moderator: true,
+    );
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    // ein Menü pro anderer Person (Lena, Jonas, Emil), keins bei mir
+    expect(find.byTooltip('Mehr zu Lena'), findsOneWidget);
+    expect(find.byTooltip('Mehr zu Max'), findsNothing);
+    await tester.tap(find.byTooltip('Mehr zu Lena'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rauswerfen'), findsOneWidget);
+    expect(find.text('Sperren'), findsOneWidget);
+    await tester.tap(find.text('Sperren'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lena sperren?'), findsOneWidget);
+    await expectLater(find.byType(Overlay).first, matchesGoldenFile('goldens/mod_confirm.png'));
+    await tester.tap(find.text('Abbrechen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lena sperren?'), findsNothing);
   });
 }

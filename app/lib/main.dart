@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'controller.dart';
+import 'platform.dart';
 import 'screens/main_screen.dart';
 import 'screens/setup_screen.dart';
 import 'src/rust/api/talkie.dart';
@@ -10,7 +11,9 @@ import 'theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
-  final config = await talkieInit(dataDir: '');
+  final config = await talkieInit(dataDir: await TalkiePlatform.dataDir());
+  // Vor dem ersten Verbinden, sonst startet das Mikrofon ohne Erlaubnis
+  await TalkiePlatform.requestMic();
   final controller = TalkieController(config)..start();
   runApp(TalkieApp(controller: controller));
 }

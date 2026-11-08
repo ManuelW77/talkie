@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'platform.dart';
 import 'src/rust/api/talkie.dart';
 
 /// Beim Bauen festlegbar: flutter build ... --dart-define=TALKIE_SERVER=talkie.example.org
@@ -56,6 +57,8 @@ class TalkieController extends ChangeNotifier {
   int get currentRoom => state?.room ?? 0;
   bool get muted => state?.muted ?? false;
   bool get deaf => state?.deaf ?? false;
+  /// Darf andere rauswerfen/sperren (verknüpftes Webkonto mit Recht).
+  bool get moderator => state?.moderator ?? false;
   List<ChatDto> get currentChat => chats[currentRoom] ?? const [];
 
   UserDto? get meUser {
@@ -89,14 +92,18 @@ class TalkieController extends ChangeNotifier {
           setupBusy = false;
           setupError = null;
         } else if (s.status == ConnStatus.failed) {
-          setupBusy = false;
           if (_setupErrors.contains(s.errorCode)) {
             showSetup = true;
             setupError = s.message;
             config = talkieConfig();
+          } else if (showSetup && setupBusy) {
+            // z. B. Server nicht erreichbar: in der Einrichtung als Fehler zeigen
+            setupError = s.message;
           }
+          setupBusy = false;
         }
         if (prev?.room != s.room) unread.remove(s.room);
+        _updateBackground(s.status);
         notifyListeners();
       case EventKind.chat:
         final m = e.chat!;
@@ -114,10 +121,20 @@ class TalkieController extends ChangeNotifier {
     }
   }
 
+  bool _active = false;
+
+  /// Handy: solange eine Verbindung besteht oder aufgebaut wird, im Hintergrund weiterlaufen.
+  void _updateBackground(ConnStatus st) {
+    final on = st == ConnStatus.connected || st == ConnStatus.connecting || st == ConnStatus.reconnecting;
+    if (on == _active) return;
+    _active = on;
+    TalkiePlatform.setActive(on);
+  }
+
   // --- Aktionen ---
 
-  /// Verbindungsaufbau während der Einrichtung abbrechen.
-  void cancelSetup() {
+  /// Laufenden Verbindungsversuch abbrechen (Einrichtung oder Banner).
+  void cancelConnect() {
     talkieDisconnect();
     setupBusy = false;
     notifyListeners();
@@ -149,6 +166,12 @@ class TalkieController extends ChangeNotifier {
   void toggleMute() => talkieSetMuted(muted: !muted);
 
   void toggleDeaf() => talkieSetDeaf(deaf: !deaf);
+
+  /// Rauswerfen (ban = auch sperren). Das Ergebnis kommt als Hinweis (Snackbar).
+  void moderate(UserDto u, {required bool ban}) => talkieModerate(user: u.id, ban: ban);
+
+  /// Schaltet jemanden nur für mich stumm – die anderen hören ihn weiter.
+  void toggleUserMuted(UserDto u) => talkieSetUserMuted(user: u.id, muted: !u.localMuted);
 
   Future<void> saveSettings(SettingsDto s) async {
     await talkieSetSettings(s: s);

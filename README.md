@@ -127,6 +127,7 @@ Am einfachsten über **GitHub Actions** (`.github/workflows/build.yml`). Jeder P
 | `Talkie-macOS.dmg` | macOS ab 10.15, Intel **und** Apple Silicon (läuft also auch auf Big Sur) |
 | `Talkie-Windows.zip` | Windows 10 und 11 (64 Bit), Laufzeit-DLLs liegen bei |
 | `Talkie-Linux-x64.tar.gz` | Linux x64 (braucht GTK 3 und ALSA, ist auf gängigen Desktops vorhanden) |
+| `Talkie-Android.apk` | Android ab 8.0, direkt installierbar (nicht über den Play Store) |
 
 **Tipp:** Unter *Settings → Secrets and variables → Actions → Variables* im Repo
 `TALKIE_SERVER` (z. B. `talkie.example.org:7777`) und `TALKIE_FINGERPRINT` (aus `talkie-server status`) setzen.
@@ -145,7 +146,16 @@ flutter_rust_bridge_codegen generate     # nur nach Änderungen an app/rust/src/
 tool/build_macos.sh --dart-define=TALKIE_SERVER=talkie.example.org   # macOS
 flutter build windows --release --dart-define=TALKIE_SERVER=...       # auf Windows
 flutter build linux --release --dart-define=TALKIE_SERVER=...         # auf Linux
+flutter build apk --release --dart-define=TALKIE_SERVER=...           # Android (braucht Android-SDK mit NDK)
+tool/build_ios_sim.sh                                                 # iOS-Simulator
 ```
+
+> **Android/iOS:** Dieselbe App läuft auch auf Handy und Tablet (Android ab 8.0, iOS ab 15).
+> Rust-Ziele vorher installieren: `rustup target add aarch64-linux-android armv7-linux-androideabi
+> x86_64-linux-android aarch64-apple-ios aarch64-apple-ios-sim`. iOS baut und signiert man in Xcode
+> (nicht in der CI): einmal `cd app && flutter build ios --config-only --release`, dann
+> `app/ios/Runner.xcworkspace` öffnen, Team unter *Signing* prüfen, *Product → Archive* und über den
+> Organizer zu App Store Connect/TestFlight hochladen.
 
 > **macOS mit Xcode 27:** Apple erlaubt damit nur noch macOS 12+ als Ziel, und das neue `lipo` verträgt
 > Flutters Universal-Prüfung nicht. `tool/build_macos.sh` baut dann nur für den eigenen Mac.
@@ -164,6 +174,12 @@ flutter build linux --release --dart-define=TALKIE_SERVER=...         # auf Linu
 - **macOS:** Talkie in „Programme“ ziehen, dann **Rechtsklick → Öffnen → Öffnen**. Nur beim ersten Mal nötig.
   Beim ersten Verbinden fragt macOS nach dem Mikrofon → „Erlauben“.
 - **Windows:** Bei „Der Computer wurde durch Windows geschützt“ → **Weitere Informationen → Trotzdem ausführen**.
+- **Linux:** Archiv entpacken, im Ordner `Talkie` einmal `./install.sh` ausführen → Talkie steht im
+  Startmenü und hat sein Icon im Dock. Starten geht auch direkt mit `./talkie`.
+- **Android:** APK aufs Handy schicken und öffnen, Installation aus dieser Quelle erlauben.
+  Mikrofon und Benachrichtigungen erlauben: Die Benachrichtigung „Talkie ist verbunden“ hält Talkie
+  im Hintergrund am Leben, während gezockt wird.
+- **Handy allgemein:** Am besten mit Kopfhörern. Über den Lautsprecher hören die anderen sich sonst als Echo.
 
 Bedienung: **Raum anklicken** = Raum wechseln. Mikrofon-Knopf = stumm (auch **Strg+M** bzw. **⌘M**),
 Kopfhörer-Knopf = niemanden hören. In den Einstellungen lässt sich die Empfindlichkeit einstellen:

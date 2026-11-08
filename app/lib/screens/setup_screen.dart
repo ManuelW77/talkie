@@ -129,14 +129,15 @@ class _SetupScreenState extends State<SetupScreen> {
                         : const Text("Los geht's"),
                   ),
                   // Klappt es nicht auf Anhieb, sieht man warum und kann abbrechen
-                  if (c.setupBusy && c.status == ConnStatus.reconnecting) ...[
+                  if (c.setupBusy) ...[
                     const SizedBox(height: 12),
-                    Text(
-                      c.state?.message ?? '',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    TextButton(onPressed: c.cancelSetup, child: const Text('Abbrechen')),
+                    if (c.status == ConnStatus.reconnecting)
+                      Text(
+                        c.state?.message ?? '',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    TextButton(onPressed: c.cancelConnect, child: const Text('Abbrechen')),
                   ],
                   if (!_showServer) ...[
                     const SizedBox(height: 8),

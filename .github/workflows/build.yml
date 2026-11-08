@@ -1,6 +1,6 @@
 name: Build
 
-# Baut Server + Desktop-Clients. Optional in den Repo-Einstellungen unter
+# Baut Server + Desktop- und Handy-Clients. Optional in den Repo-Einstellungen unter
 # Settings → Secrets and variables → Actions → Variables setzen:
 #   TALKIE_SERVER       z. B. talkie.example.org:7777  (dann müssen die Kids nur Name + Code eingeben)
 #   TALKIE_FINGERPRINT  Fingerabdruck aus "talkie-server status" (fest eingebautes Zertifikats-Pinning)
@@ -146,16 +146,48 @@ jobs:
         working-directory: app
         run: |
           mv build/linux/x64/release/bundle Talkie
+          cp linux/packaging/install.sh Talkie/
           tar czf Talkie-Linux-x64.tar.gz Talkie
       - uses: actions/upload-artifact@v5
         with:
           name: Talkie-Linux
           path: app/Talkie-Linux-x64.tar.gz
 
+  android:
+    name: Android (ab 8.0)
+    if: ${{ !(github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/feature/') || startsWith(github.ref, 'refs/heads/chore/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Bauen
+        working-directory: app
+        # Signiert mit dem Debug-Schlüssel: zum direkten Installieren, nicht für den Play Store
+        run: flutter build apk --release $DART_DEFINES
+      - name: Paket
+        working-directory: app
+        run: cp build/app/outputs/flutter-apk/app-release.apk Talkie-Android.apk
+      - uses: actions/upload-artifact@v5
+        with:
+          name: Talkie-Android
+          path: app/Talkie-Android.apk
+
   release:
     name: Release anlegen
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [macos, windows, linux]
+    needs: [macos, windows, linux, android]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

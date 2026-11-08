@@ -330,3 +330,115 @@ func TestHistoryFitsFrame(t *testing.T) {
 		t.Fatal("text verändert")
 	}
 }
+
+// recvVoice wartet kurz auf ein Sprachpaket und liefert die Absender-ID (0 = nichts kam).
+func recvVoice(t *testing.T, c *testClient, wait time.Duration) int64 {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	d, err := c.conn.ReceiveDatagram(ctx)
+	if err != nil {
+		return 0
+	}
+	return int64(binary.BigEndian.Uint32(d[1:5]))
+}
+
+func TestIgnoreOnlyForSelf(t *testing.T) {
+	srv := startTestServer(t)
+	inv, err := srv.store.CreateInvite(3, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, wa := login(t, srv.addr, newKey(t), "Anna", inv.Code)
+	b, _ := login(t, srv.addr, newKey(t), "Ben", inv.Code)
+	c, wc := login(t, srv.addr, newKey(t), "Cleo", inv.Code)
+	b.expect("user_joined")
+	pkt := []byte{DatagramVoice, 0, 1, 0xAA}
+
+	// Ben schaltet Anna für sich stumm (eigene ID und Unsinn werden ignoriert)
+	writeEnv(t, b.stream, &Envelope{T: "ignore", IDs: []int64{wa.You.ID, -5, 0}})
+	time.Sleep(150 * time.Millisecond)
+	_ = a.conn.SendDatagram(pkt)
+	if got := recvVoice(t, c, 2*time.Second); got != wa.You.ID {
+		t.Fatalf("Cleo muss Anna weiter hören, bekam %d", got)
+	}
+	if got := recvVoice(t, b, 300*time.Millisecond); got != 0 {
+		t.Fatalf("Ben hört Anna trotz Stummschaltung (%d)", got)
+	}
+	// Cleo hört Ben weiterhin
+	_ = c.conn.SendDatagram(pkt)
+	if got := recvVoice(t, b, 2*time.Second); got != wc.You.ID {
+		t.Fatalf("Ben muss Cleo hören, bekam %d", got)
+	}
+
+	// Leere Liste hebt die Stummschaltung auf
+	writeEnv(t, b.stream, &Envelope{T: "ignore"})
+	time.Sleep(150 * time.Millisecond)
+	_ = a.conn.SendDatagram(pkt)
+	if got := recvVoice(t, b, 2*time.Second); got != wa.You.ID {
+		t.Fatalf("Ben hört Anna nach Aufheben nicht (%d)", got)
+	}
+}
+
+func TestModerationFromApp(t *testing.T) {
+	srv := startTestServer(t)
+	inv, err := srv.store.CreateInvite(4, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyMod := newKey(t)
+	// Zuerst registrieren, dann Webkonten verknüpfen, dann neu anmelden (mod kommt im welcome)
+	m0, wm := login(t, srv.addr, keyMod, "Mama", inv.Code)
+	_, wa := login(t, srv.addr, newKey(t), "Anna", inv.Code)
+	b, wb := login(t, srv.addr, newKey(t), "Ben", inv.Code)
+	_, wc := login(t, srv.addr, newKey(t), "Chef", inv.Code)
+	if wm.Mod != nil {
+		t.Fatal("ohne verknüpftes Konto darf niemand moderieren")
+	}
+	m0.conn.CloseWithError(0, "")
+
+	if _, err := srv.store.AddAccount(Account{Email: "mama@x.de", Role: RoleUser, Perms: PermUsersEdit, TalkieID: wm.You.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.store.AddAccount(Account{Email: "oma@x.de", Role: RoleUser, Perms: PermInvite, TalkieID: wb.You.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.store.AddAccount(Account{Email: "chef@x.de", Role: RoleAdmin, TalkieID: wc.You.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	m, wm2 := login(t, srv.addr, keyMod, "", "")
+	if wm2.Mod == nil || !*wm2.Mod {
+		t.Fatalf("Mama muss moderieren dürfen: %+v", wm2)
+	}
+
+	// Ben hat nur „Kids einladen“ → darf nicht
+	writeEnv(t, b.stream, &Envelope{T: "kick", ID: wa.You.ID})
+	if e := b.expect("error"); e.Code != "forbidden" {
+		t.Fatalf("Ben: %+v", e)
+	}
+	// Admin ist geschützt
+	writeEnv(t, m.stream, &Envelope{T: "kick", ID: wc.You.ID})
+	if e := m.expect("error"); !strings.Contains(e.Reason, "Admins") {
+		t.Fatalf("Admin-Schutz: %+v", e)
+	}
+	// Ben rauswerfen
+	writeEnv(t, m.stream, &Envelope{T: "kick", ID: wb.You.ID})
+	if e := m.expect("info"); !strings.Contains(e.Reason, "rausgeworfen") {
+		t.Fatalf("kick: %+v", e)
+	}
+	if k := b.expect("kicked"); !strings.Contains(k.Reason, "Mama") {
+		t.Fatalf("Ben bekam: %+v", k)
+	}
+	// Anna sperren → fliegt raus und kommt nicht wieder rein
+	writeEnv(t, m.stream, &Envelope{T: "ban", ID: wa.You.ID})
+	if e := m.expect("info"); !strings.Contains(e.Reason, "gesperrt") {
+		t.Fatalf("ban: %+v", e)
+	}
+	if u, _ := srv.store.UserByID(wa.You.ID); u == nil || !u.Banned {
+		t.Fatal("Anna nicht gesperrt")
+	}
+	if log, _ := srv.store.AuditLog(10); len(log) == 0 || !strings.Contains(log[0].Who, "(App)") {
+		t.Fatalf("Protokoll fehlt: %+v", log)
+	}
+}

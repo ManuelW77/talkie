@@ -77,6 +77,7 @@ func (h *Hub) broadcastLocked(e *Envelope, except *Session) {
 // Add registriert eine angemeldete Session. Eine ältere Session desselben Nutzers wird beendet.
 // Liefert false, wenn der Server voll ist.
 func (h *Hub) Add(s *Session) (old *Session, ok bool) {
+	_, mod := h.store.Moderator(s.userID)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	old = h.sessions[s.userID]
@@ -90,6 +91,9 @@ func (h *Hub) Add(s *Session) (old *Session, ok bool) {
 	s.room = h.defaultRoomLocked()
 	h.sessions[s.userID] = s
 	welcome := &Envelope{T: "welcome", You: ptr(s.wireLocked()), Rooms: h.rooms, Users: h.usersLocked()}
+	if mod {
+		welcome.Mod = boolPtr(true)
+	}
 	s.send(welcome)
 	h.broadcastLocked(&Envelope{T: "user_joined", User: ptr(s.wireLocked())}, s)
 	return old, true
@@ -170,10 +174,30 @@ func (h *Hub) ForwardVoice(from *Session, pkt []byte) {
 		return
 	}
 	for _, o := range h.sessions {
-		if o != from && o.room == from.room && !o.deaf {
+		if o != from && o.room == from.room && !o.deaf && !o.ignored[from.userID] {
 			_ = o.conn.SendDatagram(pkt) // Verlust ist bei Sprache in Ordnung
 		}
 	}
+}
+
+// maxIgnored begrenzt die Liste, damit ein Client den Server nicht mit Speicher flutet.
+const maxIgnored = 500
+
+// SetIgnored ersetzt die Liste der Nutzer, die s für sich stumm geschaltet hat.
+// Ihre Sprache wird an s gar nicht erst geschickt (spart Daten).
+func (h *Hub) SetIgnored(s *Session, ids []int64) {
+	if len(ids) > maxIgnored {
+		ids = ids[:maxIgnored]
+	}
+	set := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		if id > 0 && id != s.userID {
+			set[id] = true
+		}
+	}
+	h.mu.Lock()
+	s.ignored = set
+	h.mu.Unlock()
 }
 
 // --- Admin-Operationen ---
@@ -210,6 +234,49 @@ func (h *Hub) Kick(userID int64, reason string) bool {
 	}
 	s.kick(reason)
 	return true
+}
+
+// Moderate wirft target raus (ban = auch sperren), wenn s das über sein Webkonto darf.
+// Der Server prüft bei jeder Aktion neu; das mod-Flag im welcome ist nur für die Anzeige.
+func (h *Hub) Moderate(s *Session, target int64, ban bool) {
+	fail := func(msg string) { s.send(&Envelope{T: "error", Code: "forbidden", Reason: msg}) }
+	acc, ok := h.store.Moderator(s.userID)
+	if !ok {
+		fail("Das darfst du nicht.")
+		return
+	}
+	if target == s.userID {
+		fail("Dich selbst kannst du nicht rauswerfen.")
+		return
+	}
+	u, err := h.store.UserByID(target)
+	if err != nil {
+		fail("Diesen Nutzer gibt es nicht mehr.")
+		return
+	}
+	if !acc.IsAdmin() && h.store.LinkedToAdmin(target) {
+		fail("Admins kannst du nicht rauswerfen.")
+		return
+	}
+	h.mu.RLock()
+	by := s.name
+	h.mu.RUnlock()
+	if ban {
+		if _, err := h.store.SetBanned(u.Name, true); err != nil {
+			fail("Sperren hat nicht geklappt.")
+			return
+		}
+		h.Kick(target, by+" hat dich gesperrt.")
+		h.store.Audit(acc.Email+" (App)", "Talkie-Nutzer "+u.Name+" gesperrt")
+		s.send(&Envelope{T: "info", Reason: u.Name + " ist gesperrt."})
+		return
+	}
+	if !h.Kick(target, by+" hat dich rausgeworfen.") {
+		fail(u.Name + " ist nicht online.")
+		return
+	}
+	h.store.Audit(acc.Email+" (App)", "Talkie-Nutzer "+u.Name+" rausgeworfen")
+	s.send(&Envelope{T: "info", Reason: u.Name + " wurde rausgeworfen."})
 }
 
 func (h *Hub) Renamed(userID int64, name string) {
