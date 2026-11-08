@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../src/rust/api/talkie.dart' show ConnStatus;
 import '../controller.dart';
 import '../theme.dart';
 
@@ -127,6 +128,16 @@ class _SetupScreenState extends State<SetupScreen> {
                         ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
                         : const Text("Los geht's"),
                   ),
+                  // Klappt es nicht auf Anhieb, sieht man warum und kann abbrechen
+                  if (c.setupBusy && c.status == ConnStatus.reconnecting) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      c.state?.message ?? '',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    TextButton(onPressed: c.cancelSetup, child: const Text('Abbrechen')),
+                  ],
                   if (!_showServer) ...[
                     const SizedBox(height: 8),
                     TextButton(
