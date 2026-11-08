@@ -7,9 +7,11 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    # feature/** und chore/**: nur Tests; devel, main, Tags und PRs: Tests + alle Builds
+    branches: [main, devel, "feature/**", "chore/**", "fix/**"]
     tags: ["v*"]
   pull_request:
+    branches: [main, devel]
   workflow_dispatch:
 
 permissions:
@@ -51,6 +53,7 @@ jobs:
 
   macos:
     name: macOS (Universal, ab 10.15)
+    if: ${{ !(github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/feature/') || startsWith(github.ref, 'refs/heads/chore/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     needs: test
     # Xcode 27+ kann nicht mehr für macOS 10.15/11 bauen → ältere Runner-Version mit Xcode 16
     runs-on: macos-15
@@ -84,6 +87,7 @@ jobs:
 
   windows:
     name: Windows (ab 10)
+    if: ${{ !(github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/feature/') || startsWith(github.ref, 'refs/heads/chore/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     needs: test
     runs-on: windows-2022
     steps:
@@ -116,6 +120,7 @@ jobs:
 
   linux:
     name: Linux (x64)
+    if: ${{ !(github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/feature/') || startsWith(github.ref, 'refs/heads/chore/') || startsWith(github.ref, 'refs/heads/fix/'))) }}
     needs: test
     runs-on: ubuntu-22.04
     steps:
