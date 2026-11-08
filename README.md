@@ -1,26 +1,77 @@
 # Talkie
 
-Sprach- und Textchat für eine kleine, geschlossene Gruppe (z. B. Kinder und ihre Freunde beim Zocken).
-Einfach, sicher und sparsam:
+**Talkie ist ein Sprach- und Text-Chat für Freunde und Familie** – gebaut für Kinder, die beim Zocken
+miteinander reden wollen, ohne dass dafür ein großer Dienst wie Discord nötig ist.
 
-- **Rein nur mit Einladungscode.** Danach meldet sich das Gerät automatisch an, ohne Passwort.
+Ihr betreibt Talkie selbst: Ein kleiner Server läuft bei euch zu Hause oder auf einem gemieteten Server,
+die Kinder installieren die App, geben ihren Namen und einen Einladungscode ein – fertig. Fremde kommen
+nicht hinein, Werbung und Tracking gibt es nicht, und alle Daten bleiben bei euch.
+
+<p align="center"><img src="docs/screenshots/app-desktop.png" alt="Talkie am Computer: Räume links, Chat rechts" width="820"></p>
+
+## Was kann Talkie?
+
+- 🎙️ **Einfach reden:** Sobald du sprichst, hören dich die anderen im Raum – keine Taste nötig.
+  Wer lieber eine Taste drückt, schaltet „Push-to-Talk“ ein (funktioniert auch, während ein Spiel läuft).
+- 🏠 **Räume:** z. B. „Lobby“, „Minecraft“, „Hausaufgaben“. Ein Tipp auf den Raum, und du bist drin.
+  Du siehst sofort, wer da ist und wer gerade spricht.
+- 💬 **Chat pro Raum** für Lobby-Codes, Links und „bin gleich da“. Nachrichten verschwinden nach 24 Stunden.
+- 🔇 **Stumm, taub, leiser:** Mikro aus, niemanden hören, oder einzelne Personen nur für dich leiser oder stumm schalten.
+- 📱 **Auf allen Geräten** – und mit demselben Namen auf mehreren (z. B. Laptop und Handy).
+- 🎧 **Gut verständlich und sparsam:** Rauschfilter gegen Lüfter und Tastatur, Echo-Unterdrückung am Handy.
+  Talkie braucht nur etwa 3 KB pro Sekunde und Sprecher – das Spiel merkt davon nichts.
+- 🔒 **Sicher:** Nur wer eingeladen ist, kommt rein. Alles ist verschlüsselt, ohne Passwörter, ohne E-Mail-Adressen der Kinder.
+
+<p align="center"><img src="docs/screenshots/app-handy.png" alt="Talkie am Handy: Chat, Räume und Einrichtung" width="820"></p>
+
+## Für welche Geräte?
+
+| Gerät | ab Version | Download |
+|---|---|---|
+| 🪟 Windows | Windows 10 | [Releases](https://github.com/ManuelW77/talkie/releases/latest) → `Talkie-Windows.zip` |
+| 🍎 Mac | macOS 10.15 (Intel und Apple Silicon) | [Releases](https://github.com/ManuelW77/talkie/releases/latest) → `Talkie-macOS.dmg` |
+| 🐧 Linux | 64 Bit (x64) | [Releases](https://github.com/ManuelW77/talkie/releases/latest) → `Talkie-Linux-x64.tar.gz` |
+| 🤖 Android | Android 8.0 | [Releases](https://github.com/ManuelW77/talkie/releases/latest) → `Talkie-Android.apk` |
+| 📱 iPhone / iPad | iOS 15 | [TestFlight](https://testflight.apple.com/join/zfBAJJNK) (erst die App „TestFlight“ aus dem App Store laden) |
+
+**So kommst du rein:** App starten → deinen Namen und den Einladungscode eingeben, den du bekommen hast →
+„Los geht's“. Ab dann verbindet sich Talkie beim Start von selbst.
+
+## Für Eltern und Betreiber: die Verwaltungsseite
+
+Im Browser verwaltest du alles: Einladungen erstellen (auch per Mail an die Eltern der Freunde), sehen,
+wer online ist und wo, Räume anlegen, Nutzer umbenennen, rauswerfen oder sperren, den Chat lesen oder leeren.
+Anmeldung per E-Mail-Code oder mit eurem eigenen Login (z. B. Pocket ID). Andere Eltern können eigene
+Konten mit eingeschränkten Rechten bekommen (z. B. „nur Kinder einladen“).
+
+<p align="center">
+  <img src="docs/screenshots/verwaltung-uebersicht.png" alt="Verwaltung: wer ist gerade online" width="49%">
+  <img src="docs/screenshots/verwaltung-nutzer.png" alt="Verwaltung: Nutzer mit seinen Geräten" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/verwaltung-einladungen.png" alt="Verwaltung: Einladungen erstellen" width="49%">
+  <img src="docs/screenshots/verwaltung-chat.png" alt="Verwaltung: Chat mitlesen und leeren" width="49%">
+</p>
+
+🔐 **Datenschutz:** Talkie sammelt nichts für uns – alles liegt auf eurem Server. Details: [docs/DATENSCHUTZ.md](docs/DATENSCHUTZ.md) (English: [docs/PRIVACY.md](docs/PRIVACY.md)).
+
+---
+
+# Technik und Einrichtung
+
+Ab hier geht es um den Betrieb des Servers und das Bauen der Apps.
+
+- **Rein nur mit Einladungscode.** Danach meldet sich das Gerät automatisch an (Ed25519-Geräteschlüssel), ohne Passwort.
 - **Verschlüsselt** (QUIC/TLS 1.3). Die Clients merken sich das Server-Zertifikat und verweigern einen fremden Server.
 - **Datensparsam:** Opus mit 16 kbit/s, 40-ms-Pakete, gesendet wird nur beim Sprechen.
   Das sind etwa **25 kbit/s pro sprechender Person** (rund 11 MB pro Stunde Dauerreden), in Pausen nahezu 0.
-- **Rauschfilter** (RNNoise) und automatische Sprachaktivierung, keine Taste nötig.
-- Räume, Text-Chat pro Raum, Stumm- und Taub-Schalter, Push-to-Talk.
-
-> 📱 **iPhone und iPad:** Talkie gibt es als Beta über TestFlight:
-> **[testflight.apple.com/join/zfBAJJNK](https://testflight.apple.com/join/zfBAJJNK)**
-> (erst die App „TestFlight“ aus dem App Store laden, dann den Link öffnen).
+- **Rauschfilter** (RNNoise), Sprachaktivierung oder Push-to-Talk, Echo-Unterdrückung des Systems am Handy.
 
 ```
-server/   Go-Server (Docker), Verwaltung per Kommandozeile
+server/   Go-Server (Docker), Verwaltung per Kommandozeile und im Browser
 app/      Flutter-App (Windows, macOS, Linux, Android, iOS) mit Rust-Kern in app/rust
-docs/     Protokoll
+docs/     Protokoll, Release, Datenschutz, Screenshots
 ```
-
----
 
 ## 1. Server starten
 

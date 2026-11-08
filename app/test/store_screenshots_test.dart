@@ -217,12 +217,30 @@ void main() {
   setUpAll(_loadFonts);
   final skip = _outDir.isEmpty;
 
+  // Desktop-Fenster ohne Rahmen (README)
+  testWidgets('desktop: Hauptfenster', (tester) async {
+    tester.view.physicalSize = const Size(2400, 1500);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(RepaintBoundary(
+      key: _shotKey,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(Brightness.dark),
+        home: MainScreen(controller: _mainController()),
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await _shot(tester, const _Device('desktop', Size(2400, 1500), 2, Size(1200, 750), 0), 'hauptfenster');
+  }, skip: skip);
+
   for (final d in [_iphone, _iphone63, _ipad]) {
     testWidgets('${d.folder}: Chat', (tester) async {
       await _pump(
         tester,
         d,
-        _frame(d, 'Quatschen beim Zocken', 'Reden und schreiben mit deinen Freunden', MainScreen(controller: _mainController())),
+        _frame(d, 'Quatschen beim Zocken', 'Reden und schreiben mit deinen Freunden',
+            MainScreen(controller: _mainController()..phoneChat = true)),
       );
       await _shot(tester, d, '1_chat');
     }, skip: skip);
@@ -234,10 +252,7 @@ void main() {
         _frame(d, 'Ein Raum pro Runde', 'Du siehst sofort, wer da ist und wer gerade spricht',
             MainScreen(controller: _mainController())),
       );
-      if (d != _ipad) {
-        await tester.tap(find.byTooltip('Räume'));
-        await tester.pumpAndSettle();
-      }
+      // Handy zeigt die Räume von selbst (Umschalter „Räume | Chat“)
       await _shot(tester, d, '2_raeume');
     }, skip: skip);
 
