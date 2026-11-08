@@ -46,6 +46,12 @@ class TalkiePlatform {
 
   static bool get isIOS => Platform.isIOS;
 
+  /// Meldungen vom System an die App (z. B. „audioResume“ nach einem Anruf).
+  static void onNative(void Function(String method) handler) {
+    if (!isMobile) return;
+    _ch.setMethodCallHandler((call) async => handler(call.method));
+  }
+
   /// Öffnet eine Internetadresse im Browser.
   static Future<void> openUrl(String url) async {
     if (!url.startsWith('https://') && !url.startsWith('http://')) return;

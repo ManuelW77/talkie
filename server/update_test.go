@@ -24,12 +24,18 @@ func TestUpdateCheckerGitHub(t *testing.T) {
 	if got := u.Get(); got.Version != "1.4.2" || got.URL == "" {
 		t.Fatalf("%+v", got)
 	}
+	// Fremder Link wird nicht weitergegeben
+	body = `{"tag_name":"v1.4.3","html_url":"https://evil.example/x"}`
+	u.Check(context.Background())
+	if got := u.Get(); got.Version != "1.4.3" || got.URL != "" {
+		t.Fatalf("fremder Link: %+v", got)
+	}
 	// Vorabversion und Unsinn werden ignoriert
 	body = `{"tag_name":"v2.0.0","prerelease":true}`
 	u.Check(context.Background())
 	body = `{"tag_name":"<script>"}`
 	u.Check(context.Background())
-	if got := u.Get(); got.Version != "1.4.2" {
+	if got := u.Get(); got.Version != "1.4.3" {
 		t.Fatalf("überschrieben: %+v", got)
 	}
 }

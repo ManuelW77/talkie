@@ -20,6 +20,7 @@ C → S  {"t":"auth","sig":"<base64>"}                          // bekannter Nut
 C → S  {"t":"register","sig":"<base64>","name":"Max","invite":"ABCD-EFGH"}
 S → C  {"t":"welcome","you":User,"rooms":[Room],"users":[User],"mod":true,"admin":true,"chat_hours":24}
        mod/admin nur, wenn gesetzt; chat_hours: so lange bleibt der Chat erhalten (fehlt = unbegrenzt)
+       optional "latest":"1.2.0","latest_url":"https://github.com/…": neueste App-Version (Hinweis in der App)
 S → C  {"t":"error","code":"...","reason":"..."}  // danach wird die Verbindung geschlossen
 ```
 

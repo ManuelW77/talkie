@@ -56,6 +56,10 @@ class TalkieController extends ChangeNotifier {
     _sub = talkieEvents().listen(_onEvent);
     // Zurück aus den Einstellungen: Mikrofon-Erlaubnis neu prüfen
     _life = AppLifecycleListener(onResume: () => checkMic());
+    // iPhone: nach Anruf/Siri den Ton neu öffnen
+    TalkiePlatform.onNative((m) {
+      if (m == 'audioResume' && _active) talkieRestartAudio();
+    });
     if (!showSetup) {
       talkieConnect(server: config.server, name: config.name, invite: '', fingerprint: kServerFingerprint);
     }
@@ -84,10 +88,15 @@ class TalkieController extends ChangeNotifier {
   String? get updateVersion {
     final v = state?.latestVersion ?? '';
     if (v.isEmpty || TalkiePlatform.isIOS || v == _dismissedUpdate) return null;
+    if (!RegExp(r'^\d+(\.\d+){1,3}$').hasMatch(v)) return null;
     return isNewerVersion(v, kAppVersion) ? v : null;
   }
 
-  String get updateUrl => state?.latestUrl ?? '';
+  /// Nur https-Links öffnen.
+  String get updateUrl {
+    final u = state?.latestUrl ?? '';
+    return u.startsWith('https://') ? u : '';
+  }
 
   void dismissUpdate() {
     _dismissedUpdate = state?.latestVersion;
