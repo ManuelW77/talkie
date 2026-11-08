@@ -3,6 +3,9 @@
 Ein Release entsteht aus einem Tag `v<version>` auf `main`. Die CI baut dann alle Apps,
 **signiert und notarisiert die Mac-App** und legt ein GitHub-Release mit allen Downloads an.
 iPhone/iPad laufen getrennt über Xcode und TestFlight.
+Die iOS-Buildnummer setzt Xcode bei jedem Release-Build/Archive automatisch auf Datum und Uhrzeit
+(UTC, `JJMMTTSSmm`, Build-Schritt „Buildnummer setzen“) – nie von Hand hochzählen. Die Versionsnummer
+(z. B. 1.0.0) kommt aus `app/pubspec.yaml`.
 
 ## Neue Version veröffentlichen
 
