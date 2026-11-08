@@ -14,6 +14,8 @@ import (
 // Store kapselt die SQLite-Datenbank mit Nutzern, Einladungen, Räumen und Chat.
 type Store struct {
 	db *sql.DB
+	// ChatKeep: so lange bleiben Chatnachrichten erhalten (0 = unbegrenzt).
+	ChatKeep time.Duration
 }
 
 type DBUser struct {
@@ -378,10 +380,45 @@ func (s *Store) AddMessage(m DBMessage, keep int) error {
 	return err
 }
 
+// chatSince: ältere Nachrichten gelten als gelöscht (auch zwischen zwei Aufräumläufen).
+func (s *Store) chatSince() int64 {
+	if s.ChatKeep <= 0 {
+		return 0
+	}
+	return time.Now().Add(-s.ChatKeep).Unix()
+}
+
+// PurgeChat löscht Nachrichten, die älter als ChatKeep sind.
+func (s *Store) PurgeChat() (int64, error) {
+	if s.ChatKeep <= 0 {
+		return 0, nil
+	}
+	r, err := s.db.Exec("DELETE FROM messages WHERE ts < ?", s.chatSince())
+	if err != nil {
+		return 0, err
+	}
+	return r.RowsAffected()
+}
+
+// ClearChat löscht alle Nachrichten eines Raums (room = 0: aller Räume).
+func (s *Store) ClearChat(room int64) (int64, error) {
+	var r sql.Result
+	var err error
+	if room == 0 {
+		r, err = s.db.Exec("DELETE FROM messages")
+	} else {
+		r, err = s.db.Exec("DELETE FROM messages WHERE room_id = ?", room)
+	}
+	if err != nil {
+		return 0, err
+	}
+	return r.RowsAffected()
+}
+
 // History liefert die letzten n Nachrichten eines Raums, älteste zuerst.
 func (s *Store) History(room int64, n int) ([]DBMessage, error) {
 	rows, err := s.db.Query(`SELECT room_id, user_id, name, text, ts FROM
-		(SELECT * FROM messages WHERE room_id = ? ORDER BY id DESC LIMIT ?) ORDER BY id`, room, n)
+		(SELECT * FROM messages WHERE room_id = ? AND ts >= ? ORDER BY id DESC LIMIT ?) ORDER BY id`, room, s.chatSince(), n)
 	if err != nil {
 		return nil, err
 	}

@@ -406,6 +406,46 @@ class _PhoneTabs extends StatelessWidget {
   }
 }
 
+/// Nur für Admins: Chat dieses Raums oder aller Räume leeren, mit Rückfrage.
+class _ClearChatMenu extends StatelessWidget {
+  const _ClearChatMenu({required this.controller, required this.roomName});
+
+  final TalkieController controller;
+  final String roomName;
+
+  Future<void> _confirm(BuildContext context, bool all) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(all ? 'Chat in allen Räumen leeren?' : 'Chat in „$roomName“ leeren?'),
+        content: const Text('Die Nachrichten sind dann für alle weg.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: kDanger, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Leeren'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) controller.clearChat(all: all);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<bool>(
+      tooltip: 'Chat leeren',
+      icon: const Icon(Icons.delete_sweep_rounded),
+      onSelected: (all) => _confirm(context, all),
+      itemBuilder: (_) => [
+        PopupMenuItem(value: false, child: Text('„$roomName“ leeren')),
+        const PopupMenuItem(value: true, child: Text('Alle Räume leeren')),
+      ],
+    );
+  }
+}
+
 class _ChatPanel extends StatefulWidget {
   const _ChatPanel({required this.controller, this.compact = false, this.onShowRooms});
 
@@ -475,6 +515,7 @@ class _ChatPanelState extends State<_ChatPanel> {
                 child: Text(_roomName(), overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
               ),
               if (widget.onShowRooms != null) _RoomPeople(controller: widget.controller, onTap: widget.onShowRooms!),
+              if (widget.controller.admin) _ClearChatMenu(controller: widget.controller, roomName: _roomName()),
             ],
           ),
         ),

@@ -373,7 +373,32 @@ func (w *webApp) chatPage(rw http.ResponseWriter, r *http.Request) {
 		w.fail(rw, r, "/", err)
 		return
 	}
-	w.render(rw, r, "chat", "Chat", map[string]any{"Rooms": rooms, "Room": sel, "Messages": msgs})
+	w.render(rw, r, "chat", "Chat", map[string]any{
+		"Rooms": rooms, "Room": sel, "Messages": msgs, "KeepHours": int(w.store.ChatKeep / time.Hour),
+	})
+}
+
+// chatClear leert den Chat eines Raums oder aller Räume (nur Admins).
+func (w *webApp) chatClear(rw http.ResponseWriter, r *http.Request) {
+	room, _ := strconv.ParseInt(r.PostFormValue("room"), 10, 64)
+	back := "/chat"
+	name := "allen Räumen"
+	if room != 0 {
+		rm, err := w.store.RoomByID(room)
+		if err != nil {
+			w.fail(rw, r, back, err)
+			return
+		}
+		back += "?room=" + strconv.FormatInt(room, 10)
+		name = "„" + rm.Name + "“"
+	}
+	n, err := w.hub.ClearChat(room)
+	if err != nil {
+		w.fail(rw, r, back, err)
+		return
+	}
+	w.audit(r, "Chat in "+name+" geleert")
+	w.done(rw, r, back, fmt.Sprintf("Chat in %s geleert (%d Nachrichten).", name, n), false)
 }
 
 // --- Web-Konten (nur Admin) ---

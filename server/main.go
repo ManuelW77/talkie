@@ -56,6 +56,11 @@ func serve(dataDir, addr, adminAddr string, maxUsers int) error {
 		return fmt.Errorf("datenbank: %w", err)
 	}
 	defer store.Close()
+	// Chat nur begrenzt aufbewahren (Standard 24 h, 0 = unbegrenzt)
+	if h, err := strconv.Atoi(env("TALKIE_CHAT_HOURS", "24")); err == nil && h > 0 {
+		store.ChatKeep = time.Duration(h) * time.Hour
+	}
+	go purgeChatLoop(store)
 	hash := CertHash(cert)
 	hub, err := NewHub(store, hash, maxUsers)
 	if err != nil {
@@ -182,4 +187,16 @@ func webFromEnv(hub *Hub, store *Store) (*webApp, error) {
 		}
 	}
 	return newWebApp(hub, store, cfg)
+}
+
+// purgeChatLoop löscht alte Chatnachrichten beim Start und danach alle 10 Minuten.
+func purgeChatLoop(store *Store) {
+	for {
+		if n, err := store.PurgeChat(); err != nil {
+			log.Printf("chat aufräumen: %v", err)
+		} else if n > 0 {
+			log.Printf("%d alte Chatnachrichten gelöscht", n)
+		}
+		time.Sleep(10 * time.Minute)
+	}
 }

@@ -11,4 +11,15 @@
   {{range .D.Messages}}<li><time>{{unix .TS}}</time> <b>{{.Name}}</b> <span>{{.Text}}</span></li>{{end}}
 </ul>
 {{else}}<p class="muted">In „{{.D.Room.Name}}“ wurde noch nichts geschrieben.</p>{{end}}
+<p class="muted">{{if .D.KeepHours}}Nachrichten werden nach {{.D.KeepHours}} Stunden automatisch gelöscht.{{else}}Nachrichten werden unbegrenzt aufbewahrt.{{end}}</p>
+{{if .Can.admin}}
+<section class="card danger">
+  <h2>Chat leeren</h2>
+  <form method="post" action="/chat/clear" class="row">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <button name="room" value="{{.D.Room.ID}}" class="bad" data-confirm="Alle Nachrichten in „{{.D.Room.Name}}“ löschen?">„{{.D.Room.Name}}“ leeren</button>
+    <button name="room" value="0" class="bad" data-confirm="Alle Nachrichten in allen Räumen löschen?">Alle Räume leeren</button>
+  </form>
+</section>
+{{end}}
 {{end}}

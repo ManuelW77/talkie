@@ -76,7 +76,18 @@ class TalkieController extends ChangeNotifier {
   bool get deaf => state?.deaf ?? false;
   /// Darf andere rauswerfen/sperren (verknüpftes Webkonto mit Recht).
   bool get moderator => state?.moderator ?? false;
-  List<ChatDto> get currentChat => chats[currentRoom] ?? const [];
+  /// Darf den Chat leeren (verknüpftes Admin-Konto).
+  bool get admin => state?.admin ?? false;
+
+  /// Nachrichten des aktuellen Raums; ältere als die Aufbewahrungsfrist des Servers fallen weg
+  /// (die App kann tagelang offen sein).
+  List<ChatDto> get currentChat {
+    final all = chats[currentRoom] ?? const <ChatDto>[];
+    final hours = state?.chatHours ?? 0;
+    if (hours <= 0) return all;
+    final cutoff = DateTime.now().millisecondsSinceEpoch ~/ 1000 - hours * 3600;
+    return all.where((m) => m.ts >= cutoff).toList();
+  }
 
   UserDto? get meUser {
     final s = state;
@@ -135,7 +146,15 @@ class TalkieController extends ChangeNotifier {
         }
         notifyListeners();
       case EventKind.history:
-        chats[e.historyRoom] = List.of(e.history);
+        if (e.historyRoom == 0) {
+          // Admin hat den Chat in allen Räumen geleert
+          chats.clear();
+          unread.clear();
+          unreadHere = 0;
+        } else {
+          chats[e.historyRoom] = List.of(e.history);
+          if (e.history.isEmpty) unread.remove(e.historyRoom);
+        }
         notifyListeners();
       case EventKind.level:
         level = e.level;
@@ -212,6 +231,9 @@ class TalkieController extends ChangeNotifier {
   void toggleMute() => talkieSetMuted(muted: !muted);
 
   void toggleDeaf() => talkieSetDeaf(deaf: !deaf);
+
+  /// Chat leeren: aktueller Raum oder alle Räume. Ergebnis kommt als Hinweis.
+  void clearChat({required bool all}) => talkieClearChat(room: all ? 0 : currentRoom);
 
   /// Rauswerfen (ban = auch sperren). Das Ergebnis kommt als Hinweis (Snackbar).
   void moderate(UserDto u, {required bool ban}) => talkieModerate(user: u.id, ban: ban);

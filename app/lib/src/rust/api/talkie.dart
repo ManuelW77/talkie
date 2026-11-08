@@ -55,6 +55,10 @@ void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
       muted: muted,
     );
 
+/// Chat leeren (room 0 = alle Räume). Ergebnis kommt als Hinweis zurück.
+void talkieClearChat({required PlatformInt64 room}) =>
+    RustLib.instance.api.crateApiTalkieTalkieClearChat(room: room);
+
 /// Jemanden rauswerfen (`ban` = auch sperren). Ergebnis kommt als Hinweis zurück.
 void talkieModerate({required PlatformInt64 user, required bool ban}) =>
     RustLib.instance.api.crateApiTalkieTalkieModerate(user: user, ban: ban);
@@ -213,6 +217,12 @@ class StateDto {
   /// Darf andere rauswerfen/sperren.
   final bool moderator;
 
+  /// Verknüpftes Admin-Konto (darf den Chat leeren).
+  final bool admin;
+
+  /// So viele Stunden bleibt der Chat erhalten (0 = unbegrenzt).
+  final PlatformInt64 chatHours;
+
   const StateDto({
     required this.status,
     required this.message,
@@ -224,6 +234,8 @@ class StateDto {
     required this.muted,
     required this.deaf,
     required this.moderator,
+    required this.admin,
+    required this.chatHours,
   });
 
   @override
@@ -237,7 +249,9 @@ class StateDto {
       users.hashCode ^
       muted.hashCode ^
       deaf.hashCode ^
-      moderator.hashCode;
+      moderator.hashCode ^
+      admin.hashCode ^
+      chatHours.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -253,7 +267,9 @@ class StateDto {
           users == other.users &&
           muted == other.muted &&
           deaf == other.deaf &&
-          moderator == other.moderator;
+          moderator == other.moderator &&
+          admin == other.admin &&
+          chatHours == other.chatHours;
 }
 
 /// Ein Ereignis an die Oberfläche; welche Felder gefüllt sind, hängt von `kind` ab.

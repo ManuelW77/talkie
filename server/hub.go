@@ -78,6 +78,7 @@ func (h *Hub) broadcastLocked(e *Envelope, except *Session) {
 // Liefert false, wenn der Server voll ist.
 func (h *Hub) Add(s *Session) (old *Session, ok bool) {
 	_, mod := h.store.Moderator(s.userID)
+	admin := h.store.LinkedToAdmin(s.userID)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	old = h.sessions[s.userID]
@@ -94,6 +95,10 @@ func (h *Hub) Add(s *Session) (old *Session, ok bool) {
 	if mod {
 		welcome.Mod = boolPtr(true)
 	}
+	if admin {
+		welcome.Admin = boolPtr(true)
+	}
+	welcome.ChatHours = int(h.store.ChatKeep / time.Hour)
 	s.send(welcome)
 	h.broadcastLocked(&Envelope{T: "user_joined", User: ptr(s.wireLocked())}, s)
 	return old, true
@@ -277,6 +282,49 @@ func (h *Hub) Moderate(s *Session, target int64, ban bool) {
 	}
 	h.store.Audit(acc.Email+" (App)", "Talkie-Nutzer "+u.Name+" rausgeworfen")
 	s.send(&Envelope{T: "info", Reason: u.Name + " wurde rausgeworfen."})
+}
+
+// ClearChat leert den Chat eines Raums (0 = alle) und sagt es allen Apps.
+func (h *Hub) ClearChat(room int64) (int64, error) {
+	n, err := h.store.ClearChat(room)
+	if err != nil {
+		return 0, err
+	}
+	h.mu.RLock()
+	h.broadcastLocked(&Envelope{T: "chat_cleared", Room: room}, nil)
+	h.mu.RUnlock()
+	return n, nil
+}
+
+// ClearChatFrom: Leeren aus der App, nur mit verknüpftem Admin-Konto.
+func (h *Hub) ClearChatFrom(s *Session, room int64) {
+	accs, _ := h.store.LinkedAccounts(s.userID)
+	var admin *Account
+	for i := range accs {
+		if accs[i].IsAdmin() {
+			admin = &accs[i]
+			break
+		}
+	}
+	if admin == nil {
+		s.send(&Envelope{T: "error", Code: "forbidden", Reason: "Das darfst du nicht."})
+		return
+	}
+	name := "allen Räumen"
+	if room != 0 {
+		r, err := h.store.RoomByID(room)
+		if err != nil {
+			s.send(&Envelope{T: "error", Code: "not_found", Reason: "Diesen Raum gibt es nicht mehr."})
+			return
+		}
+		name = "„" + r.Name + "“"
+	}
+	if _, err := h.ClearChat(room); err != nil {
+		s.send(&Envelope{T: "error", Code: "internal", Reason: "Leeren hat nicht geklappt."})
+		return
+	}
+	h.store.Audit(admin.Email+" (App)", "Chat in "+name+" geleert")
+	s.send(&Envelope{T: "info", Reason: "Chat in " + name + " geleert."})
 }
 
 func (h *Hub) Renamed(userID int64, name string) {

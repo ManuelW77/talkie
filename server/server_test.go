@@ -442,3 +442,41 @@ func TestModerationFromApp(t *testing.T) {
 		t.Fatalf("Protokoll fehlt: %+v", log)
 	}
 }
+
+func TestClearChatFromApp(t *testing.T) {
+	srv := startTestServer(t)
+	srv.store.ChatKeep = 24 * time.Hour
+	inv, _ := srv.store.CreateInvite(2, time.Hour)
+	kChef := newKey(t)
+	c0, wc := login(t, srv.addr, kChef, "Chef", inv.Code)
+	k, wk := login(t, srv.addr, newKey(t), "Kid", inv.Code)
+	if wc.Admin != nil || wc.ChatHours != 24 {
+		t.Fatalf("welcome: admin=%v hours=%d", wc.Admin, wc.ChatHours)
+	}
+	c0.conn.CloseWithError(0, "")
+	if _, err := srv.store.AddAccount(Account{Email: "chef@x.de", Role: RoleAdmin, TalkieID: wc.You.ID}); err != nil {
+		t.Fatal(err)
+	}
+	c, wc2 := login(t, srv.addr, kChef, "", "")
+	if wc2.Admin == nil || !*wc2.Admin {
+		t.Fatal("Chef muss admin-Flag bekommen")
+	}
+	writeEnv(t, k.stream, &Envelope{T: "chat", Text: "hallo"})
+	k.expect("chat")
+	// Kid darf nicht leeren
+	writeEnv(t, k.stream, &Envelope{T: "clear_chat", Room: wk.You.Room})
+	if e := k.expect("error"); e.Code != "forbidden" {
+		t.Fatalf("Kid: %+v", e)
+	}
+	// Chef leert alles → alle Apps bekommen chat_cleared
+	writeEnv(t, c.stream, &Envelope{T: "clear_chat"})
+	if e := c.expect("info"); !strings.Contains(e.Reason, "geleert") {
+		t.Fatalf("info: %+v", e)
+	}
+	if e := k.expect("chat_cleared"); e.Room != 0 {
+		t.Fatalf("chat_cleared: %+v", e)
+	}
+	if h, _ := srv.store.History(wk.You.Room, 50); len(h) != 0 {
+		t.Fatal("Chat nicht geleert")
+	}
+}
