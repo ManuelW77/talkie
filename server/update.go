@@ -96,6 +96,10 @@ func (u *UpdateChecker) Check(ctx context.Context) error {
 	if v == "" || rel.Draft || rel.Prerelease || !validVersion(v) {
 		return nil
 	}
+	// Nur echte GitHub-Release-Seiten an die Apps weitergeben
+	if !strings.HasPrefix(rel.URL, "https://github.com/") {
+		rel.URL = ""
+	}
 	u.mu.Lock()
 	u.info = UpdateInfo{Version: v, URL: rel.URL}
 	u.mu.Unlock()

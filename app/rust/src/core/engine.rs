@@ -245,6 +245,10 @@ impl Inner {
     }
 
     /// Gibt Mikrofon und Lautsprecher frei (z. B. wenn keine Verbindung mehr möglich ist).
+    fn audio_failed(&self) -> bool {
+        self.audio.lock().as_ref().is_some_and(|a| a.failed.load(Ordering::Relaxed))
+    }
+
     fn stop_audio(&self) {
         let io = self.audio.lock().take();
         drop(io);
@@ -826,6 +830,12 @@ async fn run_session(inner: &Arc<Inner>, sess: net::Session, generation: u64) ->
             }
             _ = tick.tick() => {
                 ticks += 1;
+                // Audio-Strom abgerissen (Anruf, Headset ab, Mediendienste neu)? Nach 1 s neu öffnen.
+                if ticks % 10 == 0 && inner.audio_failed() {
+                    log::info!("audio neu öffnen");
+                    inner.stop_audio();
+                    inner.start_audio();
+                }
                 let talking = {
                     let mut m = inner.mixer.lock();
                     if ticks % 100 == 0 { m.gc(); }
