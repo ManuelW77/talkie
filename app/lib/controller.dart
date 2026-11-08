@@ -90,12 +90,15 @@ class TalkieController extends ChangeNotifier {
           setupBusy = false;
           setupError = null;
         } else if (s.status == ConnStatus.failed) {
-          setupBusy = false;
           if (_setupErrors.contains(s.errorCode)) {
             showSetup = true;
             setupError = s.message;
             config = talkieConfig();
+          } else if (showSetup && setupBusy) {
+            // z. B. Server nicht erreichbar: in der Einrichtung als Fehler zeigen
+            setupError = s.message;
           }
+          setupBusy = false;
         }
         if (prev?.room != s.room) unread.remove(s.room);
         _updateBackground(s.status);
@@ -128,8 +131,8 @@ class TalkieController extends ChangeNotifier {
 
   // --- Aktionen ---
 
-  /// Verbindungsaufbau während der Einrichtung abbrechen.
-  void cancelSetup() {
+  /// Laufenden Verbindungsversuch abbrechen (Einrichtung oder Banner).
+  void cancelConnect() {
     talkieDisconnect();
     setupBusy = false;
     notifyListeners();

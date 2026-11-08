@@ -130,6 +130,31 @@ void main() {
     expect(find.text('Nochmal verbinden'), findsOneWidget);
   });
 
+  testWidgets('Kein Netzwerk: Banner mit WLAN-Symbol und Abbrechen', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController()
+      ..state = const StateDto(
+        status: ConnStatus.reconnecting,
+        message: 'Kein Netzwerk – prüfe WLAN oder Kabel. Talkie verbindet sich dann von selbst.',
+        errorCode: 'offline',
+        me: 1,
+        room: 10,
+        rooms: [RoomDto(id: 10, name: 'Lobby')],
+        users: [],
+        muted: false,
+        deaf: false,
+      );
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('Kein Netzwerk'), findsOneWidget);
+    expect(find.byIcon(Icons.wifi_off_rounded), findsOneWidget);
+    expect(find.text('Abbrechen'), findsOneWidget);
+    expect(find.text('Nochmal verbinden'), findsNothing);
+    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_offline.png'));
+  });
+
   testWidgets('Handy: Chat vorn, Räume in der Seitenleiste', (tester) async {
     tester.view.physicalSize = const Size(390, 760);
     tester.view.devicePixelRatio = 1;

@@ -75,6 +75,23 @@ impl ServerCertVerifier for PinVerifier {
 pub enum ConnectError {
     Fatal { code: String, message: String },
     Temporary(anyhow::Error),
+    /// Dieser Rechner hat gerade gar kein Netzwerk (kein WLAN/Kabel).
+    Offline,
+}
+
+/// Prüft ohne ein Paket zu senden, ob es überhaupt einen Weg zu `addr` gibt.
+/// Ohne WLAN/Kabel meldet das System sofort „Netz nicht erreichbar“.
+pub fn has_route(addr: SocketAddr) -> bool {
+    let bind: SocketAddr = if addr.is_ipv4() { "0.0.0.0:0".parse().unwrap() } else { "[::]:0".parse().unwrap() };
+    match std::net::UdpSocket::bind(bind).and_then(|s| s.connect(addr)) {
+        Ok(()) => true,
+        Err(e) => !matches!(
+            e.kind(),
+            std::io::ErrorKind::NetworkUnreachable
+                | std::io::ErrorKind::HostUnreachable
+                | std::io::ErrorKind::AddrNotAvailable
+        ),
+    }
 }
 
 impl From<anyhow::Error> for ConnectError {
@@ -88,6 +105,7 @@ impl std::fmt::Display for ConnectError {
         match self {
             ConnectError::Fatal { code, message } => write!(f, "{message} ({code})"),
             ConnectError::Temporary(e) => write!(f, "{e}"),
+            ConnectError::Offline => write!(f, "kein Netzwerk"),
         }
     }
 }
@@ -126,9 +144,12 @@ async fn resolve(server: &str) -> Result<SocketAddr, ConnectError> {
     if host.is_empty() {
         return Err(fatal("bad_server", "Bitte gib eine Serveradresse ein."));
     }
-    let mut addrs = tokio::net::lookup_host((host.as_str(), port))
-        .await
-        .map_err(|e| ConnectError::Temporary(anyhow!("Server „{host}“ nicht gefunden: {e}")))?;
+    let mut addrs = match tokio::net::lookup_host((host.as_str(), port)).await {
+        Ok(a) => a,
+        // Name nicht auflösbar: liegt es am fehlenden Netz oder am Namen?
+        Err(_) if !has_route("1.1.1.1:53".parse().unwrap()) => return Err(ConnectError::Offline),
+        Err(e) => return Err(ConnectError::Temporary(anyhow!("Server „{host}“ nicht gefunden: {e}"))),
+    };
     let all: Vec<SocketAddr> = addrs.by_ref().collect();
     // IPv4 bevorzugen: funktioniert in mehr Heimnetzen zuverlässig
     all.iter()
@@ -136,6 +157,16 @@ async fn resolve(server: &str) -> Result<SocketAddr, ConnectError> {
         .or(all.first())
         .copied()
         .ok_or_else(|| ConnectError::Temporary(anyhow!("Server „{host}“ nicht gefunden")))
+}
+
+#[cfg(test)]
+mod route_tests {
+    use super::*;
+
+    #[test]
+    fn loopback_always_has_route() {
+        assert!(has_route("127.0.0.1:7777".parse().unwrap()));
+    }
 }
 
 pub fn parse_fingerprint(s: &str) -> Option<Vec<u8>> {
@@ -153,6 +184,9 @@ pub async fn connect(
     register: Option<(String, String)>,
 ) -> Result<Session, ConnectError> {
     let addr = resolve(server).await?;
+    if !has_route(addr) {
+        return Err(ConnectError::Offline);
+    }
 
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let verifier = Arc::new(PinVerifier {
