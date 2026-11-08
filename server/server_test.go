@@ -621,3 +621,29 @@ func TestDevicesMigration(t *testing.T) {
 		t.Fatal("zweites Gerät fehlt")
 	}
 }
+
+func TestOnlineDetails(t *testing.T) {
+	srv := startTestServer(t)
+	inv, _ := srv.store.CreateInvite(1, time.Hour)
+	conn, st, certHash := dial(t, srv.addr)
+	key := newKey(t)
+	pub := key.Public().(ed25519.PublicKey)
+	writeEnv(t, st, &Envelope{T: "hello", V: 1, PubKey: base64.StdEncoding.EncodeToString(pub)})
+	ch, _ := ReadFrame(st)
+	nonce, _ := base64.StdEncoding.DecodeString(ch.Nonce)
+	sig := base64.StdEncoding.EncodeToString(ed25519.Sign(key, authMessage(nonce, certHash)))
+	writeEnv(t, st, &Envelope{T: "register", Sig: sig, Name: "Lia", Invite: inv.Code, Device: "iPhone/iPad"})
+	if w, _ := ReadFrame(st); w.T != "welcome" {
+		t.Fatalf("%+v", w)
+	}
+	time.Sleep(100 * time.Millisecond)
+	d := srv.hub.OnlineDetails()
+	if len(d) != 1 || d[0].Device != "iPhone/iPad" || d[0].Talking {
+		t.Fatalf("vorher: %+v", d)
+	}
+	_ = conn.SendDatagram([]byte{DatagramVoice, 0, 1, 0xAA})
+	time.Sleep(150 * time.Millisecond)
+	if d := srv.hub.OnlineDetails(); !d[0].Talking {
+		t.Fatalf("spricht nicht: %+v", d)
+	}
+}
