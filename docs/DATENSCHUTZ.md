@@ -2,6 +2,8 @@
 
 Stand: 8. November 2026
 
+[English version](PRIVACY.md)
+
 Talkie ist ein Sprach- und Text-Chat für eine geschlossene Gruppe aus Freunden und Familie.
 
 ## Das Wichtigste in Kürze
@@ -47,7 +49,7 @@ So arbeitet die Talkie-Server-Software in der Grundeinstellung. Der Betreiber ka
 |---|---|
 | **Anzeigename** | damit die anderen sehen, wer spricht |
 | **Öffentlicher Geräteschlüssel** | damit dich der Server wiedererkennt |
-| **Chatnachrichten** | damit die anderen im Raum sie lesen können – pro Raum nur die letzten 200 |
+| **Chatnachrichten** | damit die anderen im Raum sie lesen können – nach 24 Stunden gelöscht, pro Raum höchstens die letzten 200 |
 | **IP-Adresse** | für die Verbindung, zur Fehlersuche und gegen Missbrauch; sie steht beim Verbinden im Server-Protokoll |
 
 **Sprache** wird in Echtzeit an die anderen im selben Raum weitergeleitet und **nicht aufgezeichnet**.
@@ -90,6 +92,7 @@ Serverbetreiber eingeladen wurde. Eltern wenden sich mit Fragen an den Betreiber
 ## Hinweis für Serverbetreiber
 
 Wer einen Talkie-Server betreibt, ist für die Daten auf diesem Server selbst verantwortlich. Die
-Server-Software speichert Namen, Geräteschlüssel und die letzten 200 Chatnachrichten pro Raum und
+Server-Software speichert Namen, Geräteschlüssel und Chatnachrichten (nach 24 Stunden gelöscht,
+höchstens die letzten 200 pro Raum; einstellbar mit `TALKIE_CHAT_HOURS`) und
 schreibt beim Verbinden Name und IP-Adresse ins Protokoll. Lege fest, wie lange das Protokoll
 aufbewahrt wird, und informiere deine Nutzer bzw. deren Eltern.
