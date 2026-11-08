@@ -11,6 +11,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -36,10 +37,13 @@ type Session struct {
 
 	userID int64
 	pubkey []byte // Schlüssel dieses Geräts
-	name   string
-	room   int64
-	muted  bool
-	deaf   bool
+	device string // Art des Geräts (z. B. „iPhone/iPad“), für die Verwaltungsseite
+	// lastVoice: Unix-Millisekunden des letzten Sprachpakets (für „spricht gerade“)
+	lastVoice atomic.Int64
+	name      string
+	room      int64
+	muted     bool
+	deaf      bool
 	// ignored: Nutzer, deren Sprache dieser Client nicht hören will (nur für ihn)
 	ignored map[int64]bool
 
@@ -110,6 +114,7 @@ func (s *Session) voiceReader(ctx context.Context) {
 		if len(d) < 4 || d[0] != DatagramVoice || len(d)-3 > maxVoicePayload || !limit.Allow() {
 			continue
 		}
+		s.lastVoice.Store(time.Now().UnixMilli())
 		pkt := make([]byte, 0, len(d)+4)
 		pkt = append(pkt, DatagramVoice)
 		pkt = binary.BigEndian.AppendUint32(pkt, uint32(s.userID))
@@ -266,7 +271,7 @@ func (h *Hub) HandleConn(conn *quic.Conn) {
 	release()
 	s := &Session{
 		hub: h, conn: conn, stream: stream, ip: ip,
-		userID: user.ID, name: user.Name, pubkey: user.PubKey,
+		userID: user.ID, name: user.Name, pubkey: user.PubKey, device: h.deviceLabel(user.PubKey),
 		out:  make(chan []byte, outQueueSize),
 		done: make(chan struct{}),
 	}
