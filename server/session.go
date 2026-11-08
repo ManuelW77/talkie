@@ -35,6 +35,7 @@ type Session struct {
 	ip     string
 
 	userID int64
+	pubkey []byte // Schlüssel dieses Geräts
 	name   string
 	room   int64
 	muted  bool
@@ -153,6 +154,8 @@ func (s *Session) controlLoop() {
 				deaf = *e.Deaf
 			}
 			s.hub.SetState(s, muted, deaf)
+		case "device_code":
+			s.hub.SendDeviceCode(s)
 		case "ignore":
 			s.hub.SetIgnored(s, e.IDs)
 		case "kick", "ban":
@@ -263,7 +266,7 @@ func (h *Hub) HandleConn(conn *quic.Conn) {
 	release()
 	s := &Session{
 		hub: h, conn: conn, stream: stream, ip: ip,
-		userID: user.ID, name: user.Name,
+		userID: user.ID, name: user.Name, pubkey: user.PubKey,
 		out:  make(chan []byte, outQueueSize),
 		done: make(chan struct{}),
 	}
@@ -349,14 +352,26 @@ func (h *Hub) handshake(stream *quic.Stream) (*DBUser, error) {
 		if existing.Banned {
 			return nil, &hsError{"banned", "Du bist auf diesem Server gesperrt.", false}
 		}
+		existing.PubKey = pk // dieses Gerät (ein Nutzer kann mehrere haben)
+		h.store.TouchDevice(pk)
 		return existing, nil
 	case existing == nil && resp.T == "register":
-		name, ok := cleanName(resp.Name)
-		if !ok {
-			return nil, &hsError{"name_invalid", "Der Name muss 2 bis 20 Zeichen lang sein (Buchstaben, Zahlen, Leerzeichen, - _ .).", false}
+		// Leerer Name: Geräte-Code für einen vorhandenen Nutzer (der Server kennt den Namen)
+		name := ""
+		if strings.TrimSpace(resp.Name) != "" {
+			var ok bool
+			if name, ok = cleanName(resp.Name); !ok {
+				return nil, &hsError{"name_invalid", "Der Name muss 2 bis 20 Zeichen lang sein (Buchstaben, Zahlen, Leerzeichen, - _ .).", false}
+			}
 		}
-		u, err := h.store.Register(resp.Invite, name, pk)
+		u, err := h.store.RegisterDevice(resp.Invite, name, pk, cleanLabel(resp.Device))
 		switch {
+		case errors.Is(err, ErrNameMissing):
+			return nil, &hsError{"name_invalid", "Bitte gib deinen Namen ein.", false}
+		case errors.Is(err, ErrTooManyDevices):
+			return nil, &hsError{"too_many_devices", "Du hast schon 5 Geräte. Lass erst eins auf der Verwaltungsseite entfernen.", false}
+		case err == nil && u.Banned:
+			return nil, &hsError{"banned", "Du bist auf diesem Server gesperrt.", false}
 		case errors.Is(err, ErrInviteInvalid):
 			return nil, &hsError{"invite_invalid", "Der Einladungscode stimmt nicht oder ist abgelaufen.", true}
 		case errors.Is(err, ErrNameTaken):
@@ -364,7 +379,8 @@ func (h *Hub) handshake(stream *quic.Stream) (*DBUser, error) {
 		case err != nil:
 			return nil, err
 		}
-		log.Printf("neuer Nutzer registriert: %s (%d)", u.Name, u.ID)
+		log.Printf("gerät registriert für %s (%d)", u.Name, u.ID)
+		u.PubKey = pk
 		return u, nil
 	case existing == nil && resp.T == "auth":
 		return nil, &hsError{"auth_failed", "Dieses Gerät ist nicht mehr registriert. Bitte melde dich neu mit einem Einladungscode an.", false}
@@ -410,4 +426,18 @@ func cleanChat(t string) (string, bool) {
 		t = string([]rune(t)[:maxChatRunes])
 	}
 	return t, t != ""
+}
+
+// cleanLabel: Gerätename aus der App (z. B. „iOS“), kurz und harmlos.
+func cleanLabel(s string) string {
+	out := []rune{}
+	for _, r := range s {
+		if len(out) >= 24 {
+			break
+		}
+		if r >= 0x20 && r != 0x7f && r < 0x250 {
+			out = append(out, r)
+		}
+	}
+	return strings.TrimSpace(string(out))
 }

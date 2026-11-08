@@ -22,6 +22,9 @@ class _SetupScreenState extends State<SetupScreen> {
   final _form = GlobalKey<FormState>();
   late bool _showServer = kDefaultServer.isEmpty;
 
+  /// Gleicher Name auf einem weiteren Gerät: nur Geräte-Code, kein Name.
+  bool _existing = false;
+
   @override
   void dispose() {
     _name.dispose();
@@ -32,7 +35,11 @@ class _SetupScreenState extends State<SetupScreen> {
 
   void _submit() {
     if (!_form.currentState!.validate()) return;
-    widget.controller.register(server: _server.text.trim(), name: _name.text.trim(), invite: _invite.text.trim());
+    widget.controller.register(
+      server: _server.text.trim(),
+      name: _existing ? '' : _name.text.trim(),
+      invite: _invite.text.trim(),
+    );
   }
 
   @override
@@ -55,24 +62,28 @@ class _SetupScreenState extends State<SetupScreen> {
                   Text('Talkie', textAlign: TextAlign.center, style: theme.textTheme.displaySmall),
                   const SizedBox(height: 8),
                   Text(
-                    'Gib deinen Namen und den Einladungscode ein, den du bekommen hast.',
+                    _existing
+                        ? 'Gib den Geräte-Code ein. Du bekommst ihn in Talkie auf deinem anderen Gerät unter '
+                              '„Mehr“ bzw. „Einstellungen“ → „Auf weiterem Gerät nutzen“.'
+                        : 'Gib deinen Namen und den Einladungscode ein, den du bekommen hast.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 28),
-                  TextFormField(
-                    controller: _name,
-                    autofocus: _name.text.isEmpty,
-                    textInputAction: TextInputAction.next,
-                    maxLength: 20,
-                    decoration: const InputDecoration(
-                      labelText: 'Dein Name',
-                      prefixIcon: Icon(Icons.person_rounded),
-                      counterText: '',
+                  if (!_existing)
+                    TextFormField(
+                      controller: _name,
+                      autofocus: _name.text.isEmpty,
+                      textInputAction: TextInputAction.next,
+                      maxLength: 20,
+                      decoration: const InputDecoration(
+                        labelText: 'Dein Name',
+                        prefixIcon: Icon(Icons.person_rounded),
+                        counterText: '',
+                      ),
+                      validator: (v) => (v == null || v.trim().length < 2) ? 'Mindestens 2 Zeichen' : null,
                     ),
-                    validator: (v) => (v == null || v.trim().length < 2) ? 'Mindestens 2 Zeichen' : null,
-                  ),
-                  const SizedBox(height: 14),
+                  if (!_existing) const SizedBox(height: 14),
                   TextFormField(
                     controller: _invite,
                     autofocus: _name.text.isNotEmpty,
@@ -80,10 +91,10 @@ class _SetupScreenState extends State<SetupScreen> {
                     textInputAction: TextInputAction.go,
                     onFieldSubmitted: (_) => _submit(),
                     style: const TextStyle(letterSpacing: 2, fontWeight: FontWeight.w600),
-                    decoration: const InputDecoration(
-                      labelText: 'Einladungscode',
+                    decoration: InputDecoration(
+                      labelText: _existing ? 'Geräte-Code' : 'Einladungscode',
                       hintText: 'ABCD-EFGH',
-                      prefixIcon: Icon(Icons.vpn_key_rounded),
+                      prefixIcon: const Icon(Icons.vpn_key_rounded),
                     ),
                     validator: (v) {
                       final clean = (v ?? '').replaceAll(RegExp(r'[\s-]'), '');
@@ -139,12 +150,15 @@ class _SetupScreenState extends State<SetupScreen> {
                       ),
                     TextButton(onPressed: c.cancelConnect, child: const Text('Abbrechen')),
                   ],
+                  TextButton(
+                    onPressed: c.setupBusy ? null : () => setState(() => _existing = !_existing),
+                    child: Text(
+                      _existing ? 'Ich bin neu bei Talkie' : 'Ich nutze Talkie schon auf einem anderen Gerät',
+                    ),
+                  ),
                   if (!_showServer) ...[
                     const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => setState(() => _showServer = true),
-                      child: const Text('Erweitert'),
-                    ),
+                    TextButton(onPressed: () => setState(() => _showServer = true), child: const Text('Erweitert')),
                   ],
                 ],
               ),

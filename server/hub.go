@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"log"
 	"sort"
 	"sync"
@@ -287,6 +289,32 @@ func (h *Hub) Moderate(s *Session, target int64, ban bool) {
 	}
 	h.store.Audit(acc.Email+" (App)", "Talkie-Nutzer "+u.Name+" rausgeworfen")
 	s.send(&Envelope{T: "info", Reason: u.Name + " wurde rausgeworfen."})
+}
+
+// deviceCodeValid: so lange gilt ein Geräte-Code aus der App.
+const deviceCodeValid = 15 * time.Minute
+
+// SendDeviceCode erzeugt einen Code, mit dem s ein weiteres Gerät anmelden kann.
+func (h *Hub) SendDeviceCode(s *Session) {
+	inv, err := h.store.CreateDeviceCode(s.userID, deviceCodeValid)
+	switch {
+	case errors.Is(err, ErrTooManyDevices):
+		s.send(&Envelope{T: "error", Code: "too_many_devices", Reason: "Du hast schon 5 Geräte. Lass erst eins auf der Verwaltungsseite entfernen."})
+	case err != nil:
+		s.send(&Envelope{T: "error", Code: "internal", Reason: "Das hat nicht geklappt."})
+	default:
+		s.send(&Envelope{T: "device_code", Code: inv.Code})
+	}
+}
+
+// KickDevice trennt die Verbindung, falls sie von diesem Gerät kommt (Gerät wurde entfernt).
+func (h *Hub) KickDevice(userID int64, pk []byte, reason string) {
+	h.mu.RLock()
+	s := h.sessions[userID]
+	h.mu.RUnlock()
+	if s != nil && bytes.Equal(s.pubkey, pk) {
+		s.kick(reason)
+	}
 }
 
 // ClearChat leert den Chat eines Raums (0 = alle) und sagt es allen Apps.

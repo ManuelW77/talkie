@@ -64,6 +64,10 @@ void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
       muted: muted,
     );
 
+/// Code für ein weiteres Gerät anfordern; kommt als Ereignis DeviceCode zurück.
+void talkieRequestDeviceCode() =>
+    RustLib.instance.api.crateApiTalkieTalkieRequestDeviceCode();
+
 /// Push-to-Talk-Knopf in der App gedrückt halten / loslassen.
 void talkieSetPttPressed({required bool down}) =>
     RustLib.instance.api.crateApiTalkieTalkieSetPttPressed(down: down);
@@ -169,7 +173,16 @@ class ConfigDto {
 
 enum ConnStatus { idle, connecting, connected, reconnecting, failed }
 
-enum EventKind { state, chat, history, level, notice }
+enum EventKind {
+  state,
+  chat,
+  history,
+  level,
+  notice,
+
+  /// Geräte-Code (steht in `notice`).
+  deviceCode,
+}
 
 class PttKeyDto {
   final String id;

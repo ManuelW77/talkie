@@ -370,4 +370,22 @@ void main() {
     expect(tester.takeException(), isNull); // passt ohne Überlauf aufs Handy
     await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_ptt.png'));
   });
+
+  testWidgets('Einrichtung: weiteres Gerät nur mit Geräte-Code', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _controller(registered: false);
+    await tester.pumpWidget(_wrap(SetupScreen(controller: c)));
+    expect(find.text('Dein Name'), findsOneWidget);
+    await tester.tap(find.text('Ich nutze Talkie schon auf einem anderen Gerät'));
+    await tester.pump();
+    expect(find.text('Dein Name'), findsNothing);
+    expect(find.text('Geräte-Code'), findsOneWidget);
+    expect(find.textContaining('Auf weiterem Gerät nutzen'), findsOneWidget);
+    await expectLater(find.byType(SetupScreen), matchesGoldenFile('goldens/setup_device.png'));
+    await tester.tap(find.text('Ich bin neu bei Talkie'));
+    await tester.pump();
+    expect(find.text('Dein Name'), findsOneWidget);
+  });
 }

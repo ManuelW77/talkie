@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 656618160;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1240692123;
 
 // Section: executor
 
@@ -575,6 +575,37 @@ fn wire__crate__api__talkie__talkie_ptt_request_access_impl(
         },
     )
 }
+fn wire__crate__api__talkie__talkie_request_device_code_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "talkie_request_device_code",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                (move || {
+                    let output_ok = crate::api::talkie::talkie_request_device_code()?;
+                    std::result::Result::Ok(output_ok)
+                })(),
+            )
+        },
+    )
+}
 fn wire__crate__api__talkie__talkie_restart_audio_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -902,6 +933,7 @@ impl SseDecode for crate::api::talkie::EventKind {
             2 => crate::api::talkie::EventKind::History,
             3 => crate::api::talkie::EventKind::Level,
             4 => crate::api::talkie::EventKind::Notice,
+            5 => crate::api::talkie::EventKind::DeviceCode,
             _ => unreachable!("Invalid variant for EventKind: {}", inner),
         };
     }
@@ -1191,10 +1223,10 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        17 => {
+        18 => {
             wire__crate__api__talkie__talkie_restart_audio_impl(port, ptr, rust_vec_len, data_len)
         }
-        21 => wire__crate__api__talkie__talkie_set_settings_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__talkie__talkie_set_settings_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1216,11 +1248,14 @@ fn pde_ffi_dispatcher_sync_impl(
         12 => wire__crate__api__talkie__talkie_moderate_impl(ptr, rust_vec_len, data_len),
         14 => wire__crate__api__talkie__talkie_ptt_access_impl(ptr, rust_vec_len, data_len),
         15 => wire__crate__api__talkie__talkie_ptt_keys_impl(ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__talkie__talkie_set_deaf_impl(ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__talkie__talkie_set_muted_impl(ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__talkie__talkie_set_ptt_pressed_impl(ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__talkie__talkie_set_user_muted_impl(ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__talkie__talkie_set_user_volume_impl(ptr, rust_vec_len, data_len),
+        17 => {
+            wire__crate__api__talkie__talkie_request_device_code_impl(ptr, rust_vec_len, data_len)
+        }
+        19 => wire__crate__api__talkie__talkie_set_deaf_impl(ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__talkie__talkie_set_muted_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__talkie__talkie_set_ptt_pressed_impl(ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__talkie__talkie_set_user_muted_impl(ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__talkie__talkie_set_user_volume_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1301,6 +1336,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::talkie::EventKind {
             Self::History => 2.into_dart(),
             Self::Level => 3.into_dart(),
             Self::Notice => 4.into_dart(),
+            Self::DeviceCode => 5.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -1536,6 +1572,7 @@ impl SseEncode for crate::api::talkie::EventKind {
                 crate::api::talkie::EventKind::History => 2,
                 crate::api::talkie::EventKind::Level => 3,
                 crate::api::talkie::EventKind::Notice => 4,
+                crate::api::talkie::EventKind::DeviceCode => 5,
                 _ => {
                     unimplemented!("");
                 }

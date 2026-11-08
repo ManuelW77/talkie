@@ -31,6 +31,8 @@ type Envelope struct {
 	Sig    string `json:"sig,omitempty"`
 	Name   string `json:"name,omitempty"`
 	Invite string `json:"invite,omitempty"`
+	// register: Art des Geräts (z. B. „iOS“, „Windows“), nur zur Anzeige
+	Device string `json:"device,omitempty"`
 
 	// welcome / updates
 	You      *WireUser   `json:"you,omitempty"`

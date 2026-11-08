@@ -47,6 +47,15 @@ class TalkieController extends ChangeNotifier {
   /// Kurze Hinweise für eine Snackbar.
   Stream<String> get notices => _notices.stream;
 
+  /// Zuletzt angeforderter Geräte-Code (null = noch keiner da).
+  final ValueNotifier<String?> deviceCode = ValueNotifier(null);
+
+  /// Code für ein weiteres Gerät anfordern; landet in [deviceCode].
+  void requestDeviceCode() {
+    deviceCode.value = null;
+    talkieRequestDeviceCode();
+  }
+
   /// Getrennt vom ChangeNotifier, damit der Pegel nicht alles neu zeichnet.
   final ValueNotifier<double> levelNotifier = ValueNotifier(0);
 
@@ -188,6 +197,8 @@ class TalkieController extends ChangeNotifier {
         levelNotifier.value = e.level;
       case EventKind.notice:
         if (e.notice.isNotEmpty) _notices.add(e.notice);
+      case EventKind.deviceCode:
+        deviceCode.value = e.notice;
     }
   }
 

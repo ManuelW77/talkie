@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -478,5 +479,123 @@ func TestClearChatFromApp(t *testing.T) {
 	}
 	if h, _ := srv.store.History(wk.You.Room, 50); len(h) != 0 {
 		t.Fatal("Chat nicht geleert")
+	}
+}
+
+func TestMultipleDevices(t *testing.T) {
+	srv := startTestServer(t)
+	inv, _ := srv.store.CreateInvite(1, time.Hour)
+	kLaptop, kPhone := newKey(t), newKey(t)
+
+	laptop, w := login(t, srv.addr, kLaptop, "Anna", inv.Code)
+	if w.T != "welcome" {
+		t.Fatalf("%+v", w)
+	}
+	// Normale Einladung ohne Namen geht nicht
+	inv2, _ := srv.store.CreateInvite(1, time.Hour)
+	if _, e := login(t, srv.addr, newKey(t), "", inv2.Code); e.T != "error" || e.Code != "name_invalid" {
+		t.Fatalf("ohne Namen: %+v", e)
+	}
+
+	// Laptop holt einen Geräte-Code
+	writeEnv(t, laptop.stream, &Envelope{T: "device_code"})
+	dc := laptop.expect("device_code")
+	if len(dc.Code) != 9 {
+		t.Fatalf("code: %+v", dc)
+	}
+	// iPhone meldet sich mit dem Code an, ohne Namen → ist Anna
+	phone, wp := login(t, srv.addr, kPhone, "", dc.Code)
+	if wp.T != "welcome" || wp.You.ID != w.You.ID || wp.You.Name != "Anna" {
+		t.Fatalf("iPhone: %+v", wp)
+	}
+	if k := laptop.expect("kicked"); !strings.Contains(k.Reason, "anderen Gerät") {
+		t.Fatalf("laptop: %+v", k)
+	}
+	// Code ist verbraucht
+	if _, e := login(t, srv.addr, newKey(t), "", dc.Code); e.Code != "invite_invalid" {
+		t.Fatalf("zweimal: %+v", e)
+	}
+	// Laptop kommt ohne Code wieder rein (eigener Schlüssel), iPhone fliegt
+	_, wl := login(t, srv.addr, kLaptop, "", "")
+	if wl.T != "welcome" || wl.You.ID != w.You.ID {
+		t.Fatalf("laptop wieder: %+v", wl)
+	}
+	phone.expect("kicked")
+	devs, _ := srv.store.Devices(w.You.ID)
+	if len(devs) != 2 {
+		t.Fatalf("geräte: %d", len(devs))
+	}
+	// Gerät entfernen: iPhone kommt nicht mehr rein, Laptop schon
+	pk, _ := srv.store.DevicePubKey(w.You.ID, devs[len(devs)-1].ID)
+	var phoneDev int64
+	for _, d := range devs {
+		if p, _ := srv.store.DevicePubKey(w.You.ID, d.ID); string(p) == string(kPhone.Public().(ed25519.PublicKey)) {
+			phoneDev = d.ID
+		}
+	}
+	_ = pk
+	if err := srv.store.DeleteDevice(w.You.ID, phoneDev); err != nil {
+		t.Fatal(err)
+	}
+	if _, e := login(t, srv.addr, kPhone, "", ""); e.T != "error" || e.Code != "auth_failed" {
+		t.Fatalf("entferntes Gerät: %+v", e)
+	}
+	// Letztes Gerät lässt sich nicht entfernen
+	devs, _ = srv.store.Devices(w.You.ID)
+	if err := srv.store.DeleteDevice(w.You.ID, devs[0].ID); err == nil {
+		t.Fatal("letztes Gerät entfernt")
+	}
+	// Höchstens MaxDevices
+	for i := 0; i < MaxDevices-1; i++ {
+		c, err := srv.store.CreateDeviceCode(w.You.ID, time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, e := login(t, srv.addr, newKey(t), "", c.Code); e.T != "welcome" {
+			t.Fatalf("gerät %d: %+v", i, e)
+		}
+	}
+	if _, err := srv.store.CreateDeviceCode(w.You.ID, time.Hour); !errors.Is(err, ErrTooManyDevices) {
+		t.Fatalf("mehr als %d geräte: %v", MaxDevices, err)
+	}
+	// Geräte-Codes tauchen nicht in der Einladungsliste auf
+	invs, _ := srv.store.Invites()
+	for _, i := range invs {
+		if i.Code == dc.Code {
+			t.Fatal("Geräte-Code in Einladungsliste")
+		}
+	}
+	// Gesperrter Nutzer kommt auch mit Geräte-Code nicht rein
+	u, _ := srv.store.UserByID(w.You.ID)
+	devs, _ = srv.store.Devices(w.You.ID)
+	_ = srv.store.DeleteDevice(w.You.ID, devs[len(devs)-1].ID)
+	c, _ := srv.store.CreateDeviceCode(w.You.ID, time.Hour)
+	srv.store.SetBanned(u.Name, true)
+	if _, e := login(t, srv.addr, newKey(t), "", c.Code); e.Code != "banned" {
+		t.Fatalf("gesperrt: %+v", e)
+	}
+}
+
+func TestDevicesMigration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "alt.db")
+	s, err := OpenStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Nutzer wie in alten Versionen: nur users.pubkey, keine Geräte
+	pk := make([]byte, 32)
+	pk[0] = 7
+	if _, err := s.db.Exec("INSERT INTO users(name, pubkey, created) VALUES('Alt', ?, 1)", pk); err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	s, err = OpenStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	u, err := s.UserByPubKey(pk)
+	if err != nil || u.Name != "Alt" {
+		t.Fatalf("migration: %v %+v", err, u)
 	}
 }
