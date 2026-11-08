@@ -174,6 +174,8 @@ tool/build_ios_sim.sh                                                 # iOS-Simu
 - **macOS:** Talkie in „Programme“ ziehen, dann **Rechtsklick → Öffnen → Öffnen**. Nur beim ersten Mal nötig.
   Beim ersten Verbinden fragt macOS nach dem Mikrofon → „Erlauben“.
 - **Windows:** Bei „Der Computer wurde durch Windows geschützt“ → **Weitere Informationen → Trotzdem ausführen**.
+- **Linux:** Archiv entpacken, im Ordner `Talkie` einmal `./install.sh` ausführen → Talkie steht im
+  Startmenü und hat sein Icon im Dock. Starten geht auch direkt mit `./talkie`.
 - **Android:** APK aufs Handy schicken und öffnen, Installation aus dieser Quelle erlauben.
   Mikrofon und Benachrichtigungen erlauben: Die Benachrichtigung „Talkie ist verbunden“ hält Talkie
   im Hintergrund am Leben, während gezockt wird.

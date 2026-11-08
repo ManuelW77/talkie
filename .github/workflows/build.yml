@@ -146,6 +146,7 @@ jobs:
         working-directory: app
         run: |
           mv build/linux/x64/release/bundle Talkie
+          cp linux/packaging/install.sh Talkie/
           tar czf Talkie-Linux-x64.tar.gz Talkie
       - uses: actions/upload-artifact@v5
         with:
