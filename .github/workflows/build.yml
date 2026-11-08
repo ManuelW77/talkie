@@ -1,0 +1,147 @@
+name: Build
+
+# Baut Server + Desktop-Clients. Optional in den Repo-Einstellungen unter
+# Settings → Secrets and variables → Actions → Variables setzen:
+#   TALKIE_SERVER       z. B. talkie.example.org:7777  (dann müssen die Kids nur Name + Code eingeben)
+#   TALKIE_FINGERPRINT  Fingerabdruck aus "talkie-server status" (fest eingebautes Zertifikats-Pinning)
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: "3.44.7"
+  DART_DEFINES: >-
+    --dart-define=TALKIE_SERVER=${{ vars.TALKIE_SERVER }}
+    --dart-define=TALKIE_FINGERPRINT=${{ vars.TALKIE_FINGERPRINT }}
+
+jobs:
+  test:
+    name: Tests (Server, Kern, Ende-zu-Ende)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update && sudo apt-get install -y libasound2-dev cmake pkg-config
+      - name: Server-Tests
+        working-directory: server
+        run: go test -race ./...
+      - name: Kern-Tests
+        working-directory: app/rust
+        run: cargo test --lib
+      - name: Ende-zu-Ende gegen echten Server
+        run: |
+          cd server && go build -o /tmp/talkie-server . && cd ..
+          TALKIE_DATA=/tmp/talkie-data /tmp/talkie-server &
+          sleep 2
+          CODE=$(TALKIE_DATA=/tmp/talkie-data /tmp/talkie-server invite 5 1 | awk '/Einladungscode/{print $2}')
+          cd app/rust && cargo run --example e2e -- 127.0.0.1:7777 "$CODE"
+
+  macos:
+    name: macOS (Universal, ab 10.15)
+    needs: test
+    # Xcode 27+ kann nicht mehr für macOS 10.15/11 bauen → ältere Runner-Version mit Xcode 16
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "16"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Bauen
+        working-directory: app
+        run: flutter build macos --release $DART_DEFINES
+      - name: DMG packen
+        working-directory: app
+        run: |
+          APP=build/macos/Build/Products/Release/Talkie.app
+          lipo -info "$APP/Contents/MacOS/Talkie"
+          mkdir -p dmg && cp -R "$APP" dmg/ && ln -s /Applications dmg/Programme
+          hdiutil create -volname Talkie -srcfolder dmg -ov -format UDZO Talkie-macOS.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Talkie-macOS
+          path: app/Talkie-macOS.dmg
+
+  windows:
+    name: Windows (ab 10)
+    needs: test
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Bauen
+        working-directory: app
+        shell: bash
+        run: flutter build windows --release $DART_DEFINES
+      - name: Paket mit Laufzeit-DLLs
+        working-directory: app
+        shell: pwsh
+        run: |
+          $out = "build/windows/x64/runner/Release"
+          # Visual-C++-Laufzeit beilegen, damit keine Extra-Installation nötig ist
+          foreach ($dll in "msvcp140.dll","vcruntime140.dll","vcruntime140_1.dll") {
+            Copy-Item "C:/Windows/System32/$dll" $out
+          }
+          Compress-Archive -Path "$out/*" -DestinationPath Talkie-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Talkie-Windows
+          path: app/Talkie-Windows.zip
+
+  linux:
+    name: Linux (x64)
+    needs: test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libasound2-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Bauen
+        working-directory: app
+        run: flutter build linux --release $DART_DEFINES
+      - name: Paket
+        working-directory: app
+        run: |
+          mv build/linux/x64/release/bundle Talkie
+          tar czf Talkie-Linux-x64.tar.gz Talkie
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Talkie-Linux
+          path: app/Talkie-Linux-x64.tar.gz
+
+  release:
+    name: Release anlegen
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, windows, linux]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

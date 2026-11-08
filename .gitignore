@@ -1,0 +1,7 @@
+.DS_Store
+server/data/
+app/build/
+app/.dart_tool/
+app/rust/target/
+*.dmg
+.claude/

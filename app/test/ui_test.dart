@@ -1,0 +1,127 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:talkie/controller.dart';
+import 'package:talkie/screens/main_screen.dart';
+import 'package:talkie/screens/setup_screen.dart';
+import 'package:talkie/src/rust/api/talkie.dart';
+import 'package:talkie/theme.dart';
+
+// UI-Tests ohne Rust: der Controller wird direkt mit einem Zustand befüllt.
+// Mit `flutter test --update-goldens` entstehen Bilder in test/goldens/ zum Anschauen.
+
+const _settings = SettingsDto(
+  vadThresholdDb: -45,
+  noiseSuppression: true,
+  inputDevice: '',
+  outputDevice: '',
+  inputGain: 1,
+  outputVolume: 1,
+);
+
+TalkieController _controller({bool registered = true}) =>
+    TalkieController(ConfigDto(server: 'talkie.example.org', name: 'Max', registered: registered, settings: _settings));
+
+Future<void> _loadFonts() async {
+  Future<void> load(String family, List<String> files) async {
+    final loader = FontLoader(family);
+    for (final f in files) {
+      final file = File(f);
+      if (file.existsSync()) loader.addFont(file.readAsBytes().then((b) => ByteData.view(b.buffer)));
+    }
+    await loader.load();
+  }
+
+  await load('Roboto', ['/System/Library/Fonts/Supplemental/Arial.ttf', '/System/Library/Fonts/Supplemental/Arial Bold.ttf']);
+  final flutterRoot = Platform.environment['FLUTTER_ROOT'] ?? '';
+  await load('MaterialIcons', ['$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf']);
+}
+
+Widget _wrap(Widget child) => MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(Brightness.dark),
+      home: child,
+    );
+
+void main() {
+  setUpAll(_loadFonts);
+
+  testWidgets('Einrichtung zeigt Name, Code und Fehler', (tester) async {
+    tester.view.physicalSize = const Size(960, 700);
+    tester.view.devicePixelRatio = 1;
+    final c = _controller(registered: false)..setupError = 'Der Einladungscode stimmt nicht oder ist abgelaufen.';
+    await tester.pumpWidget(_wrap(SetupScreen(controller: c)));
+    expect(find.text('Dein Name'), findsOneWidget);
+    expect(find.text('Einladungscode'), findsOneWidget);
+    expect(find.textContaining('Einladungscode stimmt nicht'), findsOneWidget);
+
+    // Validierung: zu kurzer Code
+    await tester.enterText(find.byType(TextFormField).at(1), 'ABC');
+    await tester.tap(find.text("Los geht's"));
+    await tester.pump();
+    expect(find.textContaining('8 Zeichen'), findsOneWidget);
+    await expectLater(find.byType(SetupScreen), matchesGoldenFile('goldens/setup.png'));
+  });
+
+  testWidgets('Hauptfenster zeigt Räume, Sprecher und Chat', (tester) async {
+    tester.view.physicalSize = const Size(1000, 640);
+    tester.view.devicePixelRatio = 1;
+    final c = _controller()
+      ..state = const StateDto(
+        status: ConnStatus.connected,
+        message: '',
+        errorCode: '',
+        me: 1,
+        room: 10,
+        rooms: [RoomDto(id: 10, name: 'Lobby'), RoomDto(id: 11, name: 'Zocken 1'), RoomDto(id: 12, name: 'Zocken 2')],
+        users: [
+          UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true),
+          UserDto(id: 2, name: 'Lena', room: 10, muted: true, deaf: false, talking: false),
+          UserDto(id: 3, name: 'Jonas', room: 11, muted: false, deaf: false, talking: true),
+          UserDto(id: 4, name: 'Emil', room: 11, muted: false, deaf: true, talking: false),
+        ],
+        muted: false,
+        deaf: false,
+      );
+    c.chats[10] = const [
+      ChatDto(room: 10, from: 2, name: 'Lena', text: 'Wer ist dabei? Runde startet gleich!', ts: 1762500000),
+      ChatDto(room: 10, from: 2, name: 'Lena', text: 'Lobby-Code: 4711', ts: 1762500030),
+      ChatDto(room: 10, from: 1, name: 'Max', text: 'Bin in 2 Minuten da 👍', ts: 1762500100),
+    ];
+    c.unread[11] = 2;
+    c.levelNotifier.value = 0.62;
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Lobby'), findsWidgets);
+    expect(find.text('Max (du)'), findsOneWidget);
+    expect(find.text('Jonas'), findsOneWidget);
+    expect(find.text('Lobby-Code: 4711'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget); // ungelesen in Zocken 1
+    expect(find.byIcon(Icons.mic_off_rounded), findsOneWidget); // Lena stumm
+    expect(find.byIcon(Icons.headset_off_rounded), findsOneWidget); // Emil taub
+    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/main.png'));
+  });
+
+  testWidgets('Verbindungsproblem zeigt Banner mit Knopf', (tester) async {
+    tester.view.physicalSize = const Size(1000, 640);
+    tester.view.devicePixelRatio = 1;
+    final c = _controller()
+      ..state = const StateDto(
+        status: ConnStatus.failed,
+        message: 'Du wurdest vom Admin rausgeworfen.',
+        errorCode: 'kicked',
+        me: 0,
+        room: 0,
+        rooms: [],
+        users: [],
+        muted: false,
+        deaf: false,
+      );
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    expect(find.text('Du wurdest vom Admin rausgeworfen.'), findsOneWidget);
+    expect(find.text('Nochmal verbinden'), findsOneWidget);
+  });
+}

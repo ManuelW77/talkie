@@ -1,0 +1,16 @@
+services:
+  talkie:
+    build: .
+    image: talkie-server:latest
+    container_name: talkie
+    restart: unless-stopped
+    ports:
+      - "7777:7777/udp"
+    volumes:
+      - talkie-data:/data
+    environment:
+      TALKIE_MAX_USERS: "50"
+      TZ: Europe/Berlin
+
+volumes:
+  talkie-data:
