@@ -250,19 +250,18 @@ func (w *webApp) securityHeaders(next http.Handler) http.Handler {
 		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
-		h.Set("Referrer-Policy", "no-referrer")
+		// same-origin statt no-referrer: Bei no-referrer schicken Browser bei Formularen
+		// „Origin: null“, und die Origin-Prüfung unten würde jedes Formular ablehnen.
+		h.Set("Referrer-Policy", "same-origin")
 		h.Set("Cache-Control", "no-store")
 		if w.secure {
 			h.Set("Strict-Transport-Security", "max-age=31536000")
 		}
 		// Formulare nur von der eigenen Seite (Schutz gegen fremde Seiten, die hierher posten)
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			if o := r.Header.Get("Origin"); o != "" && o != w.origin {
-				http.Error(rw, "Anfrage von fremder Seite abgelehnt", http.StatusForbidden)
-				return
-			}
-			if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
-				http.Error(rw, "Anfrage von fremder Seite abgelehnt", http.StatusForbidden)
+			if o := r.Header.Get("Origin"); (o != "" && o != w.origin) || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+				log.Printf("web: %s %s abgelehnt: Origin %q, erwartet %q", r.Method, r.URL.Path, o, w.origin)
+				http.Error(rw, "Anfrage von fremder Seite abgelehnt. Bitte die Seite über "+w.cfg.PublicURL+" öffnen.", http.StatusForbidden)
 				return
 			}
 		}
