@@ -5,7 +5,7 @@ datensparsam (die Kids zocken nebenher) und lauffähig auf älteren Rechnern.
 
 - **Server:** Go, läuft im Docker-Container (`server/`)
 - **Desktop-Client:** Flutter-Oberfläche + Rust-Kern über flutter_rust_bridge (`app/`)
-- **Mobile (iOS/Android):** kommt später, getrennt
+- **Handy/Tablet:** dieselbe Flutter-App mit demselben Rust-Kern (`app/android`, `app/ios`)
 
 ## Sprache
 
@@ -66,7 +66,8 @@ docs/PROTOCOL.md   Netzwerkprotokoll – bei jeder Protokolländerung mitpflegen
 - **Anmeldung in der App:** Ed25519-Geräteschlüssel + einmaliger Einladungscode, kein Passwort, keine E-Mail.
 - **Verwaltungsseite:** eigene Web-Konten (E-Mail), getrennt von den Talkie-Nutzern. Gruppen Admin/Benutzer,
   Rechte pro Konto. Login per Mail-Link + 8-stelligem Code oder OIDC (Manuel nutzt Pocket ID).
-- **Alte Systeme:** macOS ab 10.15 (Intel-Mac des Neffen mit Big Sur), Windows ab 10, Linux x64.
+- **Alte Systeme:** macOS ab 10.15 (Intel-Mac des Neffen mit Big Sur), Windows ab 10, Linux x64,
+  Android ab 8.0 (API 26, wegen AAudio), iOS ab 15 (Manuel will mindestens 16 unterstützen).
   Keine neuen Plattform-APIs ohne Rückfallebene.
 
 ## Befehle
@@ -84,6 +85,9 @@ export PATH=/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbi
 | Ende-zu-Ende gegen laufenden Server | `cd app/rust && cargo run --release --example e2e -- 127.0.0.1:7777 <CODE für ≥3 Personen>` |
 | Flutter prüfen | `cd app && flutter analyze && flutter test` (braucht `FLUTTER_ROOT`) |
 | macOS-App bauen | `app/tool/build_macos.sh` |
+| Android-APK bauen | `cd app && flutter build apk --release` (mit PATH wie oben) |
+| iOS-App für den Simulator | `app/tool/build_ios_sim.sh` |
+| Handy-Ende-zu-Ende (Simulator/Emulator) | `flutter test integration_test -d <gerät> --dart-define=TEST_SERVER=127.0.0.1:7777 --dart-define=TEST_INVITE=<CODE>` (Android-Emulator: `10.0.2.2:7777`, Mikrofon vorher erlauben, siehe Kopf von `integration_test/app_test.dart`) |
 | Icons neu erzeugen | `app/tool/make_icons.sh` |
 | Lokaler Testbetrieb mit Verwaltung + Mailpit | `server/dev.sh up` → http://localhost:8090 (admin@talkie.local), Mails: http://localhost:8026 |
 | Browser-Smoke-Test der Verwaltungsseite (echter Chrome, braucht `dev.sh up`) | `node server/tool/browser_smoke.mjs` |
@@ -101,6 +105,11 @@ wieder löschen (`user-del`, `invite-del`).
 - **`~/.zshrc` nicht ändern** – den PATH pro Befehl setzen.
 - Xcode 27 baut nur für macOS 12+ und nur eine Architektur. `build_macos.sh` baut lokal daher nur arm64.
   Den Universal-Build ab macOS 10.15 macht die CI mit Xcode 16.
+- iOS: Xcode 27 kann erst ab iOS 15 bauen und lokal nur arm64 → `build_ios_sim.sh`. Nach Änderungen am
+  Podspec (`rust_builder/ios`) einmal `cd app/ios && pod install`.
+- Android: libopus wird per CMake gebaut; `rust_builder/cargokit/gradle/plugin.gradle` reicht dafür
+  `ANDROID_NDK_ROOT` weiter. Der Emulator „Medium_Phone_API_35“ ist fast voll – zum Testen „test_API_27“ nehmen.
+  Das Emulator-Mikrofon geht nicht (fehlender Mac-Zugriff), Sprache nur auf echten Geräten prüfbar.
 - Fenster-Screenshots gehen nicht (keine Bildschirmaufnahme-Berechtigung). Flutter-UI über die
   Golden-Tests in `app/test/` prüfen, die Verwaltungsseite per Headless-Chrome.
 

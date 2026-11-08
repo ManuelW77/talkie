@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controller.dart';
+import '../platform.dart';
 import '../src/rust/api/talkie.dart';
 import '../theme.dart';
 import '../widgets/level_meter.dart';
@@ -108,12 +109,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _deviceDropdown('Mikrofon', Icons.mic_rounded, _s.inputDevice, _inputs,
-                  (v) => _update(_copy(input: v))),
-              const SizedBox(height: 12),
-              _deviceDropdown('Kopfhörer / Lautsprecher', Icons.headphones_rounded, _s.outputDevice, _outputs,
-                  (v) => _update(_copy(output: v))),
-              const SizedBox(height: 20),
+              // Auf Handy und Tablet wählt das System Mikrofon und Lautsprecher selbst
+              if (!TalkiePlatform.isMobile) ...[
+                _deviceDropdown('Mikrofon', Icons.mic_rounded, _s.inputDevice, _inputs,
+                    (v) => _update(_copy(input: v))),
+                const SizedBox(height: 12),
+                _deviceDropdown('Kopfhörer / Lautsprecher', Icons.headphones_rounded, _s.outputDevice, _outputs,
+                    (v) => _update(_copy(output: v))),
+                const SizedBox(height: 20),
+              ],
               Text('Empfindlichkeit', style: theme.textTheme.titleSmall),
               Text(
                 'Sprich normal: Der Balken muss über den weißen Strich kommen. '

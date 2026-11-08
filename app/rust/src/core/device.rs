@@ -14,12 +14,21 @@ fn device_name(d: &cpal::Device) -> String {
     d.description().map(|d| d.name().to_string()).unwrap_or_default()
 }
 
+/// Auf Handy und Tablet wählt das System das Gerät (Lautsprecher, Kopfhörer, Bluetooth) selbst.
+const SYSTEM_PICKS_DEVICE: bool = cfg!(any(target_os = "android", target_os = "ios"));
+
 pub fn input_devices() -> Vec<String> {
+    if SYSTEM_PICKS_DEVICE {
+        return Vec::new();
+    }
     let host = cpal::default_host();
     host.input_devices().map(|it| it.map(|d| device_name(&d)).filter(|n| !n.is_empty()).collect()).unwrap_or_default()
 }
 
 pub fn output_devices() -> Vec<String> {
+    if SYSTEM_PICKS_DEVICE {
+        return Vec::new();
+    }
     let host = cpal::default_host();
     host.output_devices().map(|it| it.map(|d| device_name(&d)).filter(|n| !n.is_empty()).collect()).unwrap_or_default()
 }
@@ -99,15 +108,24 @@ fn open_input(name: &str, tx: mpsc::Sender<Vec<f32>>) -> Result<cpal::Stream> {
     let dev = find_input(name).ok_or_else(|| anyhow!("Kein Mikrofon gefunden"))?;
     let sup = dev.default_input_config()?;
     let cfg: cpal::StreamConfig = sup.config();
-    let s = match sup.sample_format() {
-        SampleFormat::F32 => build_input::<f32>(&dev, cfg, tx),
-        SampleFormat::I16 => build_input::<i16>(&dev, cfg, tx),
-        SampleFormat::U16 => build_input::<u16>(&dev, cfg, tx),
-        SampleFormat::I32 => build_input::<i32>(&dev, cfg, tx),
-        SampleFormat::U8 => build_input::<u8>(&dev, cfg, tx),
-        SampleFormat::F64 => build_input::<f64>(&dev, cfg, tx),
+    let build = |cfg: cpal::StreamConfig| match sup.sample_format() {
+        SampleFormat::F32 => build_input::<f32>(&dev, cfg, tx.clone()),
+        SampleFormat::I16 => build_input::<i16>(&dev, cfg, tx.clone()),
+        SampleFormat::U16 => build_input::<u16>(&dev, cfg, tx.clone()),
+        SampleFormat::I32 => build_input::<i32>(&dev, cfg, tx.clone()),
+        SampleFormat::U8 => build_input::<u8>(&dev, cfg, tx.clone()),
+        SampleFormat::F64 => build_input::<f64>(&dev, cfg, tx.clone()),
         f => Err(anyhow!("Mikrofonformat {f:?} nicht unterstützt")),
-    }?;
+    };
+    // Manche Mikrofone (v. a. Android) melden Stereo, öffnen aber nur Mono
+    let s = match build(cfg.clone()) {
+        Ok(s) => s,
+        Err(e) if cfg.channels > 1 => {
+            log::info!("mikrofon mit {} kanälen: {e} – versuche mono", cfg.channels);
+            build(cpal::StreamConfig { channels: 1, ..cfg })?
+        }
+        Err(e) => return Err(e),
+    };
     s.play()?;
     Ok(s)
 }

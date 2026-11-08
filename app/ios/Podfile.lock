@@ -1,0 +1,22 @@
+PODS:
+  - Flutter (1.0.0)
+  - rust_lib_talkie (0.0.1):
+    - Flutter
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - rust_lib_talkie (from `.symlinks/plugins/rust_lib_talkie/ios`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  rust_lib_talkie:
+    :path: ".symlinks/plugins/rust_lib_talkie/ios"
+
+SPEC CHECKSUMS:
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  rust_lib_talkie: 5dac3e8981ed7ee2648b818b1ae110950f1108cd
+
+PODFILE CHECKSUM: dc5e9eaf12de27722f60b54c6855d48ff7de3c4a
+
+COCOAPODS: 1.17.0

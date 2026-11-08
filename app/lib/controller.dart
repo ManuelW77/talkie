@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'platform.dart';
 import 'src/rust/api/talkie.dart';
 
 /// Beim Bauen festlegbar: flutter build ... --dart-define=TALKIE_SERVER=talkie.example.org
@@ -97,6 +98,7 @@ class TalkieController extends ChangeNotifier {
           }
         }
         if (prev?.room != s.room) unread.remove(s.room);
+        _updateBackground(s.status);
         notifyListeners();
       case EventKind.chat:
         final m = e.chat!;
@@ -112,6 +114,16 @@ class TalkieController extends ChangeNotifier {
       case EventKind.notice:
         if (e.notice.isNotEmpty) _notices.add(e.notice);
     }
+  }
+
+  bool _active = false;
+
+  /// Handy: solange eine Verbindung besteht oder aufgebaut wird, im Hintergrund weiterlaufen.
+  void _updateBackground(ConnStatus st) {
+    final on = st == ConnStatus.connected || st == ConnStatus.connecting || st == ConnStatus.reconnecting;
+    if (on == _active) return;
+    _active = on;
+    TalkiePlatform.setActive(on);
   }
 
   // --- Aktionen ---
