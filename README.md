@@ -138,3 +138,7 @@ cd app && flutter test                                 # Oberfläche
   Chat-Verlauf: die letzten 200 Nachrichten pro Raum.
 - **Client-Kern (Rust):** cpal (Audio), Opus, nnnoiseless (Rauschfilter + Spracherkennung), Jitter-Puffer mit
   Verlustverschleierung, quinn (QUIC). Die Flutter-Oberfläche spricht über flutter_rust_bridge mit dem Kern.
+
+## Lizenz
+
+Talkie steht unter der [GNU General Public License v3.0](LICENSE). Du darfst es nutzen, ändern und weitergeben. Weitergegebene Versionen müssen ebenfalls unter der GPL-3.0 stehen und ihren Quellcode offenlegen.

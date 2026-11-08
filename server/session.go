@@ -227,13 +227,19 @@ func (h *Hub) HandleConn(conn *quic.Conn) {
 		time.AfterFunc(500*time.Millisecond, func() { _ = conn.CloseWithError(4, "anmeldung fehlgeschlagen") })
 	}
 
-	user, err := h.handshake(stream, ip)
+	if !h.limiter.Reserve(ip) {
+		log.Printf("anmeldung von %s abgelehnt: rate_limited", ip)
+		handshakeError(stream, "rate_limited", "Zu viele Fehlversuche. Bitte warte 10 Minuten.")
+		closeLater()
+		return
+	}
+	user, err := h.handshake(stream)
+	var he *hsError
+	if !(errors.As(err, &he) && he.countFail) {
+		h.limiter.Refund(ip) // nur echte Fehlversuche bleiben gezählt
+	}
 	if err != nil {
-		var he *hsError
-		if errors.As(err, &he) {
-			if he.countFail {
-				h.limiter.Fail(ip)
-			}
+		if he != nil {
 			log.Printf("anmeldung von %s abgelehnt: %s", ip, he.code)
 			handshakeError(stream, he.code, he.msg)
 		}
@@ -282,13 +288,10 @@ type hsError struct {
 
 func (e *hsError) Error() string { return e.code }
 
-func (h *Hub) handshake(stream *quic.Stream, ip string) (*DBUser, error) {
+func (h *Hub) handshake(stream *quic.Stream) (*DBUser, error) {
 	_ = stream.SetDeadline(time.Now().Add(handshakeTimeout))
 	defer stream.SetDeadline(time.Time{})
 
-	if h.limiter.Blocked(ip) {
-		return nil, &hsError{"rate_limited", "Zu viele Fehlversuche. Bitte warte 10 Minuten.", false}
-	}
 	hello, err := ReadFrame(stream)
 	if err != nil {
 		return nil, err
@@ -364,7 +367,10 @@ func cleanName(n string) (string, bool) {
 		return "", false
 	}
 	for _, r := range n {
-		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == ' ' || r == '-' || r == '_' || r == '.') {
+		// nur lateinische Buchstaben (inkl. Umlaute/Akzente): verhindert
+		// Doppelgänger-Namen aus kyrillischen oder Vollbreite-Zeichen
+		latin := r <= 0x24F && unicode.Is(unicode.Latin, r)
+		if !(latin || (r >= '0' && r <= '9') || r == ' ' || r == '-' || r == '_' || r == '.') {
 			return "", false
 		}
 	}
@@ -380,7 +386,9 @@ func cleanChat(t string) (string, bool) {
 		if r == '\n' || r == '\t' {
 			return r
 		}
-		if unicode.IsControl(r) {
+		// Steuer- und Formatzeichen (Bidi-Overrides, Nullbreite) entfernen,
+		// außer dem Verbinder für zusammengesetzte Emojis
+		if unicode.IsControl(r) || (unicode.Is(unicode.Cf, r) && r != 0x200D) {
 			return -1
 		}
 		return r

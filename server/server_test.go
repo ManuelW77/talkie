@@ -287,10 +287,27 @@ func TestCleanName(t *testing.T) {
 			t.Errorf("cleanName(%q) = %q, %v", in, got, ok)
 		}
 	}
-	for _, bad := range []string{"a", "<script>", "123456789012345678901", "a\u0000b"} {
+	for _, bad := range []string{"a", "<script>", "123456789012345678901", "a\u0000b", "M\u0430x", "\uFF2Dax", "Ma\u200Bx", "\u0661\u0662"} {
 		if _, ok := cleanName(bad); ok {
 			t.Errorf("cleanName(%q) sollte ungültig sein", bad)
 		}
+	}
+}
+
+func TestCleanChatStripsFormatChars(t *testing.T) {
+	if got, _ := cleanChat("a\u202Eb\u200Bc 👨\u200D👩"); got != "abc 👨\u200D👩" {
+		t.Fatalf("cleanChat = %q", got)
+	}
+}
+
+func TestLimiterReserve(t *testing.T) {
+	l := NewIPLimiter(2, time.Minute)
+	if !l.Reserve("x") || !l.Reserve("x") || l.Reserve("x") {
+		t.Fatal("parallele Versuche nicht begrenzt")
+	}
+	l.Refund("x")
+	if !l.Reserve("x") {
+		t.Fatal("Refund gibt nicht frei")
 	}
 }
 

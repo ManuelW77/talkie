@@ -58,23 +58,39 @@ func (l *IPLimiter) prune(ip string, now time.Time) []time.Time {
 	return ts
 }
 
-// Blocked meldet, ob die IP gerade gesperrt ist.
-func (l *IPLimiter) Blocked(ip string) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return len(l.prune(ip, time.Now())) >= l.max
-}
-
-// Fail zählt einen Fehlversuch.
-func (l *IPLimiter) Fail(ip string) {
+// Reserve prüft die Sperre und zählt den Versuch in einem Schritt vorab als
+// Fehlversuch (sonst könnten parallele Anmeldungen die Grenze umgehen).
+// Erfolgreiche Versuche gibt Refund wieder frei.
+func (l *IPLimiter) Reserve(ip string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now()
+	l.cleanup(now)
+	ts := l.prune(ip, now)
+	if len(ts) >= l.max {
+		return false
+	}
+	l.entries[ip] = append(ts, now)
+	return true
+}
+
+// Refund nimmt einen reservierten Versuch zurück.
+func (l *IPLimiter) Refund(ip string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if ts := l.entries[ip]; len(ts) > 0 {
+		if len(ts) == 1 {
+			delete(l.entries, ip)
+		} else {
+			l.entries[ip] = ts[:len(ts)-1]
+		}
+	}
+}
+
+func (l *IPLimiter) cleanup(now time.Time) {
 	if len(l.entries) > 1000 { // gelegentlich alles aufräumen
 		for k := range l.entries {
 			l.prune(k, now)
 		}
 	}
-	ts := l.prune(ip, now)
-	l.entries[ip] = append(ts, now)
 }
