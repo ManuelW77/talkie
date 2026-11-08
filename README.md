@@ -8,11 +8,15 @@ Einfach, sicher und sparsam:
 - **Datensparsam:** Opus mit 16 kbit/s, 40-ms-Pakete, gesendet wird nur beim Sprechen.
   Das sind etwa **25 kbit/s pro sprechender Person** (rund 11 MB pro Stunde Dauerreden), in Pausen nahezu 0.
 - **Rauschfilter** (RNNoise) und automatische Sprachaktivierung, keine Taste nötig.
-- Räume, Text-Chat pro Raum, Stumm- und Taub-Schalter.
+- Räume, Text-Chat pro Raum, Stumm- und Taub-Schalter, Push-to-Talk.
+
+> 📱 **iPhone und iPad:** Talkie gibt es als Beta über TestFlight:
+> **[testflight.apple.com/join/zfBAJJNK](https://testflight.apple.com/join/zfBAJJNK)**
+> (erst die App „TestFlight“ aus dem App Store laden, dann den Link öffnen).
 
 ```
 server/   Go-Server (Docker), Verwaltung per Kommandozeile
-app/      Flutter-App (Windows, macOS, Linux) mit Rust-Kern in app/rust
+app/      Flutter-App (Windows, macOS, Linux, Android, iOS) mit Rust-Kern in app/rust
 docs/     Protokoll
 ```
 
@@ -132,6 +136,8 @@ Am einfachsten über **GitHub Actions** (`.github/workflows/build.yml`). Jeder P
 | `Talkie-Linux-x64.tar.gz` | Linux x64 (braucht GTK 3 und ALSA, ist auf gängigen Desktops vorhanden) |
 | `Talkie-Android.apk` | Android ab 8.0, direkt installierbar (nicht über den Play Store) |
 
+iPhone/iPad (ab iOS 15): über TestFlight, siehe oben – nicht über die Actions.
+
 **Tipp:** Unter *Settings → Secrets and variables → Actions → Variables* im Repo
 `TALKIE_SERVER` (z. B. `talkie.example.org:7777`) und `TALKIE_FINGERPRINT` (aus `talkie-server status`) setzen.
 Dann ist der Server fest eingebaut und die Kids geben **nur Name und Einladungscode** ein.
@@ -179,6 +185,8 @@ tool/build_ios_sim.sh                                                 # iOS-Simu
 - **Windows:** Bei „Der Computer wurde durch Windows geschützt“ → **Weitere Informationen → Trotzdem ausführen**.
 - **Linux:** Archiv entpacken, im Ordner `Talkie` einmal `./install.sh` ausführen → Talkie steht im
   Startmenü und hat sein Icon im Dock. Starten geht auch direkt mit `./talkie`.
+- **iPhone/iPad:** App „TestFlight“ installieren, dann https://testflight.apple.com/join/zfBAJJNK öffnen
+  und „Annehmen“ / „Installieren“. Updates kommen über TestFlight von selbst.
 - **Android:** APK aufs Handy schicken und öffnen, Installation aus dieser Quelle erlauben.
   Mikrofon und Benachrichtigungen erlauben: Die Benachrichtigung „Talkie ist verbunden“ hält Talkie
   im Hintergrund am Leben, während gezockt wird.
