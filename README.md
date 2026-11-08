@@ -1,3 +1,5 @@
+<p align="center"><img src="app/assets/icon/talkie_256.png" alt="Talkie-Icon" width="128"></p>
+
 # Talkie
 
 **Talkie ist ein Sprach- und Text-Chat für Freunde und Familie** – gebaut für Kinder, die beim Zocken
