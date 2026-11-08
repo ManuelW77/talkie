@@ -231,6 +231,35 @@ func (h *Hub) Online() []WireUser {
 	return h.usersLocked()
 }
 
+// OnlineInfo: wer ist da, mit Gerät und ob gerade gesprochen wird (für die Verwaltungsseite).
+type OnlineInfo struct {
+	WireUser
+	Device  string
+	Talking bool
+}
+
+func (h *Hub) OnlineDetails() []OnlineInfo {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	now := time.Now().UnixMilli()
+	out := make([]OnlineInfo, 0, len(h.sessions))
+	for _, s := range h.sessions {
+		out = append(out, OnlineInfo{
+			WireUser: s.wireLocked(),
+			Device:   s.device,
+			Talking:  !s.muted && now-s.lastVoice.Load() < 1500,
+		})
+	}
+	return out
+}
+
+func (h *Hub) deviceLabel(pk []byte) string {
+	if d, err := h.store.DeviceByPubKey(pk); err == nil {
+		return d.Label
+	}
+	return ""
+}
+
 func (h *Hub) OnlineCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

@@ -10,11 +10,12 @@
 <h2>Gerade online</h2>
 {{if .D.Online}}
 <table>
-  <thead><tr><th>Name</th><th>Raum</th><th>Status</th></tr></thead>
+  <thead><tr><th>Name</th><th>Raum</th><th>Gerät</th><th>Status</th></tr></thead>
   <tbody>
   {{range .D.Online}}
   <tr><td><span class="dot on"></span>{{.Name}}</td><td>{{.Room}}</td>
-    <td>{{if .Deaf}}🔇 taub{{else if .Muted}}🎙️ stumm{{else}}–{{end}}</td></tr>
+    <td>{{if .Device}}{{.Device}}{{else}}<span class="muted">–</span>{{end}}</td>
+    <td>{{if .Deaf}}🔇 taub{{else if .Muted}}🔕 stumm{{else if .Talking}}🗣️ spricht gerade{{else}}🎤 Mikro an{{end}}</td></tr>
   {{end}}
   </tbody>
 </table>

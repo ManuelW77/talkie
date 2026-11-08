@@ -34,15 +34,15 @@ func (w *webApp) roomNames() map[int64]string {
 // --- Übersicht ---
 
 type onlineRow struct {
-	Name, Room  string
-	Muted, Deaf bool
+	Name, Room, Device   string
+	Muted, Deaf, Talking bool
 }
 
 func (w *webApp) dashboard(rw http.ResponseWriter, r *http.Request) {
 	rooms := w.roomNames()
 	var online []onlineRow
-	for _, u := range w.hub.Online() {
-		online = append(online, onlineRow{u.Name, rooms[u.Room], u.Muted, u.Deaf})
+	for _, u := range w.hub.OnlineDetails() {
+		online = append(online, onlineRow{u.Name, rooms[u.Room], u.Device, u.Muted, u.Deaf, u.Talking})
 	}
 	sort.Slice(online, func(i, j int) bool { return strings.ToLower(online[i].Name) < strings.ToLower(online[j].Name) })
 	users, _ := w.store.Users()
