@@ -40,5 +40,17 @@ if (!flash.includes("angelegt")) fail("Raum anlegen: " + flash);
 console.log("OK  Formular mit CSRF-Token (Raum angelegt)");
 await js(`[...document.querySelectorAll("form")].find((f) => f.action.endsWith("/delete") && f.closest("tr")?.querySelector("input[value=Browsertest]"))?.submit(); 1`);
 await sleep(1000);
+// Login per Link aus der Mail (neuer Login-Vorgang)
+await js(`location.href="/login"; 1`); await sleep(800);
+await js(`document.querySelector("input[name=email]").value="${EMAIL}"; document.querySelector("form").submit(); 1`);
+await sleep(1500);
+const list2 = await (await fetch("http://127.0.0.1:8026/api/v1/messages")).json();
+const m2 = list2.messages.find((m) => m.To[0].Address === EMAIL);
+const full = await (await fetch("http://127.0.0.1:8026/api/v1/message/" + m2.ID)).json();
+const link = full.Text.match(/http\S+\/login\/link\?t=\S+/)[0];
+await cmd("Page.navigate", { url: link }); await sleep(1000);
+await js(`document.querySelector("form").submit(); 1`); await sleep(1500);
+if (await js("location.pathname") !== "/") fail("Link-Login: " + await js("document.body.innerText.slice(0,160)"));
+console.log("OK  Anmeldung per Link aus der Mail");
 console.log("Alles bestanden.");
 chrome.kill(); process.exit(0);
