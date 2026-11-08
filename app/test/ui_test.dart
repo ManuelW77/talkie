@@ -158,27 +158,31 @@ void main() {
     await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_offline.png'));
   });
 
-  testWidgets('Handy: Chat vorn, Räume in der Seitenleiste', (tester) async {
+  testWidgets('Handy: Umschalten zwischen Räumen und Chat, Tastatur einklappen', (tester) async {
     tester.view.physicalSize = const Size(390, 760);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final c = _mainController();
-    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    final c = _mainController()..unreadHere = 1;
+    await tester.pumpWidget(_wrap(ListenableBuilder(listenable: c, builder: (_, _) => MainScreen(controller: c))));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Lobby-Code: 4711'), findsOneWidget);
-    expect(find.text('Zocken 1'), findsNothing); // Räume erst in der Seitenleiste
-    expect(find.text('Mehr'), findsOneWidget);
-    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_chat.png'));
-
-    await tester.tap(find.byTooltip('Räume'));
-    await tester.pumpAndSettle();
+    // Start: Räume mit allen Leuten (wer spricht, sieht man hier)
     expect(find.text('Zocken 1'), findsOneWidget);
+    expect(find.text('Jonas'), findsOneWidget);
+    expect(find.text('Lobby-Code: 4711'), findsNothing);
     await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_rooms.png'));
 
-    // Raum antippen schließt die Seitenleiste (aktueller Raum: kein Aufruf an den Rust-Kern)
-    await tester.tap(find.descendant(of: find.byType(Drawer), matching: find.text('Lobby')));
+    await tester.tap(find.text('Chat'));
     await tester.pumpAndSettle();
-    expect(find.byType(Drawer), findsNothing);
+    expect(find.text('Lobby-Code: 4711'), findsOneWidget);
+    expect(c.unreadHere, 0);
+    expect(find.byTooltip('Tastatur einklappen'), findsNothing);
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    expect(find.byTooltip('Tastatur einklappen'), findsOneWidget);
+    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_chat.png'));
+    await tester.tap(find.byTooltip('Tastatur einklappen'));
+    await tester.pump();
+    expect(find.byTooltip('Tastatur einklappen'), findsNothing);
   });
 
   testWidgets('Moderator sieht Menü mit Rauswerfen und Sperren', (tester) async {
