@@ -270,7 +270,8 @@ func TestWebLinkLogin(t *testing.T) {
 	if st, _, _ := phone.get("/"); st != http.StatusOK {
 		t.Fatal("nach Link nicht angemeldet")
 	}
-	if _, loc, _ := wt.browser().post("/login/link", url.Values{"t": {link}}); !strings.HasPrefix(loc, "/login?e=") {
+	again := wt.browser()
+	if _, loc, _ := again.post("/login/link", url.Values{"t": {link}}); loc != "/login" || !strings.Contains(again.flash(), "abgelaufen") {
 		t.Fatal("Link zweimal benutzbar")
 	}
 }
@@ -434,6 +435,17 @@ func newFakeIdP(t *testing.T) *fakeIdP {
 	return f
 }
 
+// flash liefert die Meldung, die die Login-Seite gerade anzeigt.
+func (b *browser) flash() string {
+	b.wt.t.Helper()
+	_, _, body := b.get("/login")
+	m := regexp.MustCompile(`class="flash err">([^<]*)<`).FindStringSubmatch(body)
+	if m == nil {
+		return ""
+	}
+	return m[1]
+}
+
 // oidcLogin spielt den Ablauf durch: /auth/oidc → Anbieter → Callback.
 func (b *browser) oidcLogin(idp *fakeIdP, claims map[string]any) (int, string) {
 	b.wt.t.Helper()
@@ -453,6 +465,13 @@ func (b *browser) oidcLogin(idp *fakeIdP, claims map[string]any) (int, string) {
 	return st, loc
 }
 
+// oidcFail meldet sich per OIDC an und liefert die Fehlermeldung der Login-Seite.
+func oidcFail(wt *webTest, idp *fakeIdP, claims map[string]any) string {
+	b := wt.browser()
+	b.oidcLogin(idp, claims)
+	return b.flash()
+}
+
 func TestWebOIDC(t *testing.T) {
 	idp := newFakeIdP(t)
 	wt := newWebTest(t, &OIDCConfig{Issuer: idp.srv.URL, ClientID: "talkie", ClientSecret: "geheim", Name: "Pocket ID"})
@@ -462,12 +481,12 @@ func TestWebOIDC(t *testing.T) {
 		t.Fatal("OIDC-Button fehlt")
 	}
 	// Unbekannte Adresse → kein Zugang (Konten legt nur der Admin an)
-	if _, loc := wt.browser().oidcLogin(idp, map[string]any{"sub": "u9", "email": "fremd@example.org", "email_verified": true}); !strings.Contains(loc, "keinen+Zugang") {
-		t.Fatalf("fremde Adresse: %s", loc)
+	if msg := oidcFail(wt, idp, map[string]any{"sub": "u9", "email": "fremd@example.org", "email_verified": true}); !strings.Contains(msg, "keinen Zugang") {
+		t.Fatalf("fremde Adresse: %s", msg)
 	}
 	// Unbestätigte Adresse → abgelehnt
-	if _, loc := wt.browser().oidcLogin(idp, map[string]any{"sub": "u1", "email": "chef@example.org", "email_verified": false}); !strings.Contains(loc, "nicht+best") {
-		t.Fatalf("unbestätigte Adresse: %s", loc)
+	if msg := oidcFail(wt, idp, map[string]any{"sub": "u1", "email": "chef@example.org", "email_verified": false}); !strings.Contains(msg, "nicht bestätigt") {
+		t.Fatalf("unbestätigte Adresse: %s", msg)
 	}
 	// Richtige Anmeldung, danach ist die Kennung verknüpft
 	b := wt.browser()
@@ -478,15 +497,19 @@ func TestWebOIDC(t *testing.T) {
 		t.Fatal("nach OIDC nicht als Admin angemeldet")
 	}
 	// Jemand anderes mit derselben Adresse, aber anderer Kennung → abgelehnt
-	if _, loc := wt.browser().oidcLogin(idp, map[string]any{"sub": "u2", "email": "chef@example.org", "email_verified": true}); !strings.Contains(loc, "anderen+Anmeldung") {
-		t.Fatalf("fremde Kennung: %s", loc)
+	if msg := oidcFail(wt, idp, map[string]any{"sub": "u2", "email": "chef@example.org", "email_verified": true}); !strings.Contains(msg, "anderen Anmeldung") {
+		t.Fatalf("fremde Kennung: %s", msg)
 	}
 	// Gleiche Kennung, neue Adresse beim Anbieter → klappt weiter
 	if _, loc := wt.browser().oidcLogin(idp, map[string]any{"sub": "u1", "email": "neu@example.org", "email_verified": true}); loc != "/" {
 		t.Fatalf("bekannte Kennung: %s", loc)
 	}
 	// Callback ohne passenden State
-	if _, loc, _ := wt.browser().get("/auth/oidc/callback?code=gut&state=falsch"); !strings.HasPrefix(loc, "/login?e=") {
+	if _, loc, _ := wt.browser().get("/auth/oidc/callback?code=gut&state=falsch"); loc != "/login" {
 		t.Fatal("Callback ohne State angenommen")
+	}
+	// Text aus der URL landet nicht auf der Login-Seite
+	if _, _, body := wt.browser().get("/login?e=Ruf+0800+an"); strings.Contains(body, "0800") {
+		t.Fatal("Text aus der URL wird angezeigt")
 	}
 }

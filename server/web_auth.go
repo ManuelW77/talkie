@@ -20,7 +20,9 @@ import (
 const pendCookie = "talkie_login"
 
 func (w *webApp) loginPage(rw http.ResponseWriter, r *http.Request) {
-	w.render(rw, r, "login", "Anmelden", map[string]any{"Error": r.URL.Query().Get("e")})
+	// Fehlermeldungen kommen nur über das Flash-Cookie (vom Server gesetzt),
+	// nie aus der URL – sonst ließe sich fremder Text in die Seite schleusen.
+	w.render(rw, r, "login", "Anmelden", map[string]any{})
 }
 
 func eightDigits() string {
@@ -117,12 +119,12 @@ func (w *webApp) linkPage(rw http.ResponseWriter, r *http.Request) {
 
 func (w *webApp) loginLink(rw http.ResponseWriter, r *http.Request) {
 	if !w.codeLimit.Reserve(w.clientIP(r)) {
-		http.Redirect(rw, r, "/login?e="+urlq("Zu viele Versuche. Bitte warte ein paar Minuten."), http.StatusSeeOther)
+		w.done(rw, r, "/login", "Zu viele Versuche. Bitte warte ein paar Minuten.", true)
 		return
 	}
 	id, err := w.store.LoginByLink(r.PostFormValue("t"))
 	if err != nil {
-		http.Redirect(rw, r, "/login?e="+urlq("Der Link ist abgelaufen oder wurde schon benutzt."), http.StatusSeeOther)
+		w.done(rw, r, "/login", "Der Link ist abgelaufen oder wurde schon benutzt.", true)
 		return
 	}
 	w.finishLogin(rw, r, id, "Mail-Link")
@@ -131,7 +133,7 @@ func (w *webApp) loginLink(rw http.ResponseWriter, r *http.Request) {
 func (w *webApp) finishLogin(rw http.ResponseWriter, r *http.Request, id int64, how string) {
 	acc, err := w.store.AccountByID(id)
 	if err != nil || acc.Disabled {
-		http.Redirect(rw, r, "/login?e="+urlq("Dieses Konto ist deaktiviert."), http.StatusSeeOther)
+		w.done(rw, r, "/login", "Dieses Konto ist deaktiviert.", true)
 		return
 	}
 	http.SetCookie(rw, &http.Cookie{Name: pendCookie, Path: "/login", MaxAge: -1})
@@ -179,7 +181,7 @@ func (w *webApp) oidcStart(rw http.ResponseWriter, r *http.Request) {
 	oc, _, err := w.oidcClient(r.Context())
 	if err != nil {
 		log.Printf("web: oidc: %v", err)
-		http.Redirect(rw, r, "/login?e="+urlq(w.cfg.OIDC.Name+" ist gerade nicht erreichbar."), http.StatusSeeOther)
+		w.done(rw, r, "/login", w.cfg.OIDC.Name+" ist gerade nicht erreichbar.", true)
 		return
 	}
 	state, nonce, ver := randToken(24), randToken(24), oauth2.GenerateVerifier()
@@ -204,7 +206,7 @@ func (w *webApp) oidcStart(rw http.ResponseWriter, r *http.Request) {
 
 func (w *webApp) oidcCallback(rw http.ResponseWriter, r *http.Request) {
 	bad := func(msg string) {
-		http.Redirect(rw, r, "/login?e="+urlq(msg), http.StatusSeeOther)
+		w.done(rw, r, "/login", msg, true)
 	}
 	if w.cfg.OIDC == nil {
 		http.NotFound(rw, r)
