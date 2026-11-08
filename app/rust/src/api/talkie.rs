@@ -104,6 +104,15 @@ pub struct SettingsDto {
     pub output_volume: f32,
     /// Hinweistöne bei Kommen/Gehen und neuen Chatnachrichten.
     pub sounds: bool,
+    /// Push-to-Talk statt Sprach-Erkennung, und die Taste dafür.
+    pub ptt: bool,
+    pub ptt_key: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PttKeyDto {
+    pub id: String,
+    pub label: String,
 }
 
 #[derive(Debug, Clone)]
@@ -198,6 +207,8 @@ fn settings_dto(s: &Settings) -> SettingsDto {
         input_gain: s.input_gain,
         output_volume: s.output_volume,
         sounds: s.sounds,
+        ptt: s.ptt,
+        ptt_key: s.ptt_key.clone(),
     }
 }
 
@@ -280,6 +291,36 @@ pub fn talkie_set_user_muted(user: i64, muted: bool) -> Result<()> {
     Ok(())
 }
 
+/// Push-to-Talk-Knopf in der App gedrückt halten / loslassen.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_set_ptt_pressed(down: bool) -> Result<()> {
+    engine()?.set_ptt_pressed(down);
+    Ok(())
+}
+
+/// Wählbare Push-to-Talk-Tasten.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_ptt_keys() -> Vec<PttKeyDto> {
+    crate::core::ptt::KEYS.iter().map(|(id, label)| PttKeyDto { id: (*id).into(), label: (*label).into() }).collect()
+}
+
+/// "ok", "permission" (macOS: Eingabeüberwachung fehlt) oder "unsupported" (nur Knopf in der App).
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_ptt_access() -> String {
+    use crate::core::ptt::Access;
+    match crate::core::ptt::access() {
+        Access::Ok => "ok",
+        Access::NeedsPermission => "permission",
+        Access::Unsupported => "unsupported",
+    }
+    .into()
+}
+
+/// macOS: nach „Eingabeüberwachung“ fragen.
+pub fn talkie_ptt_request_access() {
+    crate::core::ptt::request_access();
+}
+
 /// Chat leeren (room 0 = alle Räume). Ergebnis kommt als Hinweis zurück.
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_clear_chat(room: i64) -> Result<()> {
@@ -315,6 +356,8 @@ pub fn talkie_set_settings(s: SettingsDto) -> Result<()> {
         input_gain: s.input_gain,
         output_volume: s.output_volume,
         sounds: s.sounds,
+        ptt: s.ptt,
+        ptt_key: s.ptt_key,
     });
     Ok(())
 }

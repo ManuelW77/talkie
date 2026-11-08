@@ -20,6 +20,8 @@ const _settings = SettingsDto(
   inputGain: 1,
   outputVolume: 1,
   sounds: true,
+  ptt: false,
+  pttKey: 'f8',
 );
 
 TalkieController _controller({bool registered = true}) =>
@@ -337,5 +339,33 @@ void main() {
     await tester.tap(find.byTooltip('Ausblenden'));
     await tester.pump();
     expect(find.textContaining('Neue Talkie-Version'), findsNothing);
+  });
+
+  testWidgets('Push-to-Talk: Halten-Knopf in der Bedienleiste (Handy)', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    c.config = ConfigDto(
+      server: c.config.server,
+      name: c.config.name,
+      registered: true,
+      settings: const SettingsDto(
+        vadThresholdDb: -45,
+        noiseSuppression: true,
+        inputDevice: '',
+        outputDevice: '',
+        inputGain: 1,
+        outputVolume: 1,
+        sounds: true,
+        ptt: true,
+        pttKey: 'f8',
+      ),
+    );
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Halten'), findsOneWidget);
+    expect(tester.takeException(), isNull); // passt ohne Überlauf aufs Handy
+    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_ptt.png'));
   });
 }

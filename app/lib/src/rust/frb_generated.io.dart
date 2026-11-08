@@ -70,6 +70,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<PttKeyDto> dco_decode_list_ptt_key_dto(dynamic raw);
+
+  @protected
   List<RoomDto> dco_decode_list_room_dto(dynamic raw);
 
   @protected
@@ -80,6 +83,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StateDto? dco_decode_opt_box_autoadd_state_dto(dynamic raw);
+
+  @protected
+  PttKeyDto dco_decode_ptt_key_dto(dynamic raw);
 
   @protected
   RoomDto dco_decode_room_dto(dynamic raw);
@@ -156,6 +162,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<PttKeyDto> sse_decode_list_ptt_key_dto(SseDeserializer deserializer);
+
+  @protected
   List<RoomDto> sse_decode_list_room_dto(SseDeserializer deserializer);
 
   @protected
@@ -166,6 +175,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StateDto? sse_decode_opt_box_autoadd_state_dto(SseDeserializer deserializer);
+
+  @protected
+  PttKeyDto sse_decode_ptt_key_dto(SseDeserializer deserializer);
 
   @protected
   RoomDto sse_decode_room_dto(SseDeserializer deserializer);
@@ -255,6 +267,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_ptt_key_dto(
+    List<PttKeyDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_room_dto(List<RoomDto> self, SseSerializer serializer);
 
   @protected
@@ -271,6 +289,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     StateDto? self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_ptt_key_dto(PttKeyDto self, SseSerializer serializer);
 
   @protected
   void sse_encode_room_dto(RoomDto self, SseSerializer serializer);

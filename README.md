@@ -184,6 +184,11 @@ tool/build_ios_sim.sh                                                 # iOS-Simu
   im Hintergrund am Leben, während gezockt wird.
 - **Handy allgemein:** Am besten mit Kopfhörern. Über den Lautsprecher hören die anderen sich sonst als Echo.
 
+**Push-to-Talk:** In den Einstellungen unter „Sprechen“ auf „Taste halten“ stellen und eine Taste wählen
+(F1–F12, Strg/Alt/Umschalt, Maus-Seitentasten). Die Taste wirkt auch, während ein Spiel im Vordergrund ist
+(macOS fragt dafür nach „Eingabeüberwachung“; unter Linux nur mit X11, nicht unter reinem Wayland).
+Am Handy und zusätzlich überall: unten den Knopf „Halten“ gedrückt halten.
+
 Bedienung: **Raum anklicken** = Raum wechseln. Mikrofon-Knopf = stumm (auch **Strg+M** bzw. **⌘M**),
 Kopfhörer-Knopf = niemanden hören. In den Einstellungen lässt sich die Empfindlichkeit einstellen:
 Beim normalen Sprechen soll der grüne Balken über den weißen Strich kommen.

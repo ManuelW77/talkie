@@ -243,7 +243,7 @@ mod tests {
         let mut pkts = Vec::new();
         c.process(
             &tone,
-            CaptureParams { threshold_db: -45.0, noise_suppression: false, gain: 1.0, muted: false },
+            CaptureParams { threshold_db: -45.0, noise_suppression: false, gain: 1.0, muted: false, ptt: None },
             |e| pkts.push(e.data),
         );
         pkts

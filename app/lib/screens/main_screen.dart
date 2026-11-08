@@ -835,6 +835,10 @@ class _ControlBar extends StatelessWidget {
             ),
           ),
           SizedBox(width: compact ? 8 : 24),
+          if (c.config.settings.ptt) ...[
+            _PttButton(controller: c, compact: compact),
+            SizedBox(width: compact ? 6 : 10),
+          ],
           _RoundButton(
             icon: c.muted ? Icons.mic_off_rounded : Icons.mic_rounded,
             label: c.muted ? 'Stumm' : 'Mikro an',
@@ -859,6 +863,63 @@ class _ControlBar extends StatelessWidget {
             tooltip: 'Einstellungen',
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Push-to-Talk: gedrückt halten zum Sprechen (Maus, Finger). Die Taste aus den Einstellungen
+/// funktioniert zusätzlich systemweit.
+class _PttButton extends StatefulWidget {
+  const _PttButton({required this.controller, required this.compact});
+
+  final TalkieController controller;
+  final bool compact;
+
+  @override
+  State<_PttButton> createState() => _PttButtonState();
+}
+
+class _PttButtonState extends State<_PttButton> {
+  bool _down = false;
+
+  void _set(bool down) {
+    if (_down == down) return;
+    setState(() => _down = down);
+    widget.controller.setPttPressed(down);
+  }
+
+  @override
+  void dispose() {
+    if (_down) widget.controller.setPttPressed(false);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Tooltip(
+      message: 'Gedrückt halten zum Sprechen',
+      child: Listener(
+        onPointerDown: (_) => _set(true),
+        onPointerUp: (_) => _set(false),
+        onPointerCancel: (_) => _set(false),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 80),
+              padding: EdgeInsets.symmetric(horizontal: widget.compact ? 14 : 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: _down ? kTalking : theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Icon(Icons.record_voice_over_rounded, size: 24, color: _down ? Colors.black : null),
+            ),
+            const SizedBox(height: 4),
+            Text(_down ? 'Sprichst …' : 'Halten', style: theme.textTheme.labelSmall),
+          ],
+        ),
       ),
     );
   }
