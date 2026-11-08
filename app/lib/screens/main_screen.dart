@@ -58,30 +58,17 @@ class _MainScreenState extends State<MainScreen> {
             // Handy hochkant: Chat füllt den Bildschirm, Räume kommen als Seitenleiste
             final narrow = box.maxWidth < kNarrowWidth;
             return Scaffold(
-              drawer: narrow
-                  ? Drawer(
-                      width: 300,
-                      child: SafeArea(
-                        child: Builder(
-                          builder: (context) => _RoomsPanel(
-                            controller: c,
-                            onPicked: () => Navigator.of(context).maybePop(),
-                          ),
-                        ),
-                      ),
-                    )
-                  : null,
               body: SafeArea(
                 child: Column(
                   children: [
                     _StatusBanner(controller: c),
                     if (c.micDenied) _MicBanner(controller: c),
+                    if (narrow) _PhoneTabs(controller: c),
                     Expanded(
                       child: narrow
-                          ? Builder(
-                              builder: (context) =>
-                                  _ChatPanel(controller: c, onMenu: () => Scaffold.of(context).openDrawer()),
-                            )
+                          ? (c.phoneChat
+                              ? _ChatPanel(controller: c, compact: true, onShowRooms: () => c.showPhoneChat(false))
+                              : _RoomsPanel(controller: c))
                           : Row(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -181,11 +168,9 @@ class _MicBanner extends StatelessWidget {
 }
 
 class _RoomsPanel extends StatelessWidget {
-  const _RoomsPanel({required this.controller, this.onPicked});
+  const _RoomsPanel({required this.controller});
 
   final TalkieController controller;
-  /// Nach dem Antippen eines Raums (schließt die Seitenleiste).
-  final VoidCallback? onPicked;
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +187,7 @@ class _RoomsPanel extends StatelessWidget {
                 style: theme.textTheme.labelMedium
                     ?.copyWith(letterSpacing: 1.5, color: theme.colorScheme.onSurfaceVariant)),
           ),
-          for (final r in rooms) _RoomTile(controller: controller, room: r, onPicked: onPicked),
+          for (final r in rooms) _RoomTile(controller: controller, room: r),
         ],
       ),
     );
@@ -210,11 +195,10 @@ class _RoomsPanel extends StatelessWidget {
 }
 
 class _RoomTile extends StatelessWidget {
-  const _RoomTile({required this.controller, required this.room, this.onPicked});
+  const _RoomTile({required this.controller, required this.room});
 
   final TalkieController controller;
   final RoomDto room;
-  final VoidCallback? onPicked;
 
   @override
   Widget build(BuildContext context) {
@@ -229,10 +213,7 @@ class _RoomTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () {
-            controller.join(room.id);
-            onPicked?.call();
-          },
+          onTap: () => controller.join(room.id),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             child: Column(
@@ -382,12 +363,57 @@ class _ModMenu extends StatelessWidget {
   }
 }
 
-class _ChatPanel extends StatefulWidget {
-  const _ChatPanel({required this.controller, this.onMenu});
+/// Handy: Umschalter zwischen Räumen (wer ist da, wer spricht) und Chat.
+class _PhoneTabs extends StatelessWidget {
+  const _PhoneTabs({required this.controller});
 
   final TalkieController controller;
-  /// Gesetzt im schmalen Layout: öffnet die Räume.
-  final VoidCallback? onMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    final otherUnread = c.unread.values.any((n) => n > 0);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: SegmentedButton<bool>(
+        showSelectedIcon: false,
+        segments: [
+          ButtonSegment(
+            value: false,
+            label: const Text('Räume'),
+            icon: Badge(
+              isLabelVisible: otherUnread,
+              backgroundColor: kDanger,
+              smallSize: 8,
+              child: const Icon(Icons.groups_rounded),
+            ),
+          ),
+          ButtonSegment(
+            value: true,
+            label: const Text('Chat'),
+            icon: Badge(
+              isLabelVisible: c.unreadHere > 0,
+              label: Text('${c.unreadHere}'),
+              backgroundColor: kDanger,
+              child: const Icon(Icons.chat_bubble_rounded),
+            ),
+          ),
+        ],
+        selected: {c.phoneChat},
+        onSelectionChanged: (s) => c.showPhoneChat(s.first),
+      ),
+    );
+  }
+}
+
+class _ChatPanel extends StatefulWidget {
+  const _ChatPanel({required this.controller, this.compact = false, this.onShowRooms});
+
+  final TalkieController controller;
+  /// Handy: schlanker Kopf mit den Leuten im Raum, Knopf zum Einklappen der Tastatur.
+  final bool compact;
+  /// Handy: Antippen der Leute oben zeigt die Räume.
+  final VoidCallback? onShowRooms;
 
   @override
   State<_ChatPanel> createState() => _ChatPanelState();
@@ -398,7 +424,16 @@ class _ChatPanelState extends State<_ChatPanel> {
   final _focus = FocusNode();
 
   @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_onFocus); // Tastatur-Knopf ein-/ausblenden
+  }
+
+  void _onFocus() => setState(() {});
+
+  @override
   void dispose() {
+    _focus.removeListener(_onFocus);
     _text.dispose();
     _focus.dispose();
     super.dispose();
@@ -429,41 +464,34 @@ class _ChatPanelState extends State<_ChatPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: widget.onMenu != null
-              ? const EdgeInsets.fromLTRB(4, 4, 16, 4)
+          padding: widget.compact
+              ? const EdgeInsets.fromLTRB(20, 4, 12, 4)
               : const EdgeInsets.fromLTRB(20, 16, 20, 8),
           child: Row(
             children: [
-              if (widget.onMenu != null)
-                IconButton(
-                  onPressed: widget.onMenu,
-                  tooltip: 'Räume',
-                  icon: Badge(
-                    isLabelVisible: widget.controller.unread.values.any((n) => n > 0),
-                    backgroundColor: kDanger,
-                    smallSize: 9,
-                    child: const Icon(Icons.menu_rounded),
-                  ),
-                )
-              else ...[
-                const Icon(Icons.chat_bubble_rounded, size: 18, color: kAccent),
-                const SizedBox(width: 10),
-              ],
+              const Icon(Icons.chat_bubble_rounded, size: 18, color: kAccent),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(_roomName(), overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
               ),
-              if (widget.onMenu != null) _RoomPeople(controller: widget.controller, onTap: widget.onMenu!),
+              if (widget.onShowRooms != null) _RoomPeople(controller: widget.controller, onTap: widget.onShowRooms!),
             ],
           ),
         ),
         const Divider(height: 1),
         Expanded(
-          child: msgs.isEmpty
+          // Tippen in den Verlauf klappt die Tastatur ein
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _focus.unfocus,
+            child: msgs.isEmpty
               ? Center(
                   child: Text('Noch keine Nachrichten. Schreib was!',
                       style: TextStyle(color: theme.colorScheme.onSurfaceVariant)))
               : ListView.builder(
                   reverse: true,
+                  // Wischen durch den Verlauf klappt die Tastatur ein
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   itemCount: msgs.length,
                   itemBuilder: (context, i) {
@@ -473,11 +501,20 @@ class _ChatPanelState extends State<_ChatPanel> {
                     return _ChatLine(msg: m, grouped: grouped);
                   },
                 ),
+          ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
           child: Row(
             children: [
+              if (widget.compact && _focus.hasFocus) ...[
+                IconButton(
+                  onPressed: _focus.unfocus,
+                  icon: const Icon(Icons.keyboard_hide_rounded),
+                  tooltip: 'Tastatur einklappen',
+                ),
+                const SizedBox(width: 4),
+              ],
               Expanded(
                 child: TextField(
                   controller: _text,

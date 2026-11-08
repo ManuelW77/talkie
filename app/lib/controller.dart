@@ -30,6 +30,17 @@ class TalkieController extends ChangeNotifier {
   final _notices = StreamController<String>.broadcast();
   /// Ungelesene Nachrichten pro Raum (nur andere Räume).
   final Map<int, int> unread = {};
+
+  /// Handy: Chat statt Räumen zeigen.
+  bool phoneChat = false;
+  /// Handy: neue Nachrichten im eigenen Raum, während die Räume angezeigt werden.
+  int unreadHere = 0;
+
+  void showPhoneChat(bool chat) {
+    phoneChat = chat;
+    if (chat) unreadHere = 0;
+    notifyListeners();
+  }
   StreamSubscription<UiEvent>? _sub;
 
   /// Kurze Hinweise für eine Snackbar.
@@ -108,13 +119,20 @@ class TalkieController extends ChangeNotifier {
           }
           setupBusy = false;
         }
-        if (prev?.room != s.room) unread.remove(s.room);
+        if (prev?.room != s.room) {
+          unread.remove(s.room);
+          unreadHere = 0;
+        }
         _updateBackground(s.status);
         notifyListeners();
       case EventKind.chat:
         final m = e.chat!;
         (chats[m.room] ??= []).add(m);
-        if (m.room != currentRoom) unread[m.room] = (unread[m.room] ?? 0) + 1;
+        if (m.room != currentRoom) {
+          unread[m.room] = (unread[m.room] ?? 0) + 1;
+        } else if (!phoneChat && m.from != me) {
+          unreadHere++;
+        }
         notifyListeners();
       case EventKind.history:
         chats[e.historyRoom] = List.of(e.history);
