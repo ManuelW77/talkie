@@ -21,6 +21,10 @@ pub struct Settings {
     pub output_volume: f32,
     /// Hinweistöne bei Kommen/Gehen und neuen Chatnachrichten.
     pub sounds: bool,
+    /// Push-to-Talk statt Sprach-Erkennung.
+    pub ptt: bool,
+    /// Taste für Push-to-Talk (siehe ptt::KEYS).
+    pub ptt_key: String,
 }
 
 impl Default for Settings {
@@ -33,6 +37,8 @@ impl Default for Settings {
             input_gain: 1.0,
             output_volume: 1.0,
             sounds: true,
+            ptt: false,
+            ptt_key: crate::core::ptt::DEFAULT_KEY.into(),
         }
     }
 }

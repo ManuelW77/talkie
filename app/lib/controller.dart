@@ -265,6 +265,9 @@ class TalkieController extends ChangeNotifier {
   /// Rauswerfen (ban = auch sperren). Das Ergebnis kommt als Hinweis (Snackbar).
   void moderate(UserDto u, {required bool ban}) => talkieModerate(user: u.id, ban: ban);
 
+  /// Push-to-Talk-Knopf in der App gedrückt/losgelassen.
+  void setPttPressed(bool down) => talkieSetPttPressed(down: down);
+
   /// Lautstärke einer Person nur für mich (0 … 3, 1 = normal).
   void setUserVolume(UserDto u, double v) => talkieSetUserVolume(user: u.id, volume: v);
 

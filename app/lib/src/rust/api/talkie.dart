@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `chat_dto`, `engine`, `settings_dto`, `state_dto`, `ui_event`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Startet die Engine (einmal pro Programmstart) und liefert die gespeicherte Konfiguration.
 /// `data_dir` leer = Standardordner des Systems.
@@ -63,6 +63,22 @@ void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
       user: user,
       muted: muted,
     );
+
+/// Push-to-Talk-Knopf in der App gedrückt halten / loslassen.
+void talkieSetPttPressed({required bool down}) =>
+    RustLib.instance.api.crateApiTalkieTalkieSetPttPressed(down: down);
+
+/// Wählbare Push-to-Talk-Tasten.
+List<PttKeyDto> talkiePttKeys() =>
+    RustLib.instance.api.crateApiTalkieTalkiePttKeys();
+
+/// "ok", "permission" (macOS: Eingabeüberwachung fehlt) oder "unsupported" (nur Knopf in der App).
+String talkiePttAccess() =>
+    RustLib.instance.api.crateApiTalkieTalkiePttAccess();
+
+/// macOS: nach „Eingabeüberwachung“ fragen.
+Future<void> talkiePttRequestAccess() =>
+    RustLib.instance.api.crateApiTalkieTalkiePttRequestAccess();
 
 /// Chat leeren (room 0 = alle Räume). Ergebnis kommt als Hinweis zurück.
 void talkieClearChat({required PlatformInt64 room}) =>
@@ -155,6 +171,24 @@ enum ConnStatus { idle, connecting, connected, reconnecting, failed }
 
 enum EventKind { state, chat, history, level, notice }
 
+class PttKeyDto {
+  final String id;
+  final String label;
+
+  const PttKeyDto({required this.id, required this.label});
+
+  @override
+  int get hashCode => id.hashCode ^ label.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PttKeyDto &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          label == other.label;
+}
+
 class RoomDto {
   final PlatformInt64 id;
   final String name;
@@ -184,6 +218,10 @@ class SettingsDto {
   /// Hinweistöne bei Kommen/Gehen und neuen Chatnachrichten.
   final bool sounds;
 
+  /// Push-to-Talk statt Sprach-Erkennung, und die Taste dafür.
+  final bool ptt;
+  final String pttKey;
+
   const SettingsDto({
     required this.vadThresholdDb,
     required this.noiseSuppression,
@@ -192,6 +230,8 @@ class SettingsDto {
     required this.inputGain,
     required this.outputVolume,
     required this.sounds,
+    required this.ptt,
+    required this.pttKey,
   });
 
   @override
@@ -202,7 +242,9 @@ class SettingsDto {
       outputDevice.hashCode ^
       inputGain.hashCode ^
       outputVolume.hashCode ^
-      sounds.hashCode;
+      sounds.hashCode ^
+      ptt.hashCode ^
+      pttKey.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -215,7 +257,9 @@ class SettingsDto {
           outputDevice == other.outputDevice &&
           inputGain == other.inputGain &&
           outputVolume == other.outputVolume &&
-          sounds == other.sounds;
+          sounds == other.sounds &&
+          ptt == other.ptt &&
+          pttKey == other.pttKey;
 }
 
 class StateDto {

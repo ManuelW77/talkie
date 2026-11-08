@@ -6,6 +6,7 @@ use crate::core::dsp::CaptureParams;
 use crate::core::dsp::CaptureProcessor;
 use crate::core::cues::{self, Cue};
 use crate::core::mixer::Mixer;
+use crate::core::ptt;
 use crate::core::net::{self, ConnectError};
 use crate::core::protocol::*;
 use anyhow::Result;
@@ -108,6 +109,9 @@ struct Inner {
     capture_tx: mpsc::Sender<Vec<f32>>,
     seq: AtomicU16,
     audio_enabled: bool,
+    /// Push-to-Talk: Knopf in der App gedrückt / Taste systemweit gedrückt.
+    ptt_ui: AtomicBool,
+    ptt_key: AtomicBool,
     /// Aufgeben nach (erster Verbindungsaufbau, nach Abbruch). Für Tests verkürzbar.
     give_up: Mutex<(Duration, Duration)>,
     /// Wird bei jedem Verbinden/Trennen erhöht; alte Sitzungs-Tasks erkennen daran, dass sie veraltet sind.
@@ -125,6 +129,7 @@ fn params_from(s: &Settings, muted: bool) -> CaptureParams {
         noise_suppression: s.noise_suppression,
         gain: s.input_gain.clamp(0.0, 8.0),
         muted,
+        ptt: s.ptt.then_some(false),
     }
 }
 
@@ -264,6 +269,24 @@ impl Inner {
 }
 
 /// Mikrofon-Verarbeitung: läuft für die ganze Lebensdauer der Engine.
+/// Fragt alle 15 ms die Push-to-Talk-Taste ab, solange Push-to-Talk an ist.
+fn ptt_loop(inner: std::sync::Weak<Inner>) {
+    loop {
+        std::thread::sleep(Duration::from_millis(15));
+        let Some(inner) = inner.upgrade() else { return };
+        let (on, key) = {
+            let c = inner.config.lock();
+            (c.settings.ptt, c.settings.ptt_key.clone())
+        };
+        let down = on && ptt::key_down(&key).unwrap_or(false);
+        inner.ptt_key.store(down, Ordering::Relaxed);
+        if !on {
+            drop(inner);
+            std::thread::sleep(Duration::from_millis(200)); // aus: seltener nachsehen
+        }
+    }
+}
+
 fn capture_loop(inner: std::sync::Weak<Inner>, rx: mpsc::Receiver<Vec<f32>>) {
     let mut proc = match CaptureProcessor::new() {
         Ok(p) => p,
@@ -275,7 +298,10 @@ fn capture_loop(inner: std::sync::Weak<Inner>, rx: mpsc::Receiver<Vec<f32>>) {
     let mut since_level = 0usize;
     while let Ok(buf) = rx.recv() {
         let Some(inner) = inner.upgrade() else { return };
-        let p = *inner.params.lock();
+        let mut p = *inner.params.lock();
+        if p.ptt.is_some() {
+            p.ptt = Some(inner.ptt_ui.load(Ordering::Relaxed) || inner.ptt_key.load(Ordering::Relaxed));
+        }
         proc.process(&buf, p, |enc| inner.send_voice(&enc.data));
         since_level += buf.len();
         if since_level >= 4800 {
@@ -345,9 +371,16 @@ impl Engine {
             audio_enabled,
             generation: AtomicU64::new(0),
             give_up: Mutex::new((GIVE_UP_FIRST, GIVE_UP_LOST)),
+            ptt_ui: AtomicBool::new(false),
+            ptt_key: AtomicBool::new(false),
         });
         let weak = Arc::downgrade(&inner);
         std::thread::Builder::new().name("talkie-capture".into()).spawn(move || capture_loop(weak, capture_rx))?;
+        // Push-to-Talk-Taste systemweit abfragen (Desktop; am Handy gibt es nur den Knopf)
+        if !cfg!(any(target_os = "android", target_os = "ios")) {
+            let weak = Arc::downgrade(&inner);
+            std::thread::Builder::new().name("talkie-ptt".into()).spawn(move || ptt_loop(weak))?;
+        }
         Ok(Engine { rt, inner })
     }
 
@@ -516,6 +549,11 @@ impl Engine {
         }
         self.inner.send_cmd(self.inner.ignore_envelope());
         self.inner.emit_state();
+    }
+
+    /// Push-to-Talk-Knopf in der App gedrückt/losgelassen.
+    pub fn set_ptt_pressed(&self, down: bool) {
+        self.inner.ptt_ui.store(down, Ordering::Relaxed);
     }
 
     /// Chat leeren (room 0 = alle Räume). Nur mit verknüpftem Admin-Konto, prüft der Server.
