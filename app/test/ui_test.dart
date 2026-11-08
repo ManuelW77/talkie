@@ -62,6 +62,7 @@ TalkieController _mainController() {
       ],
       muted: false,
       deaf: false,
+      moderator: false,
     );
   c.chats[10] = const [
     ChatDto(room: 10, from: 2, name: 'Lena', text: 'Wer ist dabei? Runde startet gleich!', ts: 1762500000),
@@ -124,6 +125,7 @@ void main() {
         users: [],
         muted: false,
         deaf: false,
+        moderator: false,
       );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     expect(find.text('Du wurdest vom Admin rausgeworfen.'), findsOneWidget);
@@ -145,6 +147,7 @@ void main() {
         users: [],
         muted: false,
         deaf: false,
+        moderator: false,
       );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     await tester.pump(const Duration(milliseconds: 300));
@@ -176,5 +179,41 @@ void main() {
     await tester.tap(find.descendant(of: find.byType(Drawer), matching: find.text('Lobby')));
     await tester.pumpAndSettle();
     expect(find.byType(Drawer), findsNothing);
+  });
+
+  testWidgets('Moderator sieht Menü mit Rauswerfen und Sperren', (tester) async {
+    tester.view.physicalSize = const Size(1000, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    final s = c.state!;
+    c.state = StateDto(
+      status: s.status,
+      message: s.message,
+      errorCode: s.errorCode,
+      me: s.me,
+      room: s.room,
+      rooms: s.rooms,
+      users: s.users,
+      muted: s.muted,
+      deaf: s.deaf,
+      moderator: true,
+    );
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    // ein Menü pro anderer Person (Lena, Jonas, Emil), keins bei mir
+    expect(find.byTooltip('Mehr zu Lena'), findsOneWidget);
+    expect(find.byTooltip('Mehr zu Max'), findsNothing);
+    await tester.tap(find.byTooltip('Mehr zu Lena'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rauswerfen'), findsOneWidget);
+    expect(find.text('Sperren'), findsOneWidget);
+    await tester.tap(find.text('Sperren'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lena sperren?'), findsOneWidget);
+    await expectLater(find.byType(Overlay).first, matchesGoldenFile('goldens/mod_confirm.png'));
+    await tester.tap(find.text('Abbrechen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lena sperren?'), findsNothing);
   });
 }

@@ -84,6 +84,9 @@ pub struct Envelope {
     /// ignore: Nutzer, die dieser Client für sich stumm geschaltet hat
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ids: Vec<i64>,
+    /// welcome: darf rauswerfen/sperren
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#mod: Option<bool>,
 
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub code: String,

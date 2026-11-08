@@ -50,6 +50,9 @@ type Envelope struct {
 	// ignore: Nutzer, die dieser Client für sich stumm geschaltet hat
 	IDs []int64 `json:"ids,omitempty"`
 
+	// welcome: darf rauswerfen/sperren (verknüpftes Webkonto mit Recht)
+	Mod *bool `json:"mod,omitempty"`
+
 	// error / kicked
 	Code   string `json:"code,omitempty"`
 	Reason string `json:"reason,omitempty"`

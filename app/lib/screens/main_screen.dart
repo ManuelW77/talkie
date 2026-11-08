@@ -250,6 +250,10 @@ class _RoomTile extends StatelessWidget {
                           _UserMuteButton(controller: controller, user: u)
                         else
                           const SizedBox(width: 30, height: 30),
+                        if (controller.moderator)
+                          u.id != controller.me
+                              ? _ModMenu(controller: controller, user: u)
+                              : const SizedBox(width: 30, height: 30),
                       ],
                     ),
                   ),
@@ -281,6 +285,68 @@ class _UserMuteButton extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+    );
+  }
+}
+
+enum _ModAction { kick, ban }
+
+/// Nur für Moderatoren: rauswerfen oder sperren, jeweils mit Rückfrage.
+class _ModMenu extends StatelessWidget {
+  const _ModMenu({required this.controller, required this.user});
+
+  final TalkieController controller;
+  final UserDto user;
+
+  Future<void> _confirm(BuildContext context, _ModAction a) async {
+    final ban = a == _ModAction.ban;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(ban ? '${user.name} sperren?' : '${user.name} rauswerfen?'),
+        content: Text(ban
+            ? '${user.name} fliegt raus und kann erst wieder rein, wenn ein Admin auf der Verwaltungsseite entsperrt.'
+            : '${user.name} fliegt raus, kann sich aber gleich wieder verbinden.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: kDanger, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(ban ? 'Sperren' : 'Rauswerfen'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) controller.moderate(user, ban: ban);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_ModAction>(
+      tooltip: 'Mehr zu ${user.name}',
+      icon: const Icon(Icons.more_vert_rounded, size: 18),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 160),
+      style: IconButton.styleFrom(
+        fixedSize: const Size(30, 30),
+        minimumSize: const Size(30, 30),
+        visualDensity: VisualDensity.compact,
+      ),
+      onSelected: (a) => _confirm(context, a),
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: _ModAction.kick,
+          child: ListTile(leading: Icon(Icons.logout_rounded), title: Text('Rauswerfen'), dense: true),
+        ),
+        PopupMenuItem(
+          value: _ModAction.ban,
+          child: ListTile(
+            leading: Icon(Icons.block_rounded, color: kDanger),
+            title: Text('Sperren', style: TextStyle(color: kDanger)),
+            dense: true,
+          ),
+        ),
+      ],
     );
   }
 }

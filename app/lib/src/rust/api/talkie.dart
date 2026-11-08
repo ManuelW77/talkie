@@ -55,6 +55,10 @@ void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
       muted: muted,
     );
 
+/// Jemanden rauswerfen (`ban` = auch sperren). Ergebnis kommt als Hinweis zurück.
+void talkieModerate({required PlatformInt64 user, required bool ban}) =>
+    RustLib.instance.api.crateApiTalkieTalkieModerate(user: user, ban: ban);
+
 void talkieSetDeaf({required bool deaf}) =>
     RustLib.instance.api.crateApiTalkieTalkieSetDeaf(deaf: deaf);
 
@@ -202,6 +206,9 @@ class StateDto {
   final bool muted;
   final bool deaf;
 
+  /// Darf andere rauswerfen/sperren.
+  final bool moderator;
+
   const StateDto({
     required this.status,
     required this.message,
@@ -212,6 +219,7 @@ class StateDto {
     required this.users,
     required this.muted,
     required this.deaf,
+    required this.moderator,
   });
 
   @override
@@ -224,7 +232,8 @@ class StateDto {
       rooms.hashCode ^
       users.hashCode ^
       muted.hashCode ^
-      deaf.hashCode;
+      deaf.hashCode ^
+      moderator.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -239,7 +248,8 @@ class StateDto {
           rooms == other.rooms &&
           users == other.users &&
           muted == other.muted &&
-          deaf == other.deaf;
+          deaf == other.deaf &&
+          moderator == other.moderator;
 }
 
 /// Ein Ereignis an die Oberfläche; welche Felder gefüllt sind, hängt von `kind` ab.

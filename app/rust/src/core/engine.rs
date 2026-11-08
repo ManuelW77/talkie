@@ -50,6 +50,8 @@ pub struct Snapshot {
     pub users: Vec<UserView>,
     pub muted: bool,
     pub deaf: bool,
+    /// Darf andere rauswerfen/sperren (verknüpftes Webkonto mit Recht).
+    pub moderator: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +73,7 @@ struct NetState {
     rooms: Vec<WireRoom>,
     users: BTreeMap<i64, WireUser>,
     talking: Vec<i64>,
+    moderator: bool,
 }
 
 struct Inner {
@@ -148,6 +151,7 @@ impl Inner {
             users,
             muted,
             deaf: self.deaf.load(Ordering::Relaxed),
+            moderator: n.moderator,
         }
     }
 
@@ -292,6 +296,7 @@ impl Engine {
                 rooms: Vec::new(),
                 users: BTreeMap::new(),
                 talking: Vec::new(),
+                moderator: false,
             }),
             muted: AtomicBool::new(false),
             deaf: AtomicBool::new(false),
@@ -455,6 +460,13 @@ impl Engine {
         }
         self.inner.send_cmd(self.inner.ignore_envelope());
         self.inner.emit_state();
+    }
+
+    /// Jemanden rauswerfen (`ban` = auch sperren). Der Server prüft das Recht.
+    pub fn moderate(&self, user: i64, ban: bool) {
+        let mut e = Envelope::new(if ban { "ban" } else { "kick" });
+        e.id = user;
+        self.inner.send_cmd(e);
     }
 
     /// Taub schalten: hört niemanden und ist dabei auch stumm.
@@ -667,6 +679,7 @@ async fn run_session(inner: &Arc<Inner>, sess: net::Session, generation: u64) ->
             my_room = you.room;
         }
         n.talking.clear();
+        n.moderator = welcome.r#mod.unwrap_or(false);
         n.status = Status::Connected;
         n.message.clear();
         n.error_code.clear();
@@ -821,7 +834,7 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
         "kicked" => {
             return Some(SessionEnd::Kicked(if e.reason.is_empty() { "Du wurdest getrennt.".into() } else { e.reason }))
         }
-        "error" => inner.emit(CoreEvent::Notice(e.reason)),
+        "error" | "info" => inner.emit(CoreEvent::Notice(e.reason)),
         _ => {}
     }
     None

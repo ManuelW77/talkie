@@ -155,6 +155,8 @@ func (s *Session) controlLoop() {
 			s.hub.SetState(s, muted, deaf)
 		case "ignore":
 			s.hub.SetIgnored(s, e.IDs)
+		case "kick", "ban":
+			s.hub.Moderate(s, e.ID, e.T == "ban")
 		}
 	}
 }
