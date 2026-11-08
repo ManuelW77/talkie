@@ -24,6 +24,7 @@ const _settings = SettingsDto(
   outputDevice: '',
   inputGain: 1,
   outputVolume: 1,
+  sounds: true,
 );
 
 /// Zielgröße in Pixeln, Pixeldichte und Größe des gezeigten Geräte-Bildschirms.

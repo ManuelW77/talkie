@@ -19,6 +19,7 @@ const _settings = SettingsDto(
   outputDevice: '',
   inputGain: 1,
   outputVolume: 1,
+  sounds: true,
 );
 
 TalkieController _controller({bool registered = true}) =>

@@ -172,6 +172,9 @@ class SettingsDto {
   final double inputGain;
   final double outputVolume;
 
+  /// Hinweistöne bei Kommen/Gehen und neuen Chatnachrichten.
+  final bool sounds;
+
   const SettingsDto({
     required this.vadThresholdDb,
     required this.noiseSuppression,
@@ -179,6 +182,7 @@ class SettingsDto {
     required this.outputDevice,
     required this.inputGain,
     required this.outputVolume,
+    required this.sounds,
   });
 
   @override
@@ -188,7 +192,8 @@ class SettingsDto {
       inputDevice.hashCode ^
       outputDevice.hashCode ^
       inputGain.hashCode ^
-      outputVolume.hashCode;
+      outputVolume.hashCode ^
+      sounds.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -200,7 +205,8 @@ class SettingsDto {
           inputDevice == other.inputDevice &&
           outputDevice == other.outputDevice &&
           inputGain == other.inputGain &&
-          outputVolume == other.outputVolume;
+          outputVolume == other.outputVolume &&
+          sounds == other.sounds;
 }
 
 class StateDto {

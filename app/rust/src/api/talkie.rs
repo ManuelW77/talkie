@@ -97,6 +97,8 @@ pub struct SettingsDto {
     pub output_device: String,
     pub input_gain: f32,
     pub output_volume: f32,
+    /// Hinweistöne bei Kommen/Gehen und neuen Chatnachrichten.
+    pub sounds: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -187,6 +189,7 @@ fn settings_dto(s: &Settings) -> SettingsDto {
         output_device: s.output_device.clone(),
         input_gain: s.input_gain,
         output_volume: s.output_volume,
+        sounds: s.sounds,
     }
 }
 
@@ -296,6 +299,7 @@ pub fn talkie_set_settings(s: SettingsDto) -> Result<()> {
         output_device: s.output_device,
         input_gain: s.input_gain,
         output_volume: s.output_volume,
+        sounds: s.sounds,
     });
     Ok(())
 }

@@ -873,6 +873,7 @@ impl SseDecode for crate::api::talkie::SettingsDto {
         let mut var_outputDevice = <String>::sse_decode(deserializer);
         let mut var_inputGain = <f32>::sse_decode(deserializer);
         let mut var_outputVolume = <f32>::sse_decode(deserializer);
+        let mut var_sounds = <bool>::sse_decode(deserializer);
         return crate::api::talkie::SettingsDto {
             vad_threshold_db: var_vadThresholdDb,
             noise_suppression: var_noiseSuppression,
@@ -880,6 +881,7 @@ impl SseDecode for crate::api::talkie::SettingsDto {
             output_device: var_outputDevice,
             input_gain: var_inputGain,
             output_volume: var_outputVolume,
+            sounds: var_sounds,
         };
     }
 }
@@ -1135,6 +1137,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::talkie::SettingsDto {
             self.output_device.into_into_dart().into_dart(),
             self.input_gain.into_into_dart().into_dart(),
             self.output_volume.into_into_dart().into_dart(),
+            self.sounds.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1422,6 +1425,7 @@ impl SseEncode for crate::api::talkie::SettingsDto {
         <String>::sse_encode(self.output_device, serializer);
         <f32>::sse_encode(self.input_gain, serializer);
         <f32>::sse_encode(self.output_volume, serializer);
+        <bool>::sse_encode(self.sounds, serializer);
     }
 }
 

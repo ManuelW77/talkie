@@ -4,6 +4,7 @@ use crate::core::config::{Config, Settings, Storage};
 use crate::core::device::{self, AudioIo};
 use crate::core::dsp::CaptureParams;
 use crate::core::dsp::CaptureProcessor;
+use crate::core::cues::{self, Cue};
 use crate::core::mixer::Mixer;
 use crate::core::net::{self, ConnectError};
 use crate::core::protocol::*;
@@ -817,17 +818,39 @@ async fn run_session(inner: &Arc<Inner>, sess: net::Session, generation: u64) ->
     end
 }
 
+/// Hinweiston abspielen (nicht, wenn Töne aus sind oder man taub geschaltet ist).
+fn play_cue(inner: &Inner, cue: Cue) {
+    if !inner.config.lock().settings.sounds || inner.deaf.load(Ordering::Relaxed) {
+        return;
+    }
+    inner.mixer.lock().play_cue(&cues::render(cue));
+}
+
 fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
     match e.t.as_str() {
         "user_joined" | "user_update" => {
             if let Some(u) = e.user {
                 let mut save_room = None;
+                let mut cue = None;
                 {
                     let mut n = inner.net.lock();
                     if u.id == n.me {
                         save_room = Some(u.room);
+                    } else {
+                        // Kommt jemand in meinen Raum oder geht er?
+                        let my = n.users.get(&n.me).map(|m| m.room).unwrap_or(0);
+                        let was_here = n.users.get(&u.id).is_some_and(|p| p.room == my);
+                        let now_here = u.room == my;
+                        cue = match (was_here, now_here) {
+                            (false, true) => Some(Cue::Join),
+                            (true, false) => Some(Cue::Leave),
+                            _ => None,
+                        };
                     }
                     n.users.insert(u.id, u);
+                }
+                if let Some(c) = cue {
+                    play_cue(inner, c);
                 }
                 if let Some(r) = save_room {
                     let changed = {
@@ -844,7 +867,14 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
             }
         }
         "user_left" => {
-            inner.net.lock().users.remove(&e.id);
+            let was_here = {
+                let mut n = inner.net.lock();
+                let my = n.users.get(&n.me).map(|m| m.room).unwrap_or(0);
+                e.id != n.me && n.users.remove(&e.id).is_some_and(|u| u.room == my)
+            };
+            if was_here {
+                play_cue(inner, Cue::Leave);
+            }
             inner.mixer.lock().remove(e.id);
             inner.emit_state();
         }
@@ -855,6 +885,9 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
         "history" => inner.emit(CoreEvent::History(e.room, e.messages)),
         "chat" => {
             if let Some(m) = e.msg {
+                if m.from != inner.net.lock().me {
+                    play_cue(inner, Cue::Chat);
+                }
                 inner.emit(CoreEvent::Chat(m));
             }
         }

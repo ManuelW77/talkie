@@ -19,6 +19,8 @@ pub struct Settings {
     pub input_gain: f32,
     /// Lautstärke, 1.0 = unverändert.
     pub output_volume: f32,
+    /// Hinweistöne bei Kommen/Gehen und neuen Chatnachrichten.
+    pub sounds: bool,
 }
 
 impl Default for Settings {
@@ -30,6 +32,7 @@ impl Default for Settings {
             output_device: String::new(),
             input_gain: 1.0,
             output_volume: 1.0,
+            sounds: true,
         }
     }
 }

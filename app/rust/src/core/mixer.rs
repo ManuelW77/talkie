@@ -59,6 +59,8 @@ pub struct Mixer {
     pub deaf: bool,
     /// Nur für sich stumm geschaltete Nutzer (falls der Server sie doch schickt).
     pub ignored: HashSet<i64>,
+    /// Hinweistöne, die gerade abgespielt werden.
+    cues: VecDeque<f32>,
     /// Zähler für Tests/Diagnose
     pub packets: u64,
     pub lost: u64,
@@ -72,6 +74,7 @@ impl Default for Mixer {
             volume: 1.0,
             deaf: false,
             ignored: HashSet::new(),
+            cues: VecDeque::new(),
             packets: 0,
             lost: 0,
         }
@@ -142,10 +145,17 @@ impl Mixer {
         }
     }
 
+    /// Hinweiston einreihen. Mehr als eine Sekunde Rückstau wird verworfen (z. B. viele Leute auf einmal).
+    pub fn play_cue(&mut self, samples: &[f32]) {
+        if self.cues.len() < RATE as usize {
+            self.cues.extend(samples);
+        }
+    }
+
     /// Ein gemischtes Sample bei 48 kHz.
     #[inline]
     pub fn next_sample(&mut self) -> f32 {
-        let mut acc = 0.0;
+        let mut acc = self.cues.pop_front().unwrap_or(0.0);
         for sp in self.speakers.values_mut() {
             if sp.prebuffering {
                 if sp.pcm.len() >= PREBUFFER {
@@ -276,6 +286,19 @@ mod tests {
         }
         assert_eq!(m.talking(), vec![2]);
         assert!(drain(&mut m, 9600) > 0.05);
+    }
+
+    #[test]
+    fn cue_is_played_and_capped() {
+        let mut m = Mixer::default();
+        let c = crate::core::cues::render(crate::core::cues::Cue::Chat);
+        m.play_cue(&c);
+        assert!(drain(&mut m, c.len()) > 0.01);
+        assert!(drain(&mut m, 480) < 1e-6, "danach still");
+        for _ in 0..100 {
+            m.play_cue(&c);
+        }
+        assert!(m.cues.len() < 2 * RATE as usize, "Rückstau begrenzt");
     }
 
     #[test]

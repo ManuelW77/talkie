@@ -769,8 +769,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SettingsDto dco_decode_settings_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return SettingsDto(
       vadThresholdDb: dco_decode_f_32(arr[0]),
       noiseSuppression: dco_decode_bool(arr[1]),
@@ -778,6 +778,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       outputDevice: dco_decode_String(arr[3]),
       inputGain: dco_decode_f_32(arr[4]),
       outputVolume: dco_decode_f_32(arr[5]),
+      sounds: dco_decode_bool(arr[6]),
     );
   }
 
@@ -1055,6 +1056,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_outputDevice = sse_decode_String(deserializer);
     var var_inputGain = sse_decode_f_32(deserializer);
     var var_outputVolume = sse_decode_f_32(deserializer);
+    var var_sounds = sse_decode_bool(deserializer);
     return SettingsDto(
       vadThresholdDb: var_vadThresholdDb,
       noiseSuppression: var_noiseSuppression,
@@ -1062,6 +1064,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       outputDevice: var_outputDevice,
       inputGain: var_inputGain,
       outputVolume: var_outputVolume,
+      sounds: var_sounds,
     );
   }
 
@@ -1348,6 +1351,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.outputDevice, serializer);
     sse_encode_f_32(self.inputGain, serializer);
     sse_encode_f_32(self.outputVolume, serializer);
+    sse_encode_bool(self.sounds, serializer);
   }
 
   @protected

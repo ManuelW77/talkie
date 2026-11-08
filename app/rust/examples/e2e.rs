@@ -60,6 +60,8 @@ fn main() {
     check(sa.rooms.len() >= 1 && sa.room == sa.rooms[0].id, "beide starten im ersten Raum");
     std::thread::sleep(Duration::from_millis(300));
     check(b.snapshot().users.iter().any(|u| u.id == sa.me), "Ben sieht Anna");
+    check(a.mixer_drain_rms(48_000) > 0.01, "Anna hört den Ton, als Ben in den Raum kommt");
+    check(b.mixer_drain_rms(48_000) < 1e-4, "Ben hört keinen Kommen-Ton für Leute, die schon da waren");
 
     // Chat
     while rb.try_recv().is_ok() {}
@@ -72,6 +74,8 @@ fn main() {
         }
     }
     check(got, "Chat kommt an");
+    check(b.mixer_drain_rms(48_000) > 0.01, "Ben hört den Chat-Ton");
+    check(a.mixer_drain_rms(48_000) < 1e-4, "Anna hört bei der eigenen Nachricht keinen Ton");
 
     // Sprache: 2 s Ton in Echtzeit-Häppchen
     let (p0, _) = b.mixer_stats();

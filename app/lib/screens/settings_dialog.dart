@@ -48,6 +48,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     String? output,
     double? gain,
     double? volume,
+    bool? sounds,
   }) =>
       SettingsDto(
         vadThresholdDb: vad ?? _s.vadThresholdDb,
@@ -56,6 +57,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
         outputDevice: output ?? _s.outputDevice,
         inputGain: gain ?? _s.inputGain,
         outputVolume: volume ?? _s.outputVolume,
+        sounds: sounds ?? _s.sounds,
       );
 
   Widget _deviceDropdown(String label, IconData icon, String value, List<String> options, ValueChanged<String> onChanged) {
@@ -144,6 +146,13 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 subtitle: const Text('Filtert Lüfter, Tastatur und Hintergrundgeräusche'),
                 value: _s.noiseSuppression,
                 onChanged: (v) => _update(_copy(ns: v)),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Töne'),
+                subtitle: const Text('Kurzer Ton, wenn jemand kommt oder geht und bei neuen Chatnachrichten'),
+                value: _s.sounds,
+                onChanged: (v) => _update(_copy(sounds: v)),
               ),
               const SizedBox(height: 8),
               Text('Mikrofon-Lautstärke', style: theme.textTheme.titleSmall),
