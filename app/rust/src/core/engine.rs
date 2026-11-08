@@ -483,6 +483,14 @@ impl Engine {
         self.inner.emit_state();
     }
 
+    /// Mikrofon und Lautsprecher neu öffnen (z. B. nachdem das Mikrofon erlaubt wurde).
+    pub fn restart_audio(&self) {
+        if self.inner.audio.lock().is_some() {
+            self.stop_audio();
+            self.start_audio();
+        }
+    }
+
     pub fn set_settings(&self, s: Settings) {
         let devices_changed = {
             let mut c = self.inner.config.lock();

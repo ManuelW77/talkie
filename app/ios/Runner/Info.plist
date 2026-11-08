@@ -16,6 +16,8 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>Talkie</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Talkie braucht das Mikrofon, damit deine Freunde dich hören.</string>
 	<key>UIBackgroundModes</key>

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../controller.dart';
+import '../platform.dart';
 import '../src/rust/api/talkie.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
@@ -74,6 +75,7 @@ class _MainScreenState extends State<MainScreen> {
                 child: Column(
                   children: [
                     _StatusBanner(controller: c),
+                    if (c.micDenied) _MicBanner(controller: c),
                     Expanded(
                       child: narrow
                           ? Builder(
@@ -142,6 +144,35 @@ class _StatusBanner extends StatelessWidget {
               )
             else
               TextButton(onPressed: controller.cancelConnect, child: const Text('Abbrechen')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Handy: Mikrofon nicht erlaubt → erklären und zu den Einstellungen führen.
+class _MicBanner extends StatelessWidget {
+  const _MicBanner({required this.controller});
+
+  final TalkieController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: kDanger.withValues(alpha: 0.18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.mic_off_rounded, color: kDanger),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Talkie darf dein Mikrofon nicht benutzen. Die anderen hören dich nicht.')),
+            FilledButton.tonal(
+              onPressed: TalkiePlatform.openSettings,
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 36)),
+              child: const Text('Erlauben'),
+            ),
           ],
         ),
       ),

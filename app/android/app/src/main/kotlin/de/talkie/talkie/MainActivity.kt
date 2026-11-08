@@ -18,6 +18,17 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "dataDir" -> result.success(filesDir.absolutePath)
                 "requestMic" -> requestMic(result)
+                "micStatus" -> result.success(
+                    if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) "granted"
+                    else "undetermined"
+                )
+                "openSettings" -> {
+                    startActivity(
+                        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(android.net.Uri.fromParts("package", packageName, null))
+                    )
+                    result.success(null)
+                }
                 "setActive" -> {
                     setActive(call.arguments as? Boolean ?: false)
                     result.success(null)

@@ -12,10 +12,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
   final config = await talkieInit(dataDir: await TalkiePlatform.dataDir());
-  // Vor dem ersten Verbinden, sonst startet das Mikrofon ohne Erlaubnis
-  await TalkiePlatform.requestMic();
   final controller = TalkieController(config)..start();
   runApp(TalkieApp(controller: controller));
+  // Erst fragen, wenn die App sichtbar ist (iOS zeigt die Abfrage sonst evtl. nicht)
+  WidgetsBinding.instance.addPostFrameCallback((_) => controller.checkMic(ask: true));
 }
 
 class TalkieApp extends StatelessWidget {

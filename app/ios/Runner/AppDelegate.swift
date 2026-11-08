@@ -22,6 +22,13 @@ import UIKit
         result(TalkieAudio.dataDir())
       case "requestMic":
         TalkieAudio.requestMic { ok in DispatchQueue.main.async { result(ok) } }
+      case "micStatus":
+        result(TalkieAudio.micStatus())
+      case "openSettings":
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+          UIApplication.shared.open(url)
+        }
+        result(nil)
       case "setActive":
         TalkieAudio.setActive(call.arguments as? Bool ?? false)
         result(nil)
@@ -53,6 +60,22 @@ enum TalkieAudio {
       try AVAudioSession.sharedInstance().setActive(on, options: on ? [] : [.notifyOthersOnDeactivation])
     } catch {
       NSLog("Talkie: Audio-Sitzung \(on ? "an" : "aus"): \(error)")
+    }
+  }
+
+  /// "granted", "denied" oder "undetermined"
+  static func micStatus() -> String {
+    if #available(iOS 17.0, *) {
+      switch AVAudioApplication.shared.recordPermission {
+      case .granted: return "granted"
+      case .denied: return "denied"
+      default: return "undetermined"
+      }
+    }
+    switch AVAudioSession.sharedInstance().recordPermission {
+    case .granted: return "granted"
+    case .denied: return "denied"
+    default: return "undetermined"
     }
   }
 
