@@ -23,11 +23,12 @@ datensparsam (die Kids zocken nebenher) und lauffähig auf älteren Rechnern.
 | `fix/<name>`, `chore/<name>` | Fehlerbehebung, Pflege (Doku, CI, Abhängigkeiten) | nur Tests |
 
 1. Neue Arbeit immer auf einem eigenen Branch von `devel` beginnen (`git checkout -b feature/xyz devel`).
-2. Fertig und lokal getestet: committen, pushen, nach `devel` mergen (`git merge --no-ff`), `devel` pushen.
+2. **Nach jedem erfolgreichen Build/Testlauf committen** (auf dem Feature-Branch).
+3. Am Ende der Arbeit: Feature-Branch pushen, nach `devel` mergen (`git merge --no-ff`) und **`devel` pushen**.
    Die CI baut dann Windows, Linux und macOS zum Testen.
-3. Merge `devel` → `main` und Release-Tags **nur auf ausdrückliche Anweisung von Manuel**.
-4. Nie direkt auf `main` committen. Kein Force-Push auf `main` oder `devel`.
-5. Commit-Nachrichten auf Deutsch: kurze Betreffzeile, darunter Stichpunkte.
+4. Merge `devel` → `main` und Release-Tags **nur auf ausdrückliche Anweisung von Manuel**.
+5. Nie direkt auf `main` committen. Kein Force-Push auf `main` oder `devel`.
+6. Commit-Nachrichten auf Deutsch: kurze Betreffzeile, darunter Stichpunkte.
 
 Das Repo ist **öffentlich** (github.com/ManuelW77/talkie). Keine Geheimnisse committen: keine `.env`,
 keine Server-Adressen, Tokens oder Schlüssel. Server-Adresse und Fingerabdruck kommen als
@@ -73,7 +74,8 @@ export PATH=/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbi
 | Flutter prüfen | `cd app && flutter analyze && flutter test` (braucht `FLUTTER_ROOT`) |
 | macOS-App bauen | `app/tool/build_macos.sh` |
 | Icons neu erzeugen | `app/tool/make_icons.sh` |
-| Lokaler Server | `cd server && docker compose up -d --build` |
+| Lokaler Testbetrieb mit Verwaltung + Mailpit | `server/dev.sh up` → http://localhost:8090 (admin@talkie.local), Mails: http://localhost:8026 |
+| Lokaler Server ohne Webseite | `cd server && docker compose up -d --build` |
 | Einladung (lokal) | `docker exec talkie talkie-server invite 3` |
 | Screenshots der Verwaltungsseite | `TALKIE_SNAPSHOT=<ordner> go test -run Snapshot ./...` in `server/`, dann Headless-Chrome |
 

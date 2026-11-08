@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -84,8 +85,9 @@ func serve(dataDir, addr, adminAddr string, maxUsers int) error {
 	defer ln.Close()
 
 	var webSrv *http.Server
+	// Fehler in der Web-Konfiguration schalten nur die Verwaltungsseite ab, nie den Sprachserver.
 	if web, err := webFromEnv(hub, store); err != nil {
-		return fmt.Errorf("webseite: %w", err)
+		log.Printf("Verwaltungsseite aus: %v", err)
 	} else if web != nil {
 		webAddr := env("TALKIE_WEB_ADDR", ":8080")
 		webSrv = &http.Server{Addr: webAddr, Handler: web.handler(),
@@ -155,11 +157,14 @@ func webFromEnv(hub *Hub, store *Store) (*webApp, error) {
 			Issuer:               iss,
 			ClientID:             env("TALKIE_OIDC_CLIENT_ID", ""),
 			ClientSecret:         env("TALKIE_OIDC_CLIENT_SECRET", ""),
-			Name:                 env("TALKIE_OIDC_NAME", "OIDC"),
+			Name:                 env("TALKIE_OIDC_NAME", ""),
 			AllowUnverifiedEmail: env("TALKIE_OIDC_ALLOW_UNVERIFIED", "") == "1",
 		}
-		if cfg.OIDC.ClientID == "" {
-			return nil, errors.New("TALKIE_OIDC_CLIENT_ID fehlt")
+		if cfg.OIDC.ClientID == "" || strings.Contains(iss, "example.org") {
+			log.Printf("Hinweis: OIDC aus – TALKIE_OIDC_ISSUER und TALKIE_OIDC_CLIENT_ID sind nicht vollständig eingetragen")
+			cfg.OIDC = nil
+		} else if cfg.OIDC.Name == "" {
+			cfg.OIDC.Name = "OIDC"
 		}
 	}
 	if cfg.Mailer == nil && cfg.OIDC == nil {

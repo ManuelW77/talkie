@@ -1,0 +1,34 @@
+# Lokales Testen mit Verwaltungsseite und Mail-Fänger (Mailpit), wie bei Ride-LE:
+#
+#   ./dev.sh up        startet Server + Mailpit
+#
+#   Verwaltung: http://localhost:8090   Anmelden mit admin@talkie.local
+#   Mailpit:    http://localhost:8026   hier landen ALLE Mails (Login-Codes, Einladungen)
+#
+# Andere Ports als Ride-LE (8080/8025), damit beide Projekte gleichzeitig laufen können.
+# Nichts verlässt den Rechner: Mailpit nimmt jede Mail an und verschickt nichts weiter.
+services:
+  talkie:
+    ports: !override
+      - "7777:7777/udp"
+      - "127.0.0.1:8090:8080"
+    environment:
+      TALKIE_PUBLIC_URL: http://localhost:8090
+      TALKIE_TRUST_PROXY: "0"
+      TALKIE_ADMIN_EMAIL: admin@talkie.local
+      TALKIE_SERVER_ADDR: 127.0.0.1:7777
+      TALKIE_SMTP_HOST: mailpit
+      TALKIE_SMTP_PORT: "1025"
+      TALKIE_SMTP_TLS: none
+      TALKIE_SMTP_USER: ""
+      TALKIE_SMTP_PASS: ""
+      TALKIE_SMTP_FROM: Talkie <talkie@talkie.local>
+    depends_on:
+      - mailpit
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: talkie-mailpit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8026:8025"

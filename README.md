@@ -96,6 +96,14 @@ Meldet die Seite „E-Mail-Adresse nicht bestätigt“, bestätigt der Anbieter 
 Bei einem eigenen Anbieter, bei dem nur du Konten anlegst, kannst du das mit
 `TALKIE_OIDC_ALLOW_UNVERIFIED=1` abschalten. Bei öffentlichen Anbietern lass es aus.
 
+**Lokal ausprobieren:** `server/dev.sh up` startet den Server mit Verwaltungsseite und
+[Mailpit](https://mailpit.axllent.org) als Mail-Fänger. Alle Mails (Login-Codes, Einladungen) landen dort
+und gehen nicht raus.
+
+- Verwaltung: http://localhost:8090, anmelden mit `admin@talkie.local`
+- Mails: http://localhost:8026
+- Stoppen: `server/dev.sh down`
+
 **Ausgesperrt?** `docker exec talkie talkie-server web-admin du@example.org` macht das Konto wieder zum
 aktiven Admin.
 

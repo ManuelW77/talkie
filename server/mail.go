@@ -33,7 +33,7 @@ func smtpFromEnv() *SMTPConfig {
 		From: env("TALKIE_SMTP_FROM", ""),
 		Mode: strings.ToLower(env("TALKIE_SMTP_TLS", "")),
 	}
-	if c.Host == "" {
+	if c.Host == "" || strings.HasSuffix(c.Host, "example.org") {
 		return nil
 	}
 	if c.Mode == "" {
