@@ -57,6 +57,7 @@ fn main() {
     check(wait_status(&b, Status::Connected, 10), "Ben registriert und verbunden");
 
     let sa = a.snapshot();
+    let sa_name = a.config().name;
     check(sa.rooms.len() >= 1 && sa.room == sa.rooms[0].id, "beide starten im ersten Raum");
     std::thread::sleep(Duration::from_millis(300));
     check(b.snapshot().users.iter().any(|u| u.id == sa.me), "Ben sieht Anna");
@@ -161,6 +162,32 @@ fn main() {
     check(cfg.registered && !cfg.pinned_fingerprint.is_empty(), "Registrierung und Fingerabdruck gespeichert");
     a2.connect(&server, "", "", "").expect("connect");
     check(wait_status(&a2, Status::Connected, 10), "Anna meldet sich ohne Code wieder an");
+
+    // Weiteres Gerät: Anna holt einen Geräte-Code, das zweite Gerät meldet sich damit als Anna an
+    let (a3, ra3) = {
+        drop(a2);
+        std::thread::sleep(Duration::from_millis(300));
+        engine(&da)
+    };
+    a3.connect(&server, "", "", "").expect("connect");
+    check(wait_status(&a3, Status::Connected, 10), "Anna wieder verbunden");
+    a3.request_device_code();
+    let t = Instant::now();
+    let mut code = String::new();
+    while t.elapsed() < Duration::from_secs(3) && code.is_empty() {
+        if let Ok(CoreEvent::DeviceCode(c)) = ra3.recv_timeout(Duration::from_millis(100)) {
+            code = c;
+        }
+    }
+    check(code.len() == 9, &format!("Geräte-Code bekommen ({code})"));
+    let (phone, _) = engine(&base.join("phone"));
+    phone.connect(&server, "", &code, "").expect("connect");
+    check(wait_status(&phone, Status::Connected, 10), "zweites Gerät mit Geräte-Code verbunden");
+    check(phone.config().name == sa_name, "zweites Gerät heißt wie Anna");
+    check(phone.snapshot().me == sa.me, "zweites Gerät ist derselbe Nutzer");
+    check(wait_status(&a3, Status::Failed, 5) && a3.snapshot().error_code == "kicked", "erstes Gerät wird getrennt");
+    drop(phone);
+    drop(a3);
 
     // Falscher Fingerabdruck → abgelehnt
     let (c, _) = engine(&dc);
