@@ -24,6 +24,26 @@ class TalkiePlatform {
     }
   }
 
+  /// "granted", "denied" (nur iOS sicher erkennbar) oder "undetermined". Desktop: immer "granted".
+  static Future<String> micStatus() async {
+    if (!isMobile) return 'granted';
+    try {
+      return await _ch.invokeMethod<String>('micStatus') ?? 'undetermined';
+    } on PlatformException {
+      return 'undetermined';
+    }
+  }
+
+  /// Öffnet die System-Einstellungen von Talkie (Mikrofon erlauben).
+  static Future<void> openSettings() async {
+    if (!isMobile) return;
+    try {
+      await _ch.invokeMethod<void>('openSettings');
+    } on PlatformException {
+      // nichts zu tun
+    }
+  }
+
   /// Verbunden: Android startet den Hintergrund-Dienst, iOS aktiviert die Audio-Sitzung.
   static Future<void> setActive(bool on) async {
     if (!isMobile) return;

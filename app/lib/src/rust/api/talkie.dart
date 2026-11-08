@@ -59,6 +59,10 @@ void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
 void talkieModerate({required PlatformInt64 user, required bool ban}) =>
     RustLib.instance.api.crateApiTalkieTalkieModerate(user: user, ban: ban);
 
+/// Audio neu starten, z. B. nachdem das Mikrofon erlaubt wurde.
+Future<void> talkieRestartAudio() =>
+    RustLib.instance.api.crateApiTalkieTalkieRestartAudio();
+
 void talkieSetDeaf({required bool deaf}) =>
     RustLib.instance.api.crateApiTalkieTalkieSetDeaf(deaf: deaf);
 

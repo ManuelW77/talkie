@@ -263,6 +263,12 @@ pub fn talkie_moderate(user: i64, ban: bool) -> Result<()> {
     Ok(())
 }
 
+/// Audio neu starten, z. B. nachdem das Mikrofon erlaubt wurde.
+pub fn talkie_restart_audio() -> Result<()> {
+    engine()?.restart_audio();
+    Ok(())
+}
+
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_set_deaf(deaf: bool) -> Result<()> {
     engine()?.set_deaf(deaf);

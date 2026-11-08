@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 
 import 'platform.dart';
 import 'src/rust/api/talkie.dart';
@@ -37,8 +38,12 @@ class TalkieController extends ChangeNotifier {
   /// Getrennt vom ChangeNotifier, damit der Pegel nicht alles neu zeichnet.
   final ValueNotifier<double> levelNotifier = ValueNotifier(0);
 
+  AppLifecycleListener? _life;
+
   void start() {
     _sub = talkieEvents().listen(_onEvent);
+    // Zurück aus den Einstellungen: Mikrofon-Erlaubnis neu prüfen
+    _life = AppLifecycleListener(onResume: () => checkMic());
     if (!showSetup) {
       talkieConnect(server: config.server, name: config.name, invite: '', fingerprint: kServerFingerprint);
     }
@@ -47,6 +52,7 @@ class TalkieController extends ChangeNotifier {
   @override
   void dispose() {
     _sub?.cancel();
+    _life?.dispose();
     _notices.close();
     levelNotifier.dispose();
     super.dispose();
@@ -118,6 +124,28 @@ class TalkieController extends ChangeNotifier {
         levelNotifier.value = e.level;
       case EventKind.notice:
         if (e.notice.isNotEmpty) _notices.add(e.notice);
+    }
+  }
+
+  /// Handy: Mikrofon ist nicht erlaubt → Hinweis mit Knopf zu den Einstellungen.
+  bool micDenied = false;
+
+  /// Prüft die Mikrofon-Erlaubnis (ask = ggf. nachfragen). Kommt sie neu dazu,
+  /// wird das Audio neu geöffnet, damit das Mikrofon wirklich läuft.
+  Future<void> checkMic({bool ask = false}) async {
+    if (!TalkiePlatform.isMobile) return;
+    final before = await TalkiePlatform.micStatus();
+    var st = before;
+    if (st != 'granted' && ask) {
+      st = await TalkiePlatform.requestMic() ? 'granted' : 'denied';
+    }
+    final denied = st != 'granted';
+    if (!denied && (before != 'granted' || micDenied)) {
+      await talkieRestartAudio(); // Erlaubnis kam gerade dazu
+    }
+    if (denied != micDenied) {
+      micDenied = denied;
+      notifyListeners();
     }
   }
 
