@@ -8,5 +8,9 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- QUIC öffnet einen eigenen UDP-Port (bind). Die Sandbox zählt das als „Server“,
+	     ohne dieses Recht scheitert jede Verbindung still. -->
+	<key>com.apple.security.network.server</key>
+	<true/>
 </dict>
 </plist>
