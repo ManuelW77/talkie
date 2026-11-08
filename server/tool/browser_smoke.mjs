@@ -1,7 +1,10 @@
 // Smoke-Test im echten Browser (Headless-Chrome) gegen den Testbetrieb (./dev.sh up):
 //   node tool/browser_smoke.mjs
 // Meldet sich über Mailpit an und legt per Formular einen Raum an (und löscht ihn wieder).
-import { spawn } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
+// Eigenes Testkonto, damit der Test nicht das Mail-Kontingent von admin@talkie.local verbraucht
+const EMAIL = "smoke@talkie.local";
+execSync(`docker exec talkie talkie-server web-admin ${EMAIL}`, { stdio: "ignore" });
 const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const chrome = spawn(CHROME,
   ["--headless=new", "--remote-debugging-port=9333", "--user-data-dir=" + (await import("node:fs")).mkdtempSync((await import("node:os")).tmpdir() + "/talkie-smoke-"), "about:blank"], { stdio: "ignore" });
@@ -16,13 +19,15 @@ ws.addEventListener("message", (e) => { const m = JSON.parse(e.data); if (m.id &
 const cmd = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
 const js = async (e) => (await cmd("Runtime.evaluate", { expression: e, awaitPromise: true })).result.value;
 await cmd("Page.navigate", { url: "http://localhost:8090/login" }); await sleep(1000);
-await js(`document.querySelector("input[name=email]").value="admin@talkie.local"; document.querySelector("form").submit(); 1`);
+await js(`document.querySelector("input[name=email]").value="${EMAIL}"; document.querySelector("form").submit(); 1`);
 await sleep(1500);
 const fail = (msg) => { console.log("FEHLER:", msg); chrome.kill(); process.exit(1); };
 if (await js("location.pathname") !== "/login/code") fail("E-Mail-Formular: " + await js("document.body.innerText.slice(0,120)"));
 console.log("OK  E-Mail-Formular");
 const mails = await (await fetch("http://127.0.0.1:8026/api/v1/messages")).json();
-const code = mails.messages[0].Subject.split(": ")[1];
+const mail = mails.messages.find((m) => m.To[0].Address === EMAIL);
+if (!mail) fail("keine Mail in Mailpit");
+const code = mail.Subject.split(": ")[1];
 await js(`document.querySelector("input[name=code]").value="${code}"; document.querySelector("form").submit(); 1`);
 await sleep(1500);
 if (await js("location.pathname") !== "/") fail("Code-Formular: " + await js("document.body.innerText.slice(0,120)"));

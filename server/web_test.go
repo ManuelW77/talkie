@@ -252,6 +252,28 @@ func TestWebCodeAttemptsLimited(t *testing.T) {
 	}
 }
 
+func TestWebMailLimitKeepsCode(t *testing.T) {
+	wt := newWebTest(t, nil)
+	wt.account("a@example.org", RoleAdmin, 0)
+	b := wt.browser()
+	for i := 0; i < loginMailsPerWindow; i++ {
+		b.post("/login", url.Values{"email": {"a@example.org"}})
+	}
+	for wt.mail.count() < loginMailsPerWindow {
+		time.Sleep(10 * time.Millisecond)
+	}
+	last := codeRe.FindStringSubmatch(wt.mail.last(t))
+	// Über dem Limit: keine Mail, aber der letzte Code bleibt gültig
+	b.post("/login", url.Values{"email": {"a@example.org"}})
+	time.Sleep(100 * time.Millisecond)
+	if wt.mail.count() != loginMailsPerWindow {
+		t.Fatal("Limit greift nicht")
+	}
+	if _, loc, _ := b.post("/login/code", url.Values{"code": {last[1] + last[2]}}); loc != "/" {
+		t.Fatal("letzter Code nach erneuter Anforderung ungültig")
+	}
+}
+
 func TestWebLinkLogin(t *testing.T) {
 	wt := newWebTest(t, nil)
 	wt.account("a@example.org", RoleUser, 0)
@@ -264,7 +286,16 @@ func TestWebLinkLogin(t *testing.T) {
 	if st, _, body := phone.get("/login/link?t=" + link); st != http.StatusOK || !strings.Contains(body, "Jetzt anmelden") {
 		t.Fatalf("Linkseite: %d", st)
 	}
-	if st, loc, _ := phone.post("/login/link", url.Values{"t": {link}}); st != http.StatusSeeOther || loc != "/" {
+	// Mail-Programme öffnen Links teils abgeschottet („Origin: null“) – muss gehen
+	req, _ := http.NewRequest("POST", wt.srv.URL+"/login/link", strings.NewReader(url.Values{"t": {link}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "null")
+	resp, err := phone.c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if st, loc := resp.StatusCode, resp.Header.Get("Location"); st != http.StatusSeeOther || loc != "/" {
 		t.Fatalf("Link-Login: %d %s", st, loc)
 	}
 	if st, _, _ := phone.get("/"); st != http.StatusOK {

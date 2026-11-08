@@ -259,7 +259,11 @@ func (w *webApp) securityHeaders(next http.Handler) http.Handler {
 		}
 		// Formulare nur von der eigenen Seite (Schutz gegen fremde Seiten, die hierher posten)
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			if o := r.Header.Get("Origin"); (o != "" && o != w.origin) || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+			o := r.Header.Get("Origin")
+			// Mail-Programme öffnen Links teils in abgeschotteten Fenstern, die „Origin: null“
+			// schicken. Beim Link-Login ist das geheime Token selbst der Nachweis.
+			linkLogin := r.URL.Path == "/login/link" && o == "null"
+			if !linkLogin && ((o != "" && o != w.origin) || r.Header.Get("Sec-Fetch-Site") == "cross-site") {
 				log.Printf("web: %s %s abgelehnt: Origin %q, erwartet %q", r.Method, r.URL.Path, o, w.origin)
 				http.Error(rw, "Anfrage von fremder Seite abgelehnt. Bitte die Seite über "+w.cfg.PublicURL+" öffnen.", http.StatusForbidden)
 				return

@@ -19,6 +19,9 @@ import (
 
 const pendCookie = "talkie_login"
 
+// Höchstens so viele Login-Mails pro Konto in 15 Minuten.
+const loginMailsPerWindow = 5
+
 func (w *webApp) loginPage(rw http.ResponseWriter, r *http.Request) {
 	// Fehlermeldungen kommen nur über das Flash-Cookie (vom Server gesetzt),
 	// nie aus der URL – sonst ließe sich fremder Text in die Seite schleusen.
@@ -45,10 +48,20 @@ func (w *webApp) loginMail(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	email := normEmail(r.PostFormValue("email"))
+	// Geht keine neue Mail raus, behält der Browser sein bisheriges Login-Cookie –
+	// sonst wäre der Code aus der letzten Mail plötzlich ungültig.
 	pend := randToken(32)
+	if c, err := r.Cookie(pendCookie); err == nil && len(c.Value) >= 40 {
+		pend = c.Value
+	}
+	newPend := randToken(32)
 	if acc, err := w.store.AccountByEmail(email); err == nil && !acc.Disabled {
-		if n, err := w.store.RecentLogins(acc.ID, 15*time.Minute); err == nil && n < 3 {
+		if n, err := w.store.RecentLogins(acc.ID, 15*time.Minute); err != nil || n >= loginMailsPerWindow {
+			// Still für den Browser (verrät sonst, dass es das Konto gibt), aber sichtbar im Log
+			log.Printf("web: login-mail an %s übersprungen: schon %d in 15 Minuten", acc.Email, n)
+		} else {
 			link, code := randToken(32), eightDigits()
+			pend = newPend
 			if err := w.store.CreateLogin(acc.ID, link, pend, code); err != nil {
 				log.Printf("web: login anlegen: %v", err)
 			} else {
