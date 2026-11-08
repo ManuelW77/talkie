@@ -1,0 +1,20 @@
+{{define "content"}}
+<h1>Talkie-Nutzer</h1>
+<p class="muted">Die Kids melden sich in der App mit einem Einladungscode an.{{if .Can.invite}} <a href="/invites">Neue Einladung erstellen</a>{{end}}</p>
+{{if .D.Users}}
+<table>
+  <thead><tr><th>Name</th><th>Status</th><th>Zuletzt da</th><th>Dabei seit</th><th></th></tr></thead>
+  <tbody>
+  {{range .D.Users}}
+  <tr>
+    <td>{{if .Online}}<span class="dot on"></span>{{else}}<span class="dot"></span>{{end}}{{.Name}}</td>
+    <td>{{if .Banned}}<span class="tag bad">gesperrt</span>{{else if .Online}}<span class="tag ok">online</span>{{else}}offline{{end}}</td>
+    <td>{{dt .LastSeen}}</td>
+    <td>{{date .Created}}</td>
+    <td class="right">{{if or $.Can.users_edit $.Can.users_delete}}<a href="/users/{{.ID}}">Bearbeiten</a>{{end}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}<p class="muted">Noch niemand registriert.</p>{{end}}
+{{end}}

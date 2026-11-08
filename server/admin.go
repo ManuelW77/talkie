@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -53,6 +54,7 @@ func (a *adminAPI) handler() http.Handler {
 	mux.HandleFunc("POST /rooms", a.addRoom)
 	mux.HandleFunc("DELETE /rooms/{name}", a.deleteRoom)
 	mux.HandleFunc("GET /chat", a.chatLog)
+	mux.HandleFunc("POST /web-admin", a.webAdmin)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if subtle.ConstantTimeCompare([]byte(got), []byte(a.token)) != 1 {
@@ -258,6 +260,37 @@ func (a *adminAPI) chatLog(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, msgs)
 }
 
+// webAdmin legt ein Admin-Konto für die Verwaltungsseite an oder macht ein
+// bestehendes Konto wieder zum aktiven Admin (Notfall: ausgesperrt).
+func (a *adminAPI) webAdmin(w http.ResponseWriter, r *http.Request) {
+	email := normEmail(r.URL.Query().Get("email"))
+	if addr, err := mail.ParseAddress(email); err != nil || addr.Address != email {
+		http.Error(w, "ungültige E-Mail-Adresse", http.StatusBadRequest)
+		return
+	}
+	acc, err := a.store.AccountByEmail(email)
+	if errors.Is(err, ErrNotFound) {
+		if _, err := a.store.AddAccount(Account{Email: email, Name: "Admin", Role: RoleAdmin}); err != nil {
+			writeErr(w, err)
+			return
+		}
+		a.store.Audit("CLI", "Admin-Konto "+email+" angelegt")
+		writeJSON(w, map[string]string{"result": "angelegt"})
+		return
+	}
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	acc.Role, acc.Disabled = RoleAdmin, false
+	if err := a.store.UpdateAccount(*acc); err != nil {
+		writeErr(w, err)
+		return
+	}
+	a.store.Audit("CLI", "Web-Konto "+email+" zum Admin gemacht")
+	writeJSON(w, map[string]string{"result": "zum Admin gemacht"})
+}
+
 // --- CLI ---
 
 type adminClient struct {
@@ -308,6 +341,7 @@ Verwaltung (während der Server läuft, z. B. per "docker exec talkie talkie-ser
   rooms                             Räume anzeigen
   room-add NAME / room-del NAME     Raum anlegen / löschen
   chat RAUM [anzahl]                letzte Chatnachrichten eines Raums
+  web-admin E-MAIL                  Admin-Konto für die Verwaltungsseite anlegen/reaktivieren
 `
 
 func runCLI(args []string, dataDir, adminAddr string) error {
@@ -447,6 +481,15 @@ func runCLI(args []string, dataDir, adminAddr string) error {
 		for _, m := range ms {
 			fmt.Fprintf(tw, "%s\t%s:\t%s\n", time.Unix(m.TS, 0).Format("02.01. 15:04"), m.Name, m.Text)
 		}
+	case "web-admin":
+		if err := need(1); err != nil {
+			return err
+		}
+		var res map[string]string
+		if err := c.do("POST", "/web-admin", url.Values{"email": {args[1]}}, &res); err != nil {
+			return err
+		}
+		ok("Admin-Konto " + args[1] + ": " + res["result"] + ".")
 	default:
 		fmt.Print(usage)
 	}

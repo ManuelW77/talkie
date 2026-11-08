@@ -3,6 +3,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
+COPY web ./web
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /talkie-server .
 
 FROM alpine:3.22
@@ -11,5 +12,5 @@ COPY --from=build /talkie-server /usr/local/bin/talkie-server
 USER talkie
 ENV TALKIE_DATA=/data TALKIE_ADDR=:7777
 VOLUME /data
-EXPOSE 7777/udp
+EXPOSE 7777/udp 8080/tcp
 ENTRYPOINT ["talkie-server"]

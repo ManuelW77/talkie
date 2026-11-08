@@ -175,14 +175,19 @@ func (s *Session) sendHistory(room int64) {
 
 func remoteIP(c *quic.Conn) string {
 	if a, ok := c.RemoteAddr().(*net.UDPAddr); ok {
-		if v4 := a.IP.To4(); v4 != nil {
-			return v4.String()
-		}
-		// IPv6: ein Anschluss hat meist ein ganzes /64 — danach begrenzen
-		return a.IP.Mask(net.CIDRMask(64, 128)).String() + "/64"
+		return ipKey(a.IP)
 	}
 	host, _, _ := net.SplitHostPort(c.RemoteAddr().String())
 	return host
+}
+
+// ipKey liefert den Schlüssel für Rate-Limits: IPv4 genau, IPv6 pro /64
+// (ein Anschluss hat meist ein ganzes /64).
+func ipKey(ip net.IP) string {
+	if v4 := ip.To4(); v4 != nil {
+		return v4.String()
+	}
+	return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
 }
 
 func handshakeError(stream *quic.Stream, code, msg string) {

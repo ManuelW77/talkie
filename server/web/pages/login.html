@@ -1,0 +1,20 @@
+{{define "content"}}
+<div class="card login">
+  <img class="logo" src="/static/icon.svg" alt="">
+  <h1>Talkie-Verwaltung</h1>
+  {{with .D.Error}}<div class="flash err">{{.}}</div>{{end}}
+  {{if .MailOn}}
+  <form method="post" action="/login">
+    <label>E-Mail-Adresse
+      <input type="email" name="email" required autofocus autocomplete="email">
+    </label>
+    <button class="primary wide">Anmeldecode per Mail schicken</button>
+  </form>
+  {{end}}
+  {{if and .MailOn .OIDCName}}<div class="or"><span>oder</span></div>{{end}}
+  {{if .OIDCName}}<a class="button wide" href="/auth/oidc">Mit {{.OIDCName}} anmelden</a>{{end}}
+  {{if not (or .MailOn .OIDCName)}}
+  <p class="muted">Es ist noch keine Anmeldung eingerichtet. Bitte <code>TALKIE_SMTP_*</code> oder <code>TALKIE_OIDC_*</code> setzen (siehe README).</p>
+  {{end}}
+</div>
+{{end}}

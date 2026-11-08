@@ -116,6 +116,13 @@ class TalkieController extends ChangeNotifier {
 
   // --- Aktionen ---
 
+  /// Verbindungsaufbau während der Einrichtung abbrechen.
+  void cancelSetup() {
+    talkieDisconnect();
+    setupBusy = false;
+    notifyListeners();
+  }
+
   void register({required String server, required String name, required String invite}) {
     setupBusy = true;
     setupError = null;

@@ -1,0 +1,44 @@
+{{define "content"}}
+<h1>Räume</h1>
+<table>
+  <thead><tr><th>Raum</th><th>Online</th>{{if .Can.rooms}}<th></th>{{end}}</tr></thead>
+  <tbody>
+  {{range $i, $r := .D.Rooms}}
+  <tr>
+    <td>
+      {{if $.Can.rooms}}
+      <form method="post" action="/rooms/{{$r.ID}}/rename" class="row inline">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <input name="name" value="{{$r.Name}}" required minlength="2" maxlength="20" aria-label="Raumname">
+        <button class="link">Umbenennen</button>
+      </form>
+      {{else}}{{$r.Name}}{{end}}
+    </td>
+    <td>{{$r.Online}}</td>
+    {{if $.Can.rooms}}
+    <td class="right nowrap">
+      <form method="post" action="/rooms/{{$r.ID}}/up" class="inline"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <button class="icon" title="Nach oben" {{if eq $i 0}}disabled{{end}}>↑</button></form>
+      <form method="post" action="/rooms/{{$r.ID}}/down" class="inline"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <button class="icon" title="Nach unten" {{if eq $i $.D.Last}}disabled{{end}}>↓</button></form>
+      <form method="post" action="/rooms/{{$r.ID}}/delete" class="inline"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <button class="link bad" data-confirm="Raum „{{$r.Name}}“ löschen? Der Chatverlauf geht verloren, wer drin ist, landet im ersten Raum.">Löschen</button></form>
+    </td>
+    {{end}}
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+<p class="muted">Der oberste Raum ist der Startraum.</p>
+
+{{if .Can.rooms}}
+<section class="card">
+  <h2>Neuer Raum</h2>
+  <form method="post" action="/rooms" class="row">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input name="name" required minlength="2" maxlength="20" placeholder="z. B. Minecraft">
+    <button class="primary">Anlegen</button>
+  </form>
+</section>
+{{end}}
+{{end}}

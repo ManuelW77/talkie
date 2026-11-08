@@ -2,3 +2,5 @@ data/
 *_test.go
 Dockerfile
 docker-compose.yml
+.env
+.env.*

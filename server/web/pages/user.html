@@ -1,0 +1,46 @@
+{{define "content"}}
+{{$u := .D.U}}
+<p><a href="/users">← Alle Nutzer</a></p>
+<h1>{{$u.Name}} {{if $u.Banned}}<span class="tag bad">gesperrt</span>{{else if $u.Online}}<span class="tag ok">online</span>{{end}}</h1>
+<dl class="kv">
+  <dt>Dabei seit</dt><dd>{{date $u.Created}}</dd>
+  <dt>Zuletzt da</dt><dd>{{dt $u.LastSeen}}</dd>
+</dl>
+
+{{if .Can.users_edit}}
+<section class="card">
+  <h2>Umbenennen</h2>
+  <form method="post" action="/users/{{$u.ID}}/rename" class="row">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input name="name" value="{{$u.Name}}" required minlength="2" maxlength="20">
+    <button class="primary">Speichern</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Aktionen</h2>
+  <div class="row">
+    {{if $u.Online}}
+    <form method="post" action="/users/{{$u.ID}}/kick"><input type="hidden" name="csrf" value="{{.CSRF}}">
+      <button title="Trennt die Verbindung. Darf sofort wiederkommen.">Rauswerfen</button></form>
+    {{end}}
+    {{if $u.Banned}}
+    <form method="post" action="/users/{{$u.ID}}/unban"><input type="hidden" name="csrf" value="{{.CSRF}}">
+      <button>Entsperren</button></form>
+    {{else}}
+    <form method="post" action="/users/{{$u.ID}}/ban"><input type="hidden" name="csrf" value="{{.CSRF}}">
+      <button class="warn" data-confirm="{{$u.Name}} sperren? Die Verbindung wird sofort getrennt.">Sperren</button></form>
+    {{end}}
+  </div>
+</section>
+{{end}}
+
+{{if .Can.users_delete}}
+<section class="card danger">
+  <h2>Entfernen</h2>
+  <p class="muted">Löscht den Zugang. Für eine Rückkehr braucht es eine neue Einladung.</p>
+  <form method="post" action="/users/{{$u.ID}}/delete"><input type="hidden" name="csrf" value="{{.CSRF}}">
+    <button class="bad" data-confirm="{{$u.Name}} wirklich entfernen?">{{$u.Name}} entfernen</button></form>
+</section>
+{{end}}
+{{end}}

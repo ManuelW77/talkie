@@ -1,0 +1,30 @@
+{{define "content"}}
+<h1>Übersicht</h1>
+<div class="stats">
+  <div><b>{{len .D.Online}}</b><span>online</span></div>
+  <div><b>{{.D.Users}}</b><span>Talkie-Nutzer</span></div>
+  <div><b>{{.D.Rooms}}</b><span>Räume</span></div>
+  {{if .Can.invite}}<div><b>{{.D.Invites}}</b><span>offene Einladungen</span></div>{{end}}
+</div>
+
+<h2>Gerade online</h2>
+{{if .D.Online}}
+<table>
+  <thead><tr><th>Name</th><th>Raum</th><th>Status</th></tr></thead>
+  <tbody>
+  {{range .D.Online}}
+  <tr><td><span class="dot on"></span>{{.Name}}</td><td>{{.Room}}</td>
+    <td>{{if .Deaf}}🔇 taub{{else if .Muted}}🎙️ stumm{{else}}–{{end}}</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}<p class="muted">Gerade ist niemand online.</p>{{end}}
+
+{{if .Can.invite}}<p><a class="button primary" href="/invites">Jemanden einladen</a></p>{{end}}
+
+<h2>Server</h2>
+<dl class="kv">
+  {{with .D.ServerAddr}}<dt>Adresse</dt><dd><code>{{.}}</code></dd>{{end}}
+  <dt>Fingerabdruck</dt><dd><code class="small">{{.D.Fingerprint}}</code></dd>
+</dl>
+{{end}}

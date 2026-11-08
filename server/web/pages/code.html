@@ -1,0 +1,17 @@
+{{define "content"}}
+<div class="card login">
+  <img class="logo" src="/static/icon.svg" alt="">
+  <h1>Code eingeben</h1>
+  {{with .D.Error}}<div class="flash err">{{.}}</div>{{end}}
+  <p class="muted">Falls es ein Konto für die Adresse gibt, ist jetzt eine Mail unterwegs. Gib den 8-stelligen Code ein oder klicke auf den Link in der Mail.</p>
+  <form method="post" action="/login/code">
+    <label>Code
+      <input name="code" required autofocus inputmode="numeric" autocomplete="one-time-code" placeholder="1234 5678" class="code">
+    </label>
+    <button class="primary wide">Anmelden</button>
+  </form>
+  <p class="muted small">Keine Mail? Schau im Spam-Ordner nach. Wurden kurz hintereinander mehrere Codes
+    angefordert, kommt eine Weile keine neue Mail – nimm dann den Code aus der letzten Mail (15 Minuten gültig).</p>
+  <p class="center"><a href="/login">Andere Adresse / neuen Code</a></p>
+</div>
+{{end}}
