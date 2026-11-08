@@ -50,7 +50,54 @@ docker exec talkie talkie-server room-add "Minecraft"
 docker exec talkie talkie-server room-del "Zocken 2"
 docker exec talkie talkie-server chat Lobby 50   # letzte 50 Chatnachrichten eines Raums
 docker exec talkie talkie-server status          # Fingerabdruck + Anzahl online
+docker exec talkie talkie-server web-admin du@example.org   # Admin für die Verwaltungsseite (auch Notfall)
 ```
+
+### Verwaltungsseite im Browser
+
+Alles, was die Befehle oben können, geht auch bequem im Browser, auch für andere Eltern:
+Kids einladen (auch per Mail), Nutzer umbenennen, rauswerfen, sperren und entfernen, Räume anlegen,
+umbenennen, sortieren und löschen, den Chat mitlesen. Ein Protokoll zeigt, wer was geändert hat.
+
+**Konten und Rechte:** Die Web-Konten (mit E-Mail-Adresse) sind getrennt von den Talkie-Nutzern der Kids.
+Es gibt zwei Gruppen:
+
+- **Admin** darf alles, auch Web-Konten anlegen und Rechte vergeben.
+- **Benutzer** darf nur, was der Admin anhakt: Kids einladen, Talkie-Nutzer bearbeiten/rauswerfen/sperren,
+  Talkie-Nutzer entfernen, Räume verwalten, Chat mitlesen.
+
+**Anmeldung** ohne Passwort, auf zwei Wegen (einer reicht):
+
+- **Per Mail:** E-Mail-Adresse eingeben, dann kommt ein Link und ein 8-stelliger Code (15 Minuten gültig,
+  5 Versuche). Braucht einen SMTP-Zugang.
+- **Per OIDC:** z. B. Pocket ID, Authentik, Keycloak, Google. Angemeldet wird nur, wer als Web-Konto mit
+  derselben (bestätigten) E-Mail-Adresse eingetragen ist. Beim ersten Login wird das Konto fest mit der
+  Identität beim Anbieter verknüpft.
+
+**Einrichten:**
+
+1. `server/.env.example` nach `server/.env` kopieren und ausfüllen. Die `.env` enthält Passwörter und
+   wird nicht committet.
+2. `docker compose up -d` startet den Server neu. Das Admin-Konto aus `TALKIE_ADMIN_EMAIL` wird angelegt,
+   solange es noch keinen Admin gibt.
+3. Die Seite lauscht nur lokal auf Port 8080. Von außen erreichst du sie über einen Reverse-Proxy mit HTTPS,
+   zum Beispiel Caddy:
+   ```
+   talkie.example.org {
+       reverse_proxy 127.0.0.1:8080
+   }
+   ```
+   `TALKIE_PUBLIC_URL` muss genau die Adresse sein, die im Browser steht.
+
+**Pocket ID:** Unter *OIDC Clients* einen Client anlegen, Callback-URL
+`https://talkie.example.org/auth/oidc/callback`. Client-ID und Secret in die `.env`, dazu
+`TALKIE_OIDC_ISSUER=https://id.example.org` (die Pocket-ID-Adresse) und `TALKIE_OIDC_NAME=Pocket ID`.
+Meldet die Seite „E-Mail-Adresse nicht bestätigt“, bestätigt der Anbieter die Adressen nicht.
+Bei einem eigenen Anbieter, bei dem nur du Konten anlegst, kannst du das mit
+`TALKIE_OIDC_ALLOW_UNVERIFIED=1` abschalten. Bei öffentlichen Anbietern lass es aus.
+
+**Ausgesperrt?** `docker exec talkie talkie-server web-admin du@example.org` macht das Konto wieder zum
+aktiven Admin.
 
 Alle Daten (Datenbank, Zertifikat) liegen im Docker-Volume `talkie-data`.
 **Wird das Volume gelöscht, entsteht ein neues Zertifikat.** Dann verweigern alle Clients die Verbindung

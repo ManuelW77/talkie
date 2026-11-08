@@ -6,11 +6,32 @@ services:
     restart: unless-stopped
     ports:
       - "7777:7777/udp"
+      # Verwaltungsseite: nur lokal freigeben, von außen über einen Reverse-Proxy mit HTTPS
+      - "127.0.0.1:8080:8080"
     volumes:
       - talkie-data:/data
     environment:
       TALKIE_MAX_USERS: "50"
       TZ: Europe/Berlin
+      # --- Verwaltungsseite (aus, solange TALKIE_PUBLIC_URL leer ist) ---
+      TALKIE_PUBLIC_URL: ${TALKIE_PUBLIC_URL:-}
+      TALKIE_TRUST_PROXY: ${TALKIE_TRUST_PROXY:-1}
+      TALKIE_ADMIN_EMAIL: ${TALKIE_ADMIN_EMAIL:-}
+      TALKIE_SERVER_ADDR: ${TALKIE_SERVER_ADDR:-}
+      TALKIE_DOWNLOAD_URL: ${TALKIE_DOWNLOAD_URL:-}
+      # Login per Mail
+      TALKIE_SMTP_HOST: ${TALKIE_SMTP_HOST:-}
+      TALKIE_SMTP_PORT: ${TALKIE_SMTP_PORT:-587}
+      TALKIE_SMTP_USER: ${TALKIE_SMTP_USER:-}
+      TALKIE_SMTP_PASS: ${TALKIE_SMTP_PASS:-}
+      TALKIE_SMTP_FROM: ${TALKIE_SMTP_FROM:-}
+      TALKIE_SMTP_TLS: ${TALKIE_SMTP_TLS:-}
+      # Login per OIDC (Pocket ID, Authentik, Keycloak, Google, …)
+      TALKIE_OIDC_ISSUER: ${TALKIE_OIDC_ISSUER:-}
+      TALKIE_OIDC_CLIENT_ID: ${TALKIE_OIDC_CLIENT_ID:-}
+      TALKIE_OIDC_CLIENT_SECRET: ${TALKIE_OIDC_CLIENT_SECRET:-}
+      TALKIE_OIDC_NAME: ${TALKIE_OIDC_NAME:-}
+      TALKIE_OIDC_ALLOW_UNVERIFIED: ${TALKIE_OIDC_ALLOW_UNVERIFIED:-}
 
 volumes:
   talkie-data:

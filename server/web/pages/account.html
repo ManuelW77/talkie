@@ -1,0 +1,46 @@
+{{define "content"}}
+{{$a := .D.A}}
+<p><a href="/accounts">← Alle Web-Konten</a></p>
+<h1>{{if .D.New}}Neues Web-Konto{{else}}{{$a.Name}}{{end}}</h1>
+<form method="post" action="{{if .D.New}}/accounts/new{{else}}/accounts/{{$a.ID}}{{end}}" class="card grid">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <label>Name
+    <input name="name" value="{{$a.Name}}" required maxlength="40">
+  </label>
+  <label>E-Mail-Adresse
+    <input type="email" name="email" value="{{$a.Email}}" required>
+  </label>
+  <fieldset class="full">
+    <legend>Gruppe</legend>
+    <label class="check"><input type="radio" name="role" value="user" {{if not $a.IsAdmin}}checked{{end}}> Benutzer – darf nur, was unten angehakt ist</label>
+    <label class="check"><input type="radio" name="role" value="admin" {{if $a.IsAdmin}}checked{{end}}> Admin – darf alles, auch Web-Konten verwalten</label>
+  </fieldset>
+  <fieldset class="full" data-perms>
+    <legend>Rechte (für Benutzer)</legend>
+    {{range .D.Perms}}
+    <label class="check"><input type="checkbox" name="perm_{{.Key}}" value="1" {{if $a.Has .P}}checked{{end}}> {{.Label}}</label>
+    {{end}}
+  </fieldset>
+  <label class="full">Verknüpfter Talkie-Nutzer (optional)
+    <select name="talkie_id">
+      <option value="0">– keiner –</option>
+      {{range .D.Users}}<option value="{{.ID}}" {{if eq .ID $a.TalkieID}}selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+  </label>
+  {{if not .D.New}}
+  <label class="check full"><input type="checkbox" name="disabled" value="1" {{if $a.Disabled}}checked{{end}}> Konto deaktivieren (Anmeldung gesperrt)</label>
+  {{if $a.OIDCSub}}
+  <label class="check full"><input type="checkbox" name="reset_oidc" value="1"> Verknüpfung mit {{if $.OIDCName}}{{$.OIDCName}}{{else}}OIDC{{end}} zurücksetzen</label>
+  {{end}}
+  {{end}}
+  <div class="full"><button class="primary">{{if .D.New}}Konto anlegen{{else}}Speichern{{end}}</button></div>
+</form>
+
+{{if and (not .D.New) (ne $a.ID .Me.ID)}}
+<section class="card danger">
+  <h2>Konto löschen</h2>
+  <form method="post" action="/accounts/{{$a.ID}}/delete"><input type="hidden" name="csrf" value="{{.CSRF}}">
+    <button class="bad" data-confirm="Konto {{$a.Email}} wirklich löschen?">Löschen</button></form>
+</section>
+{{end}}
+{{end}}
