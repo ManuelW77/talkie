@@ -286,16 +286,21 @@ func TestWebLinkLogin(t *testing.T) {
 	if st, _, body := phone.get("/login/link?t=" + link); st != http.StatusOK || !strings.Contains(body, "Jetzt anmelden") {
 		t.Fatalf("Linkseite: %d", st)
 	}
-	// Mail-Programme öffnen Links teils abgeschottet („Origin: null“) – muss gehen
+	// Abgeschottetes Fenster / fremde Seite („Origin: null“): kein Login (Login-CSRF),
+	// Link bleibt aber gültig und die Login-Seite erklärt, was zu tun ist
+	sandbox := wt.browser()
 	req, _ := http.NewRequest("POST", wt.srv.URL+"/login/link", strings.NewReader(url.Values{"t": {link}}.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "null")
-	resp, err := phone.c.Do(req)
+	resp, err := sandbox.c.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
-	if st, loc := resp.StatusCode, resp.Header.Get("Location"); st != http.StatusSeeOther || loc != "/" {
+	if resp.Header.Get("Location") != "/login" || !strings.Contains(sandbox.flash(), "Adresszeile") {
+		t.Fatal("Link-Login mit Origin null nicht sauber abgelehnt")
+	}
+	if st, loc, _ := phone.post("/login/link", url.Values{"t": {link}}); st != http.StatusSeeOther || loc != "/" {
 		t.Fatalf("Link-Login: %d %s", st, loc)
 	}
 	if st, _, _ := phone.get("/"); st != http.StatusOK {
