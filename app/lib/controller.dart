@@ -238,6 +238,9 @@ class TalkieController extends ChangeNotifier {
   /// Rauswerfen (ban = auch sperren). Das Ergebnis kommt als Hinweis (Snackbar).
   void moderate(UserDto u, {required bool ban}) => talkieModerate(user: u.id, ban: ban);
 
+  /// Lautstärke einer Person nur für mich (0 … 3, 1 = normal).
+  void setUserVolume(UserDto u, double v) => talkieSetUserVolume(user: u.id, volume: v);
+
   /// Schaltet jemanden nur für mich stumm – die anderen hören ihn weiter.
   void toggleUserMuted(UserDto u) => talkieSetUserMuted(user: u.id, muted: !u.localMuted);
 

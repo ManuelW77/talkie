@@ -60,10 +60,10 @@ TalkieController _mainController() {
         RoomDto(id: 12, name: 'Zocken 2'),
       ],
       users: [
-        UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true, localMuted: false),
-        UserDto(id: 2, name: 'Lena', room: 10, muted: true, deaf: false, talking: false, localMuted: false),
-        UserDto(id: 3, name: 'Jonas', room: 11, muted: false, deaf: false, talking: true, localMuted: true),
-        UserDto(id: 4, name: 'Emil', room: 11, muted: false, deaf: true, talking: false, localMuted: false),
+        UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true, localMuted: false, volume: 1),
+        UserDto(id: 2, name: 'Lena', room: 10, muted: true, deaf: false, talking: false, localMuted: false, volume: 1),
+        UserDto(id: 3, name: 'Jonas', room: 11, muted: false, deaf: false, talking: true, localMuted: true, volume: 1),
+        UserDto(id: 4, name: 'Emil', room: 11, muted: false, deaf: true, talking: false, localMuted: false, volume: 1),
       ],
       muted: false,
       deaf: false,
@@ -279,5 +279,22 @@ void main() {
     expect(find.text('Chat in allen Räumen leeren?'), findsOneWidget);
     await tester.tap(find.text('Abbrechen'));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('Person antippen: Lautstärke und stumm, ohne Rauswerfen für normale Nutzer', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byTooltip('Mehr zu Max'), findsNothing); // nicht bei mir selbst
+    await tester.tap(find.byTooltip('Mehr zu Lena'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lautstärke für dich: 100 %'), findsOneWidget);
+    expect(find.byType(Slider), findsOneWidget);
+    expect(find.text('Für mich stumm'), findsOneWidget);
+    expect(find.text('Rauswerfen'), findsNothing);
+    await expectLater(find.byType(Overlay).first, matchesGoldenFile('goldens/phone_person.png'));
   });
 }

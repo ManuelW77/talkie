@@ -38,6 +38,8 @@ pub struct UserView {
     pub talking: bool,
     /// Nur für mich stumm geschaltet.
     pub local_muted: bool,
+    /// Lautstärke nur für mich (1.0 = normal).
+    pub volume: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -131,7 +133,10 @@ impl Inner {
 
     fn snapshot(&self) -> Snapshot {
         // Mixer vor net sperren (nie beide verschachtelt in umgekehrter Reihenfolge)
-        let ignored = self.mixer.lock().ignored.clone();
+        let (ignored, gains) = {
+            let m = self.mixer.lock();
+            (m.ignored.clone(), m.gains_snapshot())
+        };
         let n = self.net.lock();
         let muted = self.muted.load(Ordering::Relaxed);
         let self_talking = self.self_talking.load(Ordering::Relaxed) && !muted;
@@ -146,6 +151,7 @@ impl Inner {
                 deaf: u.deaf,
                 talking: if u.id == n.me { self_talking } else { n.talking.binary_search(&u.id).is_ok() },
                 local_muted: ignored.contains(&u.id),
+                volume: gains.get(&u.id).copied().unwrap_or(1.0),
             })
             .collect();
         Snapshot {
@@ -290,6 +296,9 @@ impl Engine {
             let mut m = mixer.lock();
             m.volume = config.settings.output_volume;
             m.ignored = config.muted_users.iter().copied().collect();
+            for (&id, &g) in &config.user_volumes {
+                m.set_gain(id, g);
+            }
         }
         let params = params_from(&config.settings, false);
         let inner = Arc::new(Inner {
@@ -417,8 +426,15 @@ impl Engine {
             c.registered = false;
             c.last_room = 0;
             c.muted_users.clear(); // IDs gelten nur auf diesem Server
+            c.user_volumes.clear();
         }
-        self.inner.mixer.lock().ignored.clear();
+        {
+            let mut m = self.inner.mixer.lock();
+            m.ignored.clear();
+            for id in m.gains_snapshot().into_keys() {
+                m.set_gain(id, 1.0);
+            }
+        }
         self.inner.save_config();
         Ok(())
     }
@@ -446,6 +462,22 @@ impl Engine {
         }
         self.inner.params.lock().muted = muted;
         self.inner.send_cmd(self.inner.state_envelope());
+        self.inner.emit_state();
+    }
+
+    /// Lautstärke einer Person nur für mich (0.0 … 3.0). Bleibt gespeichert.
+    pub fn set_user_volume(&self, user: i64, volume: f32) {
+        let v = volume.clamp(0.0, 3.0);
+        {
+            let mut c = self.inner.config.lock();
+            if (v - 1.0).abs() < 1e-3 {
+                c.user_volumes.remove(&user);
+            } else {
+                c.user_volumes.insert(user, v);
+            }
+        }
+        self.inner.save_config();
+        self.inner.mixer.lock().set_gain(user, v);
         self.inner.emit_state();
     }
 

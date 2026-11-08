@@ -32,6 +32,8 @@ pub struct UserDto {
     pub talking: bool,
     /// Nur für mich stumm geschaltet.
     pub local_muted: bool,
+    /// Lautstärke nur für mich (1.0 = normal).
+    pub volume: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -138,6 +140,7 @@ fn state_dto(s: Snapshot) -> StateDto {
                 deaf: u.deaf,
                 talking: u.talking,
                 local_muted: u.local_muted,
+                volume: u.volume,
             })
             .collect(),
         muted: s.muted,
@@ -255,6 +258,13 @@ pub fn talkie_chat(text: String) -> Result<()> {
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_set_muted(muted: bool) -> Result<()> {
     engine()?.set_muted(muted);
+    Ok(())
+}
+
+/// Lautstärke einer Person nur für mich (0.0 … 3.0, 1.0 = normal). Bleibt gespeichert.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_set_user_volume(user: i64, volume: f32) -> Result<()> {
+    engine()?.set_user_volume(user, volume);
     Ok(())
 }
 

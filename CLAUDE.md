@@ -7,6 +7,12 @@ datensparsam (die Kids zocken nebenher) und lauffähig auf älteren Rechnern.
 - **Desktop-Client:** Flutter-Oberfläche + Rust-Kern über flutter_rust_bridge (`app/`)
 - **Handy/Tablet:** dieselbe Flutter-App mit demselben Rust-Kern (`app/android`, `app/ios`)
 
+## Parallele Sitzungen
+
+Arbeiten mehrere Claude-Sitzungen gleichzeitig, bekommt jede einen eigenen Arbeitsordner
+(`git worktree add ../talkie-<name> -b feature/<name> devel`). Im selben Ordner wechseln sich die
+Sitzungen sonst gegenseitig den Branch weg. Beim Committen nur eigene Dateien hinzufügen.
+
 ## Sprache
 
 - Antworten, Kommentare, UI-Texte, Commit-Nachrichten und Doku auf **Deutsch** mit korrekten Umlauten
@@ -41,8 +47,8 @@ Repo-Variablen `TALKIE_SERVER` / `TALKIE_FINGERPRINT` in die CI.
 - `ToDo Build.md` – alles, was noch zu bauen ist. **Neue Ideen und Aufträge von Manuel hier eintragen.**
 - `ToDo Tests.md` – was Manuel aktiv testen soll
 
-Pflege: Ist eine Aufgabe gebaut, kommt sie aus `ToDo Build` raus und mit konkreten Testschritten
-(Abschnitt mit Branch-Namen) nach `ToDo Tests`. Ändern sich Befehle, Ports oder Links, die beiden
+Pflege: Ist eine Aufgabe gebaut, wird sie in `ToDo Build` abgehakt (`- [x]`) und unter „Erledigt“
+verschoben; konkrete Testschritte (Abschnitt mit Branch-Namen) kommen nach `ToDo Tests`. Ändern sich Befehle, Ports oder Links, die beiden
 anderen Notizen mitziehen. Bearbeiten über die Obsidian-MCP-Tools.
 
 ## Aufbau

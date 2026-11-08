@@ -262,10 +262,10 @@ class _RoomTile extends StatelessWidget {
                           _UserMuteButton(controller: controller, user: u)
                         else
                           const SizedBox(width: 30, height: 30),
-                        if (controller.moderator)
-                          u.id != controller.me
-                              ? _ModMenu(controller: controller, user: u)
-                              : const SizedBox(width: 30, height: 30),
+                        if (u.id != controller.me)
+                          _UserMenuButton(controller: controller, user: u)
+                        else
+                          const SizedBox(width: 30, height: 30),
                       ],
                     ),
                   ),
@@ -301,64 +301,156 @@ class _UserMuteButton extends StatelessWidget {
   }
 }
 
-enum _ModAction { kick, ban }
+/// Rückfrage vor dem Rauswerfen/Sperren; führt die Aktion bei „Ja“ aus.
+Future<void> _confirmModerate(BuildContext context, TalkieController controller, UserDto user, bool ban) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(ban ? '${user.name} sperren?' : '${user.name} rauswerfen?'),
+      content: Text(ban
+          ? '${user.name} fliegt raus und kann erst wieder rein, wenn ein Admin auf der Verwaltungsseite entsperrt.'
+          : '${user.name} fliegt raus, kann sich aber gleich wieder verbinden.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: kDanger, foregroundColor: Colors.white),
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(ban ? 'Sperren' : 'Rauswerfen'),
+        ),
+      ],
+    ),
+  );
+  if (ok == true) controller.moderate(user, ban: ban);
+}
 
-/// Nur für Moderatoren: rauswerfen oder sperren, jeweils mit Rückfrage.
-class _ModMenu extends StatelessWidget {
-  const _ModMenu({required this.controller, required this.user});
+/// ⋮ neben einer anderen Person: Lautstärke, nur für mich stumm, (Moderatoren) rauswerfen/sperren.
+class _UserMenuButton extends StatelessWidget {
+  const _UserMenuButton({required this.controller, required this.user});
 
   final TalkieController controller;
   final UserDto user;
 
-  Future<void> _confirm(BuildContext context, _ModAction a) async {
-    final ban = a == _ModAction.ban;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(ban ? '${user.name} sperren?' : '${user.name} rauswerfen?'),
-        content: Text(ban
-            ? '${user.name} fliegt raus und kann erst wieder rein, wenn ein Admin auf der Verwaltungsseite entsperrt.'
-            : '${user.name} fliegt raus, kann sich aber gleich wieder verbinden.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kDanger, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(ban ? 'Sperren' : 'Rauswerfen'),
-          ),
-        ],
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Mehr zu ${user.name}',
+      icon: const Icon(Icons.more_vert_rounded, size: 18),
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+      onPressed: () => showDialog<void>(
+        context: context,
+        builder: (_) => _UserDialog(controller: controller, userId: user.id),
       ),
     );
-    if (ok == true) controller.moderate(user, ban: ban);
+  }
+}
+
+class _UserDialog extends StatefulWidget {
+  const _UserDialog({required this.controller, required this.userId});
+
+  final TalkieController controller;
+  final int userId;
+
+  @override
+  State<_UserDialog> createState() => _UserDialogState();
+}
+
+class _UserDialogState extends State<_UserDialog> {
+  double? _volume; // während des Ziehens
+
+  UserDto? get _user {
+    for (final u in widget.controller.state?.users ?? const <UserDto>[]) {
+      if (u.id == widget.userId) return u;
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<_ModAction>(
-      tooltip: 'Mehr zu ${user.name}',
-      icon: const Icon(Icons.more_vert_rounded, size: 18),
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 160),
-      style: IconButton.styleFrom(
-        fixedSize: const Size(30, 30),
-        minimumSize: const Size(30, 30),
-        visualDensity: VisualDensity.compact,
-      ),
-      onSelected: (a) => _confirm(context, a),
-      itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: _ModAction.kick,
-          child: ListTile(leading: Icon(Icons.logout_rounded), title: Text('Rauswerfen'), dense: true),
-        ),
-        PopupMenuItem(
-          value: _ModAction.ban,
-          child: ListTile(
-            leading: Icon(Icons.block_rounded, color: kDanger),
-            title: Text('Sperren', style: TextStyle(color: kDanger)),
-            dense: true,
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: (context, _) {
+        final u = _user;
+        if (u == null) {
+          return AlertDialog(
+            content: const Text('Diese Person ist nicht mehr da.'),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+          );
+        }
+        final theme = Theme.of(context);
+        final v = _volume ?? u.volume;
+        return AlertDialog(
+          title: Row(
+            children: [
+              Avatar(name: u.name, talking: u.talking && !u.localMuted, size: 32),
+              const SizedBox(width: 12),
+              Expanded(child: Text(u.name, overflow: TextOverflow.ellipsis)),
+            ],
           ),
-        ),
-      ],
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Lautstärke für dich: ${(v * 100).round()} %', style: theme.textTheme.titleSmall),
+                Text('Nur bei dir. Die anderen hören ${u.name} wie immer.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Slider(
+                  value: v.clamp(0.0, 3.0),
+                  max: 3,
+                  divisions: 30,
+                  label: '${(v * 100).round()} %',
+                  onChanged: u.localMuted ? null : (x) => setState(() => _volume = x),
+                  onChangeEnd: (x) {
+                    widget.controller.setUserVolume(u, x);
+                    _volume = null;
+                  },
+                ),
+                if ((v - 1).abs() > 0.01 && !u.localMuted)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => widget.controller.setUserVolume(u, 1),
+                      child: const Text('Normal (100 %)'),
+                    ),
+                  ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Für mich stumm'),
+                  value: u.localMuted,
+                  onChanged: (_) => widget.controller.toggleUserMuted(u),
+                ),
+                if (widget.controller.moderator) ...[
+                  const Divider(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _confirmModerate(context, widget.controller, u, false),
+                          icon: const Icon(Icons.logout_rounded),
+                          label: const Text('Rauswerfen'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(foregroundColor: kDanger),
+                          onPressed: () => _confirmModerate(context, widget.controller, u, true),
+                          icon: const Icon(Icons.block_rounded),
+                          label: const Text('Sperren'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fertig'))],
+        );
+      },
     );
   }
 }

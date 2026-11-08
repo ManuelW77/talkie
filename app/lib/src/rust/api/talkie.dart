@@ -48,6 +48,15 @@ void talkieChat({required String text}) =>
 void talkieSetMuted({required bool muted}) =>
     RustLib.instance.api.crateApiTalkieTalkieSetMuted(muted: muted);
 
+/// Lautstärke einer Person nur für mich (0.0 … 3.0, 1.0 = normal). Bleibt gespeichert.
+void talkieSetUserVolume({
+  required PlatformInt64 user,
+  required double volume,
+}) => RustLib.instance.api.crateApiTalkieTalkieSetUserVolume(
+  user: user,
+  volume: volume,
+);
+
 /// Einen anderen Nutzer nur für mich stumm schalten (bleibt gespeichert).
 void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
     RustLib.instance.api.crateApiTalkieTalkieSetUserMuted(
@@ -333,6 +342,9 @@ class UserDto {
   /// Nur für mich stumm geschaltet.
   final bool localMuted;
 
+  /// Lautstärke nur für mich (1.0 = normal).
+  final double volume;
+
   const UserDto({
     required this.id,
     required this.name,
@@ -341,6 +353,7 @@ class UserDto {
     required this.deaf,
     required this.talking,
     required this.localMuted,
+    required this.volume,
   });
 
   @override
@@ -351,7 +364,8 @@ class UserDto {
       muted.hashCode ^
       deaf.hashCode ^
       talking.hashCode ^
-      localMuted.hashCode;
+      localMuted.hashCode ^
+      volume.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -364,5 +378,6 @@ class UserDto {
           muted == other.muted &&
           deaf == other.deaf &&
           talking == other.talking &&
-          localMuted == other.localMuted;
+          localMuted == other.localMuted &&
+          volume == other.volume;
 }
