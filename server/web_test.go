@@ -614,6 +614,7 @@ func TestWebChatClearAndRetention(t *testing.T) {
 func TestWebDevices(t *testing.T) {
 	wt := newWebTest(t, nil)
 	wt.account("chef@x.de", RoleAdmin, 0)
+	wt.account("helfer@x.de", RoleUser, PermUsersEdit)
 	inv, _ := wt.store.CreateInvite(1, time.Hour)
 	pk1 := make([]byte, 32)
 	pk1[0] = 1
@@ -626,8 +627,20 @@ func TestWebDevices(t *testing.T) {
 	if _, _, body := b.get("/users/" + itoa(u.ID)); !strings.Contains(body, "Geräte-Code erstellen") {
 		t.Fatal("Geräte-Abschnitt fehlt")
 	}
+	// Nicht-Admin mit „Nutzer bearbeiten“ darf keine Geräte-Codes erstellen oder sehen
+	h := wt.browser()
+	h.login("helfer@x.de")
+	if st, _, _ := h.post("/users/"+itoa(u.ID)+"/device_code", url.Values{"csrf": {h.csrf()}}); st != http.StatusForbidden {
+		t.Fatalf("Helfer durfte Code erstellen: %d", st)
+	}
+	if wt.store.DeviceCode(u.ID) != nil {
+		t.Fatal("Code trotz Verbot erstellt")
+	}
 	b.post("/users/"+itoa(u.ID)+"/device_code", url.Values{"csrf": {b.csrf()}})
 	code := wt.store.DeviceCode(u.ID)
+	if _, _, body := h.get("/users/" + itoa(u.ID)); strings.Contains(body, code.Code) || strings.Contains(body, "Geräte-Code erstellen") {
+		t.Fatal("Helfer sieht den Code oder den Knopf")
+	}
 	if code == nil {
 		t.Fatal("kein Code")
 	}

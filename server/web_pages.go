@@ -100,7 +100,7 @@ func (w *webApp) userPage(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.render(rw, r, "user", u.Name, map[string]any{
-		"U": userRow{*u, w.hub.OnlineIDs()[u.ID]}, "Devices": devs, "Code": w.store.DeviceCode(u.ID), "MaxDevices": MaxDevices,
+		"U": userRow{*u, w.hub.OnlineIDs()[u.ID]}, "Devices": devs, "Code": adminDeviceCode(me(r), w.store, u.ID), "MaxDevices": MaxDevices,
 	})
 }
 
@@ -164,6 +164,12 @@ func (w *webApp) userAction(rw http.ResponseWriter, r *http.Request) {
 		}
 		w.done(rw, r, back, msg, false)
 	case "device_code":
+		// Mit dem Code kann man sich als dieser Nutzer anmelden → nur Admins
+		if !me(r).IsAdmin() {
+			rw.WriteHeader(http.StatusForbidden)
+			w.render(rw, r, "forbidden", "Kein Zugriff", nil)
+			return
+		}
 		inv, err := w.store.CreateDeviceCode(u.ID, 24*time.Hour)
 		if errors.Is(err, ErrTooManyDevices) {
 			w.done(rw, r, back, fmt.Sprintf("%s hat schon %d Geräte. Erst eins entfernen.", u.Name, MaxDevices), true)
@@ -612,4 +618,12 @@ func (w *webApp) auditPage(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.render(rw, r, "audit", "Protokoll", map[string]any{"Log": log})
+}
+
+// adminDeviceCode: offene Geräte-Codes sieht nur ein Admin (damit meldet man sich als der Nutzer an).
+func adminDeviceCode(a *Account, s *Store, userID int64) *DBInvite {
+	if a == nil || !a.IsAdmin() {
+		return nil
+	}
+	return s.DeviceCode(userID)
 }

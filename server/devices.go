@@ -49,8 +49,11 @@ func (s *Store) initDevices() error {
 			return err
 		}
 	}
+	// Nur Nutzer ohne jedes Gerät übernehmen (alte Datenbank). Sonst käme ein entferntes
+	// Erstgerät beim nächsten Start über users.pubkey wieder herein.
 	_, err := s.db.Exec(`INSERT OR IGNORE INTO devices(user_id, pubkey, label, created, last_seen)
-		SELECT id, pubkey, '', created, last_seen FROM users`)
+		SELECT id, pubkey, '', created, last_seen FROM users
+		WHERE id NOT IN (SELECT user_id FROM devices)`)
 	return err
 }
 
