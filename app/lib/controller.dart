@@ -150,6 +150,9 @@ class TalkieController extends ChangeNotifier {
 
   void toggleDeaf() => talkieSetDeaf(deaf: !deaf);
 
+  /// Schaltet jemanden nur für mich stumm – die anderen hören ihn weiter.
+  void toggleUserMuted(UserDto u) => talkieSetUserMuted(user: u.id, muted: !u.localMuted);
+
   Future<void> saveSettings(SettingsDto s) async {
     await talkieSetSettings(s: s);
     config = talkieConfig();

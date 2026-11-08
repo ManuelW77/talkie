@@ -1,7 +1,7 @@
 //! Empfang: Jitter-Puffer pro Sprecher, Opus-Dekodierung und Mischen.
 
 use crate::core::dsp::{FRAME, RATE};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
 /// So viel muss gepuffert sein, bevor ein Sprecher abgespielt wird (60 ms).
@@ -57,6 +57,8 @@ pub struct Mixer {
     buf: Vec<f32>,
     pub volume: f32,
     pub deaf: bool,
+    /// Nur für sich stumm geschaltete Nutzer (falls der Server sie doch schickt).
+    pub ignored: HashSet<i64>,
     /// Zähler für Tests/Diagnose
     pub packets: u64,
     pub lost: u64,
@@ -64,13 +66,21 @@ pub struct Mixer {
 
 impl Default for Mixer {
     fn default() -> Self {
-        Mixer { speakers: HashMap::new(), buf: vec![0.0; 5760], volume: 1.0, deaf: false, packets: 0, lost: 0 }
+        Mixer {
+            speakers: HashMap::new(),
+            buf: vec![0.0; 5760],
+            volume: 1.0,
+            deaf: false,
+            ignored: HashSet::new(),
+            packets: 0,
+            lost: 0,
+        }
     }
 }
 
 impl Mixer {
     pub fn push(&mut self, uid: i64, seq: u16, data: &[u8]) {
-        if self.deaf {
+        if self.deaf || self.ignored.contains(&uid) {
             return;
         }
         let now = Instant::now();
@@ -191,9 +201,11 @@ mod tests {
             (0..n).map(|i| 0.3 * (i as f32 * 2.0 * std::f32::consts::PI * 300.0 / RATE as f32).sin()).collect();
         let mut c = CaptureProcessor::new().unwrap();
         let mut pkts = Vec::new();
-        c.process(&tone, CaptureParams { threshold_db: -45.0, noise_suppression: false, gain: 1.0, muted: false }, |e| {
-            pkts.push(e.data)
-        });
+        c.process(
+            &tone,
+            CaptureParams { threshold_db: -45.0, noise_suppression: false, gain: 1.0, muted: false },
+            |e| pkts.push(e.data),
+        );
         pkts
     }
 
@@ -246,6 +258,23 @@ mod tests {
             m.push(1, 65530u16.wrapping_add(i as u16), p);
         }
         assert_eq!(m.lost, 0);
+        assert!(drain(&mut m, 9600) > 0.05);
+    }
+
+    #[test]
+    fn ignored_speaker_is_dropped_others_play() {
+        let pkts = encoded_tone(0.5);
+        let mut m = Mixer::default();
+        m.ignored.insert(1);
+        for (i, p) in pkts.iter().enumerate() {
+            m.push(1, i as u16, p);
+        }
+        assert!(m.talking().is_empty());
+        assert!(drain(&mut m, 4800) < 1e-6);
+        for (i, p) in pkts.iter().enumerate() {
+            m.push(2, i as u16, p);
+        }
+        assert_eq!(m.talking(), vec![2]);
         assert!(drain(&mut m, 9600) > 0.05);
     }
 

@@ -170,10 +170,30 @@ func (h *Hub) ForwardVoice(from *Session, pkt []byte) {
 		return
 	}
 	for _, o := range h.sessions {
-		if o != from && o.room == from.room && !o.deaf {
+		if o != from && o.room == from.room && !o.deaf && !o.ignored[from.userID] {
 			_ = o.conn.SendDatagram(pkt) // Verlust ist bei Sprache in Ordnung
 		}
 	}
+}
+
+// maxIgnored begrenzt die Liste, damit ein Client den Server nicht mit Speicher flutet.
+const maxIgnored = 500
+
+// SetIgnored ersetzt die Liste der Nutzer, die s für sich stumm geschaltet hat.
+// Ihre Sprache wird an s gar nicht erst geschickt (spart Daten).
+func (h *Hub) SetIgnored(s *Session, ids []int64) {
+	if len(ids) > maxIgnored {
+		ids = ids[:maxIgnored]
+	}
+	set := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		if id > 0 && id != s.userID {
+			set[id] = true
+		}
+	}
+	h.mu.Lock()
+	s.ignored = set
+	h.mu.Unlock()
 }
 
 // --- Admin-Operationen ---

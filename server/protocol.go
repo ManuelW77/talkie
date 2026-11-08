@@ -47,6 +47,9 @@ type Envelope struct {
 	Muted *bool  `json:"muted,omitempty"`
 	Deaf  *bool  `json:"deaf,omitempty"`
 
+	// ignore: Nutzer, die dieser Client für sich stumm geschaltet hat
+	IDs []int64 `json:"ids,omitempty"`
+
 	// error / kicked
 	Code   string `json:"code,omitempty"`
 	Reason string `json:"reason,omitempty"`

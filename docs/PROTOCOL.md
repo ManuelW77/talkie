@@ -34,6 +34,7 @@ Fehlercodes: `bad_request`, `version`, `invite_invalid`, `name_invalid`,
 C → S  {"t":"join","room":3}
 C → S  {"t":"chat","text":"Hi"}
 C → S  {"t":"state","muted":false,"deaf":false}
+C → S  {"t":"ignore","ids":[7,9]}   ersetzt die Liste der für sich stumm geschalteten Nutzer
 
 S → C  {"t":"user_joined","user":User}
 S → C  {"t":"user_update","user":User}
@@ -61,5 +62,9 @@ S → C  [0x01][user-id u32 BE][seq u16 BE][opus-Daten]
 ```
 
 Der Server leitet ein Paket an alle Nutzer im selben Raum weiter, außer an
-den Absender und an Nutzer, die „taub“ (deaf) geschaltet sind. Pakete von
+den Absender, an Nutzer, die „taub“ (deaf) geschaltet sind, und an Nutzer,
+die den Absender per `ignore` für sich stumm geschaltet haben (spart deren
+Download; die anderen hören ihn weiter). Der Client schickt `ignore` nach jeder
+Änderung und nach jeder Anmeldung mit der vollen Liste (höchstens 500 IDs).
+Ältere Server kennen `ignore` nicht – der Client verwirft die Pakete dann selbst. Pakete von
 stummgeschalteten Nutzern werden verworfen.

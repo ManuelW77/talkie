@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -900377814;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -945809577;
 
 // Section: executor
 
@@ -517,6 +517,39 @@ fn wire__crate__api__talkie__talkie_set_settings_impl(
         },
     )
 }
+fn wire__crate__api__talkie__talkie_set_user_muted_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "talkie_set_user_muted",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_user = <i64>::sse_decode(&mut deserializer);
+            let api_muted = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                (move || {
+                    let output_ok = crate::api::talkie::talkie_set_user_muted(api_user, api_muted)?;
+                    std::result::Result::Ok(output_ok)
+                })(),
+            )
+        },
+    )
+}
 
 // Section: dart2rust
 
@@ -821,6 +854,7 @@ impl SseDecode for crate::api::talkie::UserDto {
         let mut var_muted = <bool>::sse_decode(deserializer);
         let mut var_deaf = <bool>::sse_decode(deserializer);
         let mut var_talking = <bool>::sse_decode(deserializer);
+        let mut var_localMuted = <bool>::sse_decode(deserializer);
         return crate::api::talkie::UserDto {
             id: var_id,
             name: var_name,
@@ -828,6 +862,7 @@ impl SseDecode for crate::api::talkie::UserDto {
             muted: var_muted,
             deaf: var_deaf,
             talking: var_talking,
+            local_muted: var_localMuted,
         };
     }
 }
@@ -869,6 +904,7 @@ fn pde_ffi_dispatcher_sync_impl(
         9 => wire__crate__api__talkie__talkie_join_impl(ptr, rust_vec_len, data_len),
         12 => wire__crate__api__talkie__talkie_set_deaf_impl(ptr, rust_vec_len, data_len),
         13 => wire__crate__api__talkie__talkie_set_muted_impl(ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__talkie__talkie_set_user_muted_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1062,6 +1098,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::talkie::UserDto {
             self.muted.into_into_dart().into_dart(),
             self.deaf.into_into_dart().into_dart(),
             self.talking.into_into_dart().into_dart(),
+            self.local_muted.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1324,6 +1361,7 @@ impl SseEncode for crate::api::talkie::UserDto {
         <bool>::sse_encode(self.muted, serializer);
         <bool>::sse_encode(self.deaf, serializer);
         <bool>::sse_encode(self.talking, serializer);
+        <bool>::sse_encode(self.local_muted, serializer);
     }
 }
 

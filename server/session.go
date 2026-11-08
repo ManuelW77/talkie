@@ -27,7 +27,7 @@ const (
 )
 
 // Session ist eine angemeldete Client-Verbindung.
-// room, muted, deaf und name werden durch hub.mu geschützt.
+// room, muted, deaf, ignored und name werden durch hub.mu geschützt.
 type Session struct {
 	hub    *Hub
 	conn   *quic.Conn
@@ -39,6 +39,8 @@ type Session struct {
 	room   int64
 	muted  bool
 	deaf   bool
+	// ignored: Nutzer, deren Sprache dieser Client nicht hören will (nur für ihn)
+	ignored map[int64]bool
 
 	out       chan []byte
 	closeOnce sync.Once
@@ -151,6 +153,8 @@ func (s *Session) controlLoop() {
 				deaf = *e.Deaf
 			}
 			s.hub.SetState(s, muted, deaf)
+		case "ignore":
+			s.hub.SetIgnored(s, e.IDs)
 		}
 	}
 }
