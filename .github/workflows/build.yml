@@ -1,6 +1,7 @@
 name: Build
 
-# Baut Server + Desktop- und Handy-Clients. Optional in den Repo-Einstellungen unter
+# Baut Server + Desktop- und Handy-Clients. Release-Tags (v1.2.3) signieren und notarisieren
+# die Mac-App zusätzlich (Secrets: docs/RELEASE.md). Optional in den Repo-Einstellungen unter
 # Settings → Secrets and variables → Actions → Variables setzen:
 #   TALKIE_SERVER       z. B. talkie.example.org:7777  (dann müssen die Kids nur Name + Code eingeben)
 #   TALKIE_FINGERPRINT  Fingerabdruck aus "talkie-server status" (fest eingebautes Zertifikats-Pinning)
@@ -79,13 +80,46 @@ jobs:
       - name: Bauen
         working-directory: app
         run: flutter build macos --release $DART_DEFINES
-      - name: DMG packen
+      - name: DMG packen (ohne Signatur, Test-Builds)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         working-directory: app
         run: |
           APP=build/macos/Build/Products/Release/Talkie.app
           lipo -info "$APP/Contents/MacOS/Talkie"
           mkdir -p dmg && cp -R "$APP" dmg/ && ln -s /Applications dmg/Programme
           hdiutil create -volname Talkie -srcfolder dmg -ov -format UDZO Talkie-macOS.dmg
+      # Release: mit Developer ID signieren und bei Apple notarisieren (Secrets siehe docs/RELEASE.md)
+      - name: Signieren und notarisieren
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: app
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_API_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.NOTARY_API_ISSUER_ID }}
+        run: |
+          if [ -z "$CERTIFICATE_P12" ] || [ -z "$NOTARY_KEY_P8" ] || [ -z "$NOTARY_KEY_ID" ]; then
+            echo "::error::Secrets für die Notarisierung fehlen (siehe docs/RELEASE.md)"
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/release.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          printf '%s' "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$KEYCHAIN" -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          printf '%s' "$NOTARY_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          NOTARY_KEY_PATH="$RUNNER_TEMP/notary.p8" tool/notarize_macos.sh build/macos/Build/Products/Release/Talkie.app Talkie-macOS.dmg
+      - name: Schlüsselbund und Schlüssel entfernen
+        if: always() && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          security delete-keychain "$RUNNER_TEMP/release.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/notary.p8"
       - uses: actions/upload-artifact@v5
         with:
           name: Talkie-macOS
@@ -199,3 +233,13 @@ jobs:
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: dist/*
+          generate_release_notes: true
+          body: |
+            ## Installieren
+            - **Mac** (ab macOS 10.15, Intel und Apple Silicon): `Talkie-macOS.dmg` öffnen, Talkie in „Programme“ ziehen. Signiert und von Apple notarisiert.
+            - **Windows** (ab 10): `Talkie-Windows.zip` entpacken, `talkie.exe` starten. Beim ersten Start „Weitere Informationen → Trotzdem ausführen“.
+            - **Linux** (x64): `Talkie-Linux-x64.tar.gz` entpacken, im Ordner `./install.sh` ausführen.
+            - **Android** (ab 8.0): `Talkie-Android.apk` öffnen und installieren.
+            - **iPhone/iPad** (ab iOS 15): über TestFlight – https://testflight.apple.com/join/zfBAJJNK
+
+            Zum Anmelden brauchst du einen Einladungscode vom Betreiber deines Talkie-Servers.
