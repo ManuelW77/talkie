@@ -7,3 +7,4 @@ app/rust/target/
 .claude/
 .env
 server/server
+dist/
