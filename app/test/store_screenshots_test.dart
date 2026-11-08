@@ -37,6 +37,7 @@ class _Device {
 }
 
 const _iphone = _Device('iphone-6.9', Size(1320, 2868), 3, Size(390, 844), 46);
+const _iphone63 = _Device('iphone-6.3', Size(1206, 2622), 3, Size(390, 844), 46);
 const _ipad = _Device('ipad-13', Size(2064, 2752), 2, Size(834, 1112), 28);
 
 Future<void> _loadFonts() async {
@@ -207,7 +208,7 @@ void main() {
   setUpAll(_loadFonts);
   final skip = _outDir.isEmpty;
 
-  for (final d in [_iphone, _ipad]) {
+  for (final d in [_iphone, _iphone63, _ipad]) {
     testWidgets('${d.folder}: Chat', (tester) async {
       await _pump(
         tester,
@@ -224,7 +225,7 @@ void main() {
         _frame(d, 'Ein Raum pro Runde', 'Du siehst sofort, wer da ist und wer gerade spricht',
             MainScreen(controller: _mainController())),
       );
-      if (d == _iphone) {
+      if (d != _ipad) {
         await tester.tap(find.byTooltip('Räume'));
         await tester.pumpAndSettle();
       }
