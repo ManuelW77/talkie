@@ -80,6 +80,8 @@ pub struct CaptureParams {
     pub noise_suppression: bool,
     pub gain: f32,
     pub muted: bool,
+    /// Push-to-Talk: None = Sprach-Erkennung, Some(gedrückt) = senden nur solange gedrückt.
+    pub ptt: Option<bool>,
 }
 
 /// Ergebnis eines fertigen 40-ms-Pakets.
@@ -166,7 +168,10 @@ impl CaptureProcessor {
         let lvl = ((level_db + 60.0) / 60.0).clamp(0.0, 1.0);
         self.level_peak = self.level_peak.max(lvl);
 
-        let active = level_db > p.threshold_db && (vad > 0.2 || level_db > p.threshold_db + 15.0);
+        let active = match p.ptt {
+            Some(down) => down,
+            None => level_db > p.threshold_db && (vad > 0.2 || level_db > p.threshold_db + 15.0),
+        };
         if active {
             self.hang = HANGOVER;
         } else if self.hang > 0 {
@@ -209,7 +214,7 @@ mod tests {
     #[test]
     fn silence_sends_nothing_loud_sends_packets() {
         let mut c = CaptureProcessor::new().unwrap();
-        let p = CaptureParams { threshold_db: -45.0, noise_suppression: false, gain: 1.0, muted: false };
+        let p = CaptureParams { threshold_db: -45.0, noise_suppression: false, gain: 1.0, muted: false, ptt: None };
         let mut n = 0;
         c.process(&vec![0.0; RATE as usize], p, |_| n += 1);
         assert_eq!(n, 0);
@@ -221,6 +226,14 @@ mod tests {
         // 16 kbit/s * 40 ms = 80 Byte, VBR schwankt etwas
         assert!(avg < 140.0, "pakete zu groß: {avg}");
 
+        // Push-to-Talk: laut, aber nicht gedrückt → nichts; gedrückt und leise → wird gesendet
+        c.process(&vec![0.0; RATE as usize], p, |_| {}); // Nachlauf vom Ton davor auslaufen lassen
+        let mut ptt_up = 0;
+        c.process(&tone(RATE as usize, 0.3), CaptureParams { ptt: Some(false), ..p }, |_| ptt_up += 1);
+        assert_eq!(ptt_up, 0);
+        let mut ptt_down = 0;
+        c.process(&tone(RATE as usize, 0.0005), CaptureParams { ptt: Some(true), ..p }, |_| ptt_down += 1);
+        assert!(ptt_down > 10, "{ptt_down}");
         let mut muted = 0;
         c.process(&tone(RATE as usize, 0.3), CaptureParams { muted: true, ..p }, |_| muted += 1);
         assert_eq!(muted, 0);

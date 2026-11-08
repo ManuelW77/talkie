@@ -31,6 +31,8 @@ type Envelope struct {
 	Sig    string `json:"sig,omitempty"`
 	Name   string `json:"name,omitempty"`
 	Invite string `json:"invite,omitempty"`
+	// register: Art des Geräts (z. B. „iOS“, „Windows“), nur zur Anzeige
+	Device string `json:"device,omitempty"`
 
 	// welcome / updates
 	You      *WireUser   `json:"you,omitempty"`
@@ -52,6 +54,13 @@ type Envelope struct {
 
 	// welcome: darf rauswerfen/sperren (verknüpftes Webkonto mit Recht)
 	Mod *bool `json:"mod,omitempty"`
+	// welcome: verknüpftes Admin-Konto (darf u. a. den Chat leeren)
+	Admin *bool `json:"admin,omitempty"`
+	// welcome: so viele Stunden bleibt der Chat erhalten (0 = unbegrenzt)
+	ChatHours int `json:"chat_hours,omitempty"`
+	// welcome: neueste App-Version und wo es sie gibt
+	Latest    string `json:"latest,omitempty"`
+	LatestURL string `json:"latest_url,omitempty"`
 
 	// error / kicked
 	Code   string `json:"code,omitempty"`

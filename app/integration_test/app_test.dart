@@ -45,8 +45,14 @@ void main() {
       await t.tap(setup);
     }
 
-    expect(await _waitFor(t, find.text('Nachricht schreiben …')), isTrue, reason: 'Hauptansicht kam nicht');
     expect(await _waitFor(t, find.text('Lobby')), isTrue, reason: 'nicht verbunden');
+    // Handy: startet in „Räume“, Chat erst umschalten
+    final chatTab = find.widgetWithText(SegmentedButton<bool>, 'Chat');
+    if (chatTab.evaluate().isNotEmpty) {
+      await t.tap(find.text('Chat'));
+      await t.pump();
+    }
+    expect(await _waitFor(t, find.text('Nachricht schreiben …')), isTrue, reason: 'Chat kam nicht');
     expect(find.textContaining('Verbinde'), findsNothing);
 
     final msg = 'Hallo vom Handy ${DateTime.now().millisecondsSinceEpoch % 100000}';

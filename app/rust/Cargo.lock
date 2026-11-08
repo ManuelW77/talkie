@@ -1633,6 +1633,7 @@ dependencies = [
  "anyhow",
  "base64",
  "bytes",
+ "coreaudio-rs",
  "cpal",
  "directories",
  "ed25519-dalek",
@@ -1640,6 +1641,7 @@ dependencies = [
  "getrandom 0.4.3",
  "hex",
  "jni-sys 0.3.1",
+ "libc",
  "log",
  "ndk-context",
  "nnnoiseless",
@@ -1651,6 +1653,8 @@ dependencies = [
  "serde_json",
  "sha2",
  "tokio",
+ "windows-sys 0.61.2",
+ "x11-dl",
 ]
 
 [[package]]
@@ -2408,6 +2412,17 @@ name = "winnow"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3b93199df0ab874cdf0c6a94f0a0dc3423fe41f1cafb62b8bd7b1deb277aef"
+
+[[package]]
+name = "x11-dl"
+version = "2.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38735924fedd5314a6e548792904ed8c6de6636285cb9fec04d5b1db85c1516f"
+dependencies = [
+ "libc",
+ "once_cell",
+ "pkg-config",
+]
 
 [[package]]
 name = "zeroize"

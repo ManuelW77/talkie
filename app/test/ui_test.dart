@@ -19,6 +19,10 @@ const _settings = SettingsDto(
   outputDevice: '',
   inputGain: 1,
   outputVolume: 1,
+  sounds: true,
+  ptt: false,
+  pttKey: 'f8',
+  echoCancel: true,
 );
 
 TalkieController _controller({bool registered = true}) =>
@@ -34,16 +38,16 @@ Future<void> _loadFonts() async {
     await loader.load();
   }
 
-  await load('Roboto', ['/System/Library/Fonts/Supplemental/Arial.ttf', '/System/Library/Fonts/Supplemental/Arial Bold.ttf']);
+  await load('Roboto', [
+    '/System/Library/Fonts/Supplemental/Arial.ttf',
+    '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
+  ]);
   final flutterRoot = Platform.environment['FLUTTER_ROOT'] ?? '';
   await load('MaterialIcons', ['$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf']);
 }
 
-Widget _wrap(Widget child) => MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(Brightness.dark),
-      home: child,
-    );
+Widget _wrap(Widget child) =>
+    MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(Brightness.dark), home: child);
 
 TalkieController _mainController() {
   final c = _controller()
@@ -53,16 +57,24 @@ TalkieController _mainController() {
       errorCode: '',
       me: 1,
       room: 10,
-      rooms: [RoomDto(id: 10, name: 'Lobby'), RoomDto(id: 11, name: 'Zocken 1'), RoomDto(id: 12, name: 'Zocken 2')],
+      rooms: [
+        RoomDto(id: 10, name: 'Lobby'),
+        RoomDto(id: 11, name: 'Zocken 1'),
+        RoomDto(id: 12, name: 'Zocken 2'),
+      ],
       users: [
-        UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true, localMuted: false),
-        UserDto(id: 2, name: 'Lena', room: 10, muted: true, deaf: false, talking: false, localMuted: false),
-        UserDto(id: 3, name: 'Jonas', room: 11, muted: false, deaf: false, talking: true, localMuted: true),
-        UserDto(id: 4, name: 'Emil', room: 11, muted: false, deaf: true, talking: false, localMuted: false),
+        UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true, localMuted: false, volume: 1),
+        UserDto(id: 2, name: 'Lena', room: 10, muted: true, deaf: false, talking: false, localMuted: false, volume: 1),
+        UserDto(id: 3, name: 'Jonas', room: 11, muted: false, deaf: false, talking: true, localMuted: true, volume: 1),
+        UserDto(id: 4, name: 'Emil', room: 11, muted: false, deaf: true, talking: false, localMuted: false, volume: 1),
       ],
       muted: false,
       deaf: false,
       moderator: false,
+      admin: false,
+      chatHours: 0,
+        latestVersion: '',
+        latestUrl: '',
     );
   c.chats[10] = const [
     ChatDto(room: 10, from: 2, name: 'Lena', text: 'Wer ist dabei? Runde startet gleich!', ts: 1762500000),
@@ -126,6 +138,10 @@ void main() {
         muted: false,
         deaf: false,
         moderator: false,
+        admin: false,
+        chatHours: 0,
+        latestVersion: '',
+        latestUrl: '',
       );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     expect(find.text('Du wurdest vom Admin rausgeworfen.'), findsOneWidget);
@@ -148,6 +164,10 @@ void main() {
         muted: false,
         deaf: false,
         moderator: false,
+        admin: false,
+        chatHours: 0,
+        latestVersion: '',
+        latestUrl: '',
       );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     await tester.pump(const Duration(milliseconds: 300));
@@ -158,27 +178,38 @@ void main() {
     await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_offline.png'));
   });
 
-  testWidgets('Handy: Chat vorn, Räume in der Seitenleiste', (tester) async {
+  testWidgets('Handy: Umschalten zwischen Räumen und Chat, Tastatur einklappen', (tester) async {
     tester.view.physicalSize = const Size(390, 760);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final c = _mainController();
-    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    final c = _mainController()..unreadHere = 1;
+    await tester.pumpWidget(
+      _wrap(
+        ListenableBuilder(
+          listenable: c,
+          builder: (_, _) => MainScreen(controller: c),
+        ),
+      ),
+    );
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Lobby-Code: 4711'), findsOneWidget);
-    expect(find.text('Zocken 1'), findsNothing); // Räume erst in der Seitenleiste
-    expect(find.text('Mehr'), findsOneWidget);
-    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_chat.png'));
-
-    await tester.tap(find.byTooltip('Räume'));
-    await tester.pumpAndSettle();
+    // Start: Räume mit allen Leuten (wer spricht, sieht man hier)
     expect(find.text('Zocken 1'), findsOneWidget);
+    expect(find.text('Jonas'), findsOneWidget);
+    expect(find.text('Lobby-Code: 4711'), findsNothing);
     await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_rooms.png'));
 
-    // Raum antippen schließt die Seitenleiste (aktueller Raum: kein Aufruf an den Rust-Kern)
-    await tester.tap(find.descendant(of: find.byType(Drawer), matching: find.text('Lobby')));
+    await tester.tap(find.text('Chat'));
     await tester.pumpAndSettle();
-    expect(find.byType(Drawer), findsNothing);
+    expect(find.text('Lobby-Code: 4711'), findsOneWidget);
+    expect(c.unreadHere, 0);
+    expect(find.byTooltip('Tastatur einklappen'), findsNothing);
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    expect(find.byTooltip('Tastatur einklappen'), findsOneWidget);
+    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_chat.png'));
+    await tester.tap(find.byTooltip('Tastatur einklappen'));
+    await tester.pump();
+    expect(find.byTooltip('Tastatur einklappen'), findsNothing);
   });
 
   testWidgets('Moderator sieht Menü mit Rauswerfen und Sperren', (tester) async {
@@ -198,6 +229,10 @@ void main() {
       muted: s.muted,
       deaf: s.deaf,
       moderator: true,
+      admin: true,
+      chatHours: 0,
+        latestVersion: '',
+        latestUrl: '',
     );
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     await tester.pump(const Duration(milliseconds: 300));
@@ -215,5 +250,142 @@ void main() {
     await tester.tap(find.text('Abbrechen'));
     await tester.pumpAndSettle();
     expect(find.text('Lena sperren?'), findsNothing);
+  });
+
+  testWidgets('Admin: Chat-leeren-Menü; alte Nachrichten fallen nach der Frist weg', (tester) async {
+    tester.view.physicalSize = const Size(1000, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final c = _mainController();
+    final s = c.state!;
+    c.state = StateDto(
+      status: s.status,
+      message: s.message,
+      errorCode: s.errorCode,
+      me: s.me,
+      room: s.room,
+      rooms: s.rooms,
+      users: s.users,
+      muted: s.muted,
+      deaf: s.deaf,
+      moderator: false,
+      admin: true,
+      chatHours: 24,
+      latestVersion: '',
+      latestUrl: '',
+    );
+    c.chats[10] = [
+      ChatDto(room: 10, from: 2, name: 'Lena', text: 'von vorgestern', ts: now - 48 * 3600),
+      ChatDto(room: 10, from: 2, name: 'Lena', text: 'von eben', ts: now - 60),
+    ];
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('von eben'), findsOneWidget);
+    expect(find.text('von vorgestern'), findsNothing);
+
+    await tester.tap(find.byTooltip('Chat leeren'));
+    await tester.pumpAndSettle();
+    expect(find.text('„Lobby“ leeren'), findsOneWidget);
+    await tester.tap(find.text('Alle Räume leeren'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chat in allen Räumen leeren?'), findsOneWidget);
+    await tester.tap(find.text('Abbrechen'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('Person antippen: Lautstärke und stumm, ohne Rauswerfen für normale Nutzer', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byTooltip('Mehr zu Max'), findsNothing); // nicht bei mir selbst
+    await tester.tap(find.byTooltip('Mehr zu Lena'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lautstärke für dich: 100 %'), findsOneWidget);
+    expect(find.byType(Slider), findsOneWidget);
+    expect(find.text('Für mich stumm'), findsOneWidget);
+    expect(find.text('Rauswerfen'), findsNothing);
+    await expectLater(find.byType(Overlay).first, matchesGoldenFile('goldens/phone_person.png'));
+  });
+
+  testWidgets('Neue Version: Hinweis mit Laden, wegklickbar', (tester) async {
+    tester.view.physicalSize = const Size(1000, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    final s = c.state!;
+    c.state = StateDto(
+      status: s.status,
+      message: s.message,
+      errorCode: s.errorCode,
+      me: s.me,
+      room: s.room,
+      rooms: s.rooms,
+      users: s.users,
+      muted: s.muted,
+      deaf: s.deaf,
+      moderator: false,
+      admin: false,
+      chatHours: 0,
+      latestVersion: '99.0.0',
+      latestUrl: 'https://github.com/ManuelW77/talkie/releases/latest',
+    );
+    await tester.pumpWidget(_wrap(ListenableBuilder(listenable: c, builder: (_, _) => MainScreen(controller: c))));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Neue Talkie-Version 99.0.0 ist da.'), findsOneWidget);
+    expect(find.text('Laden'), findsOneWidget);
+    await tester.tap(find.byTooltip('Ausblenden'));
+    await tester.pump();
+    expect(find.textContaining('Neue Talkie-Version'), findsNothing);
+  });
+
+  testWidgets('Push-to-Talk: Halten-Knopf in der Bedienleiste (Handy)', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    c.config = ConfigDto(
+      server: c.config.server,
+      name: c.config.name,
+      registered: true,
+      settings: const SettingsDto(
+        vadThresholdDb: -45,
+        noiseSuppression: true,
+        inputDevice: '',
+        outputDevice: '',
+        inputGain: 1,
+        outputVolume: 1,
+        sounds: true,
+        ptt: true,
+        pttKey: 'f8',
+        echoCancel: true,
+      ),
+    );
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Halten'), findsOneWidget);
+    expect(tester.takeException(), isNull); // passt ohne Überlauf aufs Handy
+    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_ptt.png'));
+  });
+
+  testWidgets('Einrichtung: weiteres Gerät nur mit Geräte-Code', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _controller(registered: false);
+    await tester.pumpWidget(_wrap(SetupScreen(controller: c)));
+    expect(find.text('Dein Name'), findsOneWidget);
+    await tester.tap(find.text('Ich nutze Talkie schon auf einem anderen Gerät'));
+    await tester.pump();
+    expect(find.text('Dein Name'), findsNothing);
+    expect(find.text('Geräte-Code'), findsOneWidget);
+    expect(find.textContaining('Auf weiterem Gerät nutzen'), findsOneWidget);
+    await expectLater(find.byType(SetupScreen), matchesGoldenFile('goldens/setup_device.png'));
+    await tester.tap(find.text('Ich bin neu bei Talkie'));
+    await tester.pump();
+    expect(find.text('Dein Name'), findsOneWidget);
   });
 }

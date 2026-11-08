@@ -554,3 +554,119 @@ func TestWebOIDC(t *testing.T) {
 		t.Fatal("Text aus der URL wird angezeigt")
 	}
 }
+
+func TestWebChatClearAndRetention(t *testing.T) {
+	wt := newWebTest(t, nil)
+	wt.account("chef@x.de", RoleAdmin, 0)
+	wt.account("leser@x.de", RoleUser, PermChat)
+	rooms, _ := wt.store.Rooms()
+	r1, r2 := rooms[0].ID, rooms[1].ID
+	now := time.Now().Unix()
+	for _, m := range []DBMessage{
+		{Room: r1, From: 1, Name: "A", Text: "neu", TS: now},
+		{Room: r1, From: 1, Name: "A", Text: "uralt", TS: now - 30*3600},
+		{Room: r2, From: 1, Name: "A", Text: "anderer Raum", TS: now},
+	} {
+		if err := wt.store.AddMessage(m, 100); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// 24 h: alte Nachricht wird nicht mehr gezeigt und beim Aufräumen gelöscht
+	wt.store.ChatKeep = 24 * time.Hour
+	if h, _ := wt.store.History(r1, 50); len(h) != 1 || h[0].Text != "neu" {
+		t.Fatalf("Verlauf mit Frist: %+v", h)
+	}
+	if n, _ := wt.store.PurgeChat(); n != 1 {
+		t.Fatalf("aufgeräumt: %d", n)
+	}
+
+	// Nur-Lesen-Konto sieht den Chat, aber keinen Leeren-Knopf und darf nicht leeren
+	b := wt.browser()
+	b.login("leser@x.de")
+	if _, _, body := b.get("/chat"); !strings.Contains(body, "neu") || strings.Contains(body, "Alle Räume leeren") {
+		t.Fatal("Leser: Chat fehlt oder Leeren-Knopf sichtbar")
+	}
+	if st, _, _ := b.post("/chat/clear", url.Values{"csrf": {b.csrf()}, "room": {"0"}}); st != http.StatusForbidden {
+		t.Fatalf("Leser durfte leeren: %d", st)
+	}
+
+	a := wt.browser()
+	a.login("chef@x.de")
+	if _, _, body := a.get("/chat"); !strings.Contains(body, "nach 24 Stunden") || !strings.Contains(body, "Alle Räume leeren") {
+		t.Fatal("Admin: Hinweis oder Knopf fehlt")
+	}
+	a.post("/chat/clear", url.Values{"csrf": {a.csrf()}, "room": {itoa(r1)}})
+	if h, _ := wt.store.History(r1, 50); len(h) != 0 {
+		t.Fatalf("Raum nicht geleert: %+v", h)
+	}
+	if h, _ := wt.store.History(r2, 50); len(h) != 1 {
+		t.Fatal("anderer Raum wurde mitgelöscht")
+	}
+	a.post("/chat/clear", url.Values{"csrf": {a.csrf()}, "room": {"0"}})
+	if h, _ := wt.store.History(r2, 50); len(h) != 0 {
+		t.Fatal("alle Räume nicht geleert")
+	}
+	if log, _ := wt.store.AuditLog(5); len(log) < 2 || !strings.Contains(log[0].Action, "allen Räumen") {
+		t.Fatalf("Protokoll: %+v", log)
+	}
+}
+
+func TestWebDevices(t *testing.T) {
+	wt := newWebTest(t, nil)
+	wt.account("chef@x.de", RoleAdmin, 0)
+	wt.account("helfer@x.de", RoleUser, PermUsersEdit)
+	inv, _ := wt.store.CreateInvite(1, time.Hour)
+	pk1 := make([]byte, 32)
+	pk1[0] = 1
+	u, err := wt.store.Register(inv.Code, "Mia", pk1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := wt.browser()
+	b.login("chef@x.de")
+	if _, _, body := b.get("/users/" + itoa(u.ID)); !strings.Contains(body, "Geräte-Code erstellen") {
+		t.Fatal("Geräte-Abschnitt fehlt")
+	}
+	// Nicht-Admin mit „Nutzer bearbeiten“ darf keine Geräte-Codes erstellen oder sehen
+	h := wt.browser()
+	h.login("helfer@x.de")
+	if st, _, _ := h.post("/users/"+itoa(u.ID)+"/device_code", url.Values{"csrf": {h.csrf()}}); st != http.StatusForbidden {
+		t.Fatalf("Helfer durfte Code erstellen: %d", st)
+	}
+	if wt.store.DeviceCode(u.ID) != nil {
+		t.Fatal("Code trotz Verbot erstellt")
+	}
+	b.post("/users/"+itoa(u.ID)+"/device_code", url.Values{"csrf": {b.csrf()}})
+	code := wt.store.DeviceCode(u.ID)
+	if _, _, body := h.get("/users/" + itoa(u.ID)); strings.Contains(body, code.Code) || strings.Contains(body, "Geräte-Code erstellen") {
+		t.Fatal("Helfer sieht den Code oder den Knopf")
+	}
+	if code == nil {
+		t.Fatal("kein Code")
+	}
+	if _, _, body := b.get("/users/" + itoa(u.ID)); !strings.Contains(body, code.Code) {
+		t.Fatal("Code wird nicht angezeigt")
+	}
+	pk2 := make([]byte, 32)
+	pk2[0] = 2
+	if _, err := wt.store.RegisterDevice(code.Code, "", pk2, "iOS"); err != nil {
+		t.Fatal(err)
+	}
+	devs, _ := wt.store.Devices(u.ID)
+	if len(devs) != 2 {
+		t.Fatalf("geräte: %d", len(devs))
+	}
+	if _, _, body := b.get("/users/" + itoa(u.ID)); !strings.Contains(body, "iOS") {
+		t.Fatal("Gerätename fehlt")
+	}
+	var ios int64
+	for _, d := range devs {
+		if d.Label == "iOS" {
+			ios = d.ID
+		}
+	}
+	b.post("/users/"+itoa(u.ID)+"/device_delete", url.Values{"csrf": {b.csrf()}, "device": {itoa(ios)}})
+	if devs, _ := wt.store.Devices(u.ID); len(devs) != 1 {
+		t.Fatalf("nicht entfernt: %d", len(devs))
+	}
+}

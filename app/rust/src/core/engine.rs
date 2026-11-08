@@ -4,7 +4,9 @@ use crate::core::config::{Config, Settings, Storage};
 use crate::core::device::{self, AudioIo};
 use crate::core::dsp::CaptureParams;
 use crate::core::dsp::CaptureProcessor;
+use crate::core::cues::{self, Cue};
 use crate::core::mixer::Mixer;
+use crate::core::ptt;
 use crate::core::net::{self, ConnectError};
 use crate::core::protocol::*;
 use anyhow::Result;
@@ -37,6 +39,8 @@ pub struct UserView {
     pub talking: bool,
     /// Nur für mich stumm geschaltet.
     pub local_muted: bool,
+    /// Lautstärke nur für mich (1.0 = normal).
+    pub volume: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +56,13 @@ pub struct Snapshot {
     pub deaf: bool,
     /// Darf andere rauswerfen/sperren (verknüpftes Webkonto mit Recht).
     pub moderator: bool,
+    /// Verknüpftes Admin-Konto (darf den Chat leeren).
+    pub admin: bool,
+    /// So viele Stunden bleibt der Chat erhalten (0 = unbegrenzt).
+    pub chat_hours: i64,
+    /// Neueste App-Version laut Server ("" = unbekannt) und Download-Adresse.
+    pub latest_version: String,
+    pub latest_url: String,
 }
 
 #[derive(Debug, Clone)]
@@ -61,6 +72,8 @@ pub enum CoreEvent {
     History(i64, Vec<WireChat>),
     Level(f32),
     Notice(String),
+    /// Geräte-Code für ein weiteres Gerät desselben Nutzers.
+    DeviceCode(String),
 }
 
 pub type Emitter = Arc<dyn Fn(CoreEvent) + Send + Sync>;
@@ -74,6 +87,10 @@ struct NetState {
     users: BTreeMap<i64, WireUser>,
     talking: Vec<i64>,
     moderator: bool,
+    admin: bool,
+    chat_hours: i64,
+    latest_version: String,
+    latest_url: String,
 }
 
 struct Inner {
@@ -94,6 +111,9 @@ struct Inner {
     capture_tx: mpsc::Sender<Vec<f32>>,
     seq: AtomicU16,
     audio_enabled: bool,
+    /// Push-to-Talk: Knopf in der App gedrückt / Taste systemweit gedrückt.
+    ptt_ui: AtomicBool,
+    ptt_key: AtomicBool,
     /// Aufgeben nach (erster Verbindungsaufbau, nach Abbruch). Für Tests verkürzbar.
     give_up: Mutex<(Duration, Duration)>,
     /// Wird bei jedem Verbinden/Trennen erhöht; alte Sitzungs-Tasks erkennen daran, dass sie veraltet sind.
@@ -111,6 +131,7 @@ fn params_from(s: &Settings, muted: bool) -> CaptureParams {
         noise_suppression: s.noise_suppression,
         gain: s.input_gain.clamp(0.0, 8.0),
         muted,
+        ptt: s.ptt.then_some(false),
     }
 }
 
@@ -124,7 +145,10 @@ impl Inner {
 
     fn snapshot(&self) -> Snapshot {
         // Mixer vor net sperren (nie beide verschachtelt in umgekehrter Reihenfolge)
-        let ignored = self.mixer.lock().ignored.clone();
+        let (ignored, gains) = {
+            let m = self.mixer.lock();
+            (m.ignored.clone(), m.gains_snapshot())
+        };
         let n = self.net.lock();
         let muted = self.muted.load(Ordering::Relaxed);
         let self_talking = self.self_talking.load(Ordering::Relaxed) && !muted;
@@ -139,6 +163,7 @@ impl Inner {
                 deaf: u.deaf,
                 talking: if u.id == n.me { self_talking } else { n.talking.binary_search(&u.id).is_ok() },
                 local_muted: ignored.contains(&u.id),
+                volume: gains.get(&u.id).copied().unwrap_or(1.0),
             })
             .collect();
         Snapshot {
@@ -152,6 +177,10 @@ impl Inner {
             muted,
             deaf: self.deaf.load(Ordering::Relaxed),
             moderator: n.moderator,
+            admin: n.admin,
+            chat_hours: n.chat_hours,
+            latest_version: n.latest_version.clone(),
+            latest_url: n.latest_url.clone(),
         }
     }
 
@@ -214,7 +243,13 @@ impl Inner {
         }
         let s = self.config.lock().settings.clone();
         let (io, warnings) =
-            device::start(s.input_device, s.output_device, self.capture_tx.clone(), self.mixer.clone());
+            device::start(
+                s.input_device,
+                s.output_device,
+                self.capture_tx.clone(),
+                self.mixer.clone(),
+                s.echo_cancel,
+            );
         *a = Some(io);
         drop(a);
         for w in warnings {
@@ -223,6 +258,10 @@ impl Inner {
     }
 
     /// Gibt Mikrofon und Lautsprecher frei (z. B. wenn keine Verbindung mehr möglich ist).
+    fn audio_failed(&self) -> bool {
+        self.audio.lock().as_ref().is_some_and(|a| a.failed.load(Ordering::Relaxed))
+    }
+
     fn stop_audio(&self) {
         let io = self.audio.lock().take();
         drop(io);
@@ -238,6 +277,24 @@ impl Inner {
 }
 
 /// Mikrofon-Verarbeitung: läuft für die ganze Lebensdauer der Engine.
+/// Fragt alle 15 ms die Push-to-Talk-Taste ab, solange Push-to-Talk an ist.
+fn ptt_loop(inner: std::sync::Weak<Inner>) {
+    loop {
+        std::thread::sleep(Duration::from_millis(15));
+        let Some(inner) = inner.upgrade() else { return };
+        let (on, key) = {
+            let c = inner.config.lock();
+            (c.settings.ptt, c.settings.ptt_key.clone())
+        };
+        let down = on && ptt::key_down(&key).unwrap_or(false);
+        inner.ptt_key.store(down, Ordering::Relaxed);
+        if !on {
+            drop(inner);
+            std::thread::sleep(Duration::from_millis(200)); // aus: seltener nachsehen
+        }
+    }
+}
+
 fn capture_loop(inner: std::sync::Weak<Inner>, rx: mpsc::Receiver<Vec<f32>>) {
     let mut proc = match CaptureProcessor::new() {
         Ok(p) => p,
@@ -249,7 +306,10 @@ fn capture_loop(inner: std::sync::Weak<Inner>, rx: mpsc::Receiver<Vec<f32>>) {
     let mut since_level = 0usize;
     while let Ok(buf) = rx.recv() {
         let Some(inner) = inner.upgrade() else { return };
-        let p = *inner.params.lock();
+        let mut p = *inner.params.lock();
+        if p.ptt.is_some() {
+            p.ptt = Some(inner.ptt_ui.load(Ordering::Relaxed) || inner.ptt_key.load(Ordering::Relaxed));
+        }
         proc.process(&buf, p, |enc| inner.send_voice(&enc.data));
         since_level += buf.len();
         if since_level >= 4800 {
@@ -281,6 +341,9 @@ impl Engine {
             let mut m = mixer.lock();
             m.volume = config.settings.output_volume;
             m.ignored = config.muted_users.iter().copied().collect();
+            for (&id, &g) in &config.user_volumes {
+                m.set_gain(id, g);
+            }
         }
         let params = params_from(&config.settings, false);
         let inner = Arc::new(Inner {
@@ -297,6 +360,10 @@ impl Engine {
                 users: BTreeMap::new(),
                 talking: Vec::new(),
                 moderator: false,
+                admin: false,
+                chat_hours: 0,
+                latest_version: String::new(),
+                latest_url: String::new(),
             }),
             muted: AtomicBool::new(false),
             deaf: AtomicBool::new(false),
@@ -312,9 +379,16 @@ impl Engine {
             audio_enabled,
             generation: AtomicU64::new(0),
             give_up: Mutex::new((GIVE_UP_FIRST, GIVE_UP_LOST)),
+            ptt_ui: AtomicBool::new(false),
+            ptt_key: AtomicBool::new(false),
         });
         let weak = Arc::downgrade(&inner);
         std::thread::Builder::new().name("talkie-capture".into()).spawn(move || capture_loop(weak, capture_rx))?;
+        // Push-to-Talk-Taste systemweit abfragen (Desktop; am Handy gibt es nur den Knopf)
+        if !cfg!(any(target_os = "android", target_os = "ios")) {
+            let weak = Arc::downgrade(&inner);
+            std::thread::Builder::new().name("talkie-ptt".into()).spawn(move || ptt_loop(weak))?;
+        }
         Ok(Engine { rt, inner })
     }
 
@@ -406,8 +480,15 @@ impl Engine {
             c.registered = false;
             c.last_room = 0;
             c.muted_users.clear(); // IDs gelten nur auf diesem Server
+            c.user_volumes.clear();
         }
-        self.inner.mixer.lock().ignored.clear();
+        {
+            let mut m = self.inner.mixer.lock();
+            m.ignored.clear();
+            for id in m.gains_snapshot().into_keys() {
+                m.set_gain(id, 1.0);
+            }
+        }
         self.inner.save_config();
         Ok(())
     }
@@ -438,6 +519,22 @@ impl Engine {
         self.inner.emit_state();
     }
 
+    /// Lautstärke einer Person nur für mich (0.0 … 3.0). Bleibt gespeichert.
+    pub fn set_user_volume(&self, user: i64, volume: f32) {
+        let v = volume.clamp(0.0, 3.0);
+        {
+            let mut c = self.inner.config.lock();
+            if (v - 1.0).abs() < 1e-3 {
+                c.user_volumes.remove(&user);
+            } else {
+                c.user_volumes.insert(user, v);
+            }
+        }
+        self.inner.save_config();
+        self.inner.mixer.lock().set_gain(user, v);
+        self.inner.emit_state();
+    }
+
     /// Schaltet einen anderen Nutzer nur für mich stumm (oder wieder laut).
     /// Bleibt gespeichert; der Server schickt seine Sprache dann gar nicht erst.
     pub fn set_user_muted(&self, user: i64, muted: bool) {
@@ -462,6 +559,23 @@ impl Engine {
         self.inner.emit_state();
     }
 
+    /// Geräte-Code anfordern (kommt als CoreEvent::DeviceCode zurück).
+    pub fn request_device_code(&self) {
+        self.inner.send_cmd(Envelope::new("device_code"));
+    }
+
+    /// Push-to-Talk-Knopf in der App gedrückt/losgelassen.
+    pub fn set_ptt_pressed(&self, down: bool) {
+        self.inner.ptt_ui.store(down, Ordering::Relaxed);
+    }
+
+    /// Chat leeren (room 0 = alle Räume). Nur mit verknüpftem Admin-Konto, prüft der Server.
+    pub fn clear_chat(&self, room: i64) {
+        let mut e = Envelope::new("clear_chat");
+        e.room = room;
+        self.inner.send_cmd(e);
+    }
+
     /// Jemanden rauswerfen (`ban` = auch sperren). Der Server prüft das Recht.
     pub fn moderate(&self, user: i64, ban: bool) {
         let mut e = Envelope::new(if ban { "ban" } else { "kick" });
@@ -483,10 +597,20 @@ impl Engine {
         self.inner.emit_state();
     }
 
+    /// Mikrofon und Lautsprecher neu öffnen (z. B. nachdem das Mikrofon erlaubt wurde).
+    pub fn restart_audio(&self) {
+        if self.inner.audio.lock().is_some() {
+            self.stop_audio();
+            self.start_audio();
+        }
+    }
+
     pub fn set_settings(&self, s: Settings) {
         let devices_changed = {
             let mut c = self.inner.config.lock();
-            let changed = c.settings.input_device != s.input_device || c.settings.output_device != s.output_device;
+            let changed = c.settings.input_device != s.input_device
+                || c.settings.output_device != s.output_device
+                || c.settings.echo_cancel != s.echo_cancel;
             c.settings = s.clone();
             changed
         };
@@ -680,6 +804,10 @@ async fn run_session(inner: &Arc<Inner>, sess: net::Session, generation: u64) ->
         }
         n.talking.clear();
         n.moderator = welcome.r#mod.unwrap_or(false);
+        n.admin = welcome.admin.unwrap_or(false);
+        n.chat_hours = welcome.chat_hours;
+        n.latest_version = welcome.latest.clone();
+        n.latest_url = welcome.latest_url.clone();
         n.status = Status::Connected;
         n.message.clear();
         n.error_code.clear();
@@ -755,6 +883,12 @@ async fn run_session(inner: &Arc<Inner>, sess: net::Session, generation: u64) ->
             }
             _ = tick.tick() => {
                 ticks += 1;
+                // Audio-Strom abgerissen (Anruf, Headset ab, Mediendienste neu)? Nach 1 s neu öffnen.
+                if ticks % 10 == 0 && inner.audio_failed() {
+                    log::info!("audio neu öffnen");
+                    inner.stop_audio();
+                    inner.start_audio();
+                }
                 let talking = {
                     let mut m = inner.mixer.lock();
                     if ticks % 100 == 0 { m.gc(); }
@@ -790,17 +924,39 @@ async fn run_session(inner: &Arc<Inner>, sess: net::Session, generation: u64) ->
     end
 }
 
+/// Hinweiston abspielen (nicht, wenn Töne aus sind oder man taub geschaltet ist).
+fn play_cue(inner: &Inner, cue: Cue) {
+    if !inner.config.lock().settings.sounds || inner.deaf.load(Ordering::Relaxed) {
+        return;
+    }
+    inner.mixer.lock().play_cue(&cues::render(cue));
+}
+
 fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
     match e.t.as_str() {
         "user_joined" | "user_update" => {
             if let Some(u) = e.user {
                 let mut save_room = None;
+                let mut cue = None;
                 {
                     let mut n = inner.net.lock();
                     if u.id == n.me {
                         save_room = Some(u.room);
+                    } else {
+                        // Kommt jemand in meinen Raum oder geht er?
+                        let my = n.users.get(&n.me).map(|m| m.room).unwrap_or(0);
+                        let was_here = n.users.get(&u.id).is_some_and(|p| p.room == my);
+                        let now_here = u.room == my;
+                        cue = match (was_here, now_here) {
+                            (false, true) => Some(Cue::Join),
+                            (true, false) => Some(Cue::Leave),
+                            _ => None,
+                        };
                     }
                     n.users.insert(u.id, u);
+                }
+                if let Some(c) = cue {
+                    play_cue(inner, c);
                 }
                 if let Some(r) = save_room {
                     let changed = {
@@ -817,7 +973,14 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
             }
         }
         "user_left" => {
-            inner.net.lock().users.remove(&e.id);
+            let was_here = {
+                let mut n = inner.net.lock();
+                let my = n.users.get(&n.me).map(|m| m.room).unwrap_or(0);
+                e.id != n.me && n.users.remove(&e.id).is_some_and(|u| u.room == my)
+            };
+            if was_here {
+                play_cue(inner, Cue::Leave);
+            }
             inner.mixer.lock().remove(e.id);
             inner.emit_state();
         }
@@ -828,6 +991,9 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
         "history" => inner.emit(CoreEvent::History(e.room, e.messages)),
         "chat" => {
             if let Some(m) = e.msg {
+                if m.from != inner.net.lock().me {
+                    play_cue(inner, Cue::Chat);
+                }
                 inner.emit(CoreEvent::Chat(m));
             }
         }
@@ -835,6 +1001,9 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
             return Some(SessionEnd::Kicked(if e.reason.is_empty() { "Du wurdest getrennt.".into() } else { e.reason }))
         }
         "error" | "info" => inner.emit(CoreEvent::Notice(e.reason)),
+        "device_code" => inner.emit(CoreEvent::DeviceCode(e.code)),
+        // Chat geleert: leerer Verlauf (Raum 0 = alle Räume)
+        "chat_cleared" => inner.emit(CoreEvent::History(e.room, Vec::new())),
         _ => {}
     }
     None

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../controller.dart';
+import '../platform.dart';
 import '../src/rust/api/talkie.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
@@ -57,29 +58,18 @@ class _MainScreenState extends State<MainScreen> {
             // Handy hochkant: Chat füllt den Bildschirm, Räume kommen als Seitenleiste
             final narrow = box.maxWidth < kNarrowWidth;
             return Scaffold(
-              drawer: narrow
-                  ? Drawer(
-                      width: 300,
-                      child: SafeArea(
-                        child: Builder(
-                          builder: (context) => _RoomsPanel(
-                            controller: c,
-                            onPicked: () => Navigator.of(context).maybePop(),
-                          ),
-                        ),
-                      ),
-                    )
-                  : null,
               body: SafeArea(
                 child: Column(
                   children: [
                     _StatusBanner(controller: c),
+                    if (c.micDenied) _MicBanner(controller: c),
+                    if (c.updateVersion != null) _UpdateBanner(controller: c),
+                    if (narrow) _PhoneTabs(controller: c),
                     Expanded(
                       child: narrow
-                          ? Builder(
-                              builder: (context) =>
-                                  _ChatPanel(controller: c, onMenu: () => Scaffold.of(context).openDrawer()),
-                            )
+                          ? (c.phoneChat
+                              ? _ChatPanel(controller: c, compact: true, onShowRooms: () => c.showPhoneChat(false))
+                              : _RoomsPanel(controller: c))
                           : Row(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -149,12 +139,73 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
-class _RoomsPanel extends StatelessWidget {
-  const _RoomsPanel({required this.controller, this.onPicked});
+/// Neue App-Version verfügbar: Laden oder wegklicken.
+class _UpdateBanner extends StatelessWidget {
+  const _UpdateBanner({required this.controller});
 
   final TalkieController controller;
-  /// Nach dem Antippen eines Raums (schließt die Seitenleiste).
-  final VoidCallback? onPicked;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: kAccent.withValues(alpha: 0.15),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
+        child: Row(
+          children: [
+            const Icon(Icons.system_update_rounded, color: kAccent),
+            const SizedBox(width: 12),
+            Expanded(child: Text('Neue Talkie-Version ${controller.updateVersion} ist da.')),
+            if (controller.updateUrl.isNotEmpty)
+              TextButton(
+                onPressed: () => TalkiePlatform.openUrl(controller.updateUrl),
+                child: const Text('Laden'),
+              ),
+            IconButton(
+              onPressed: controller.dismissUpdate,
+              tooltip: 'Ausblenden',
+              icon: const Icon(Icons.close_rounded, size: 20),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Handy: Mikrofon nicht erlaubt → erklären und zu den Einstellungen führen.
+class _MicBanner extends StatelessWidget {
+  const _MicBanner({required this.controller});
+
+  final TalkieController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: kDanger.withValues(alpha: 0.18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.mic_off_rounded, color: kDanger),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Talkie darf dein Mikrofon nicht benutzen. Die anderen hören dich nicht.')),
+            FilledButton.tonal(
+              onPressed: TalkiePlatform.openSettings,
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 36)),
+              child: const Text('Erlauben'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoomsPanel extends StatelessWidget {
+  const _RoomsPanel({required this.controller});
+
+  final TalkieController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -171,7 +222,7 @@ class _RoomsPanel extends StatelessWidget {
                 style: theme.textTheme.labelMedium
                     ?.copyWith(letterSpacing: 1.5, color: theme.colorScheme.onSurfaceVariant)),
           ),
-          for (final r in rooms) _RoomTile(controller: controller, room: r, onPicked: onPicked),
+          for (final r in rooms) _RoomTile(controller: controller, room: r),
         ],
       ),
     );
@@ -179,11 +230,10 @@ class _RoomsPanel extends StatelessWidget {
 }
 
 class _RoomTile extends StatelessWidget {
-  const _RoomTile({required this.controller, required this.room, this.onPicked});
+  const _RoomTile({required this.controller, required this.room});
 
   final TalkieController controller;
   final RoomDto room;
-  final VoidCallback? onPicked;
 
   @override
   Widget build(BuildContext context) {
@@ -198,10 +248,7 @@ class _RoomTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () {
-            controller.join(room.id);
-            onPicked?.call();
-          },
+          onTap: () => controller.join(room.id),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             child: Column(
@@ -250,10 +297,10 @@ class _RoomTile extends StatelessWidget {
                           _UserMuteButton(controller: controller, user: u)
                         else
                           const SizedBox(width: 30, height: 30),
-                        if (controller.moderator)
-                          u.id != controller.me
-                              ? _ModMenu(controller: controller, user: u)
-                              : const SizedBox(width: 30, height: 30),
+                        if (u.id != controller.me)
+                          _UserMenuButton(controller: controller, user: u)
+                        else
+                          const SizedBox(width: 30, height: 30),
                       ],
                     ),
                   ),
@@ -289,74 +336,251 @@ class _UserMuteButton extends StatelessWidget {
   }
 }
 
-enum _ModAction { kick, ban }
+/// Rückfrage vor dem Rauswerfen/Sperren; führt die Aktion bei „Ja“ aus.
+Future<void> _confirmModerate(BuildContext context, TalkieController controller, UserDto user, bool ban) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(ban ? '${user.name} sperren?' : '${user.name} rauswerfen?'),
+      content: Text(ban
+          ? '${user.name} fliegt raus und kann erst wieder rein, wenn ein Admin auf der Verwaltungsseite entsperrt.'
+          : '${user.name} fliegt raus, kann sich aber gleich wieder verbinden.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: kDanger, foregroundColor: Colors.white),
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(ban ? 'Sperren' : 'Rauswerfen'),
+        ),
+      ],
+    ),
+  );
+  if (ok == true) controller.moderate(user, ban: ban);
+}
 
-/// Nur für Moderatoren: rauswerfen oder sperren, jeweils mit Rückfrage.
-class _ModMenu extends StatelessWidget {
-  const _ModMenu({required this.controller, required this.user});
+/// ⋮ neben einer anderen Person: Lautstärke, nur für mich stumm, (Moderatoren) rauswerfen/sperren.
+class _UserMenuButton extends StatelessWidget {
+  const _UserMenuButton({required this.controller, required this.user});
 
   final TalkieController controller;
   final UserDto user;
 
-  Future<void> _confirm(BuildContext context, _ModAction a) async {
-    final ban = a == _ModAction.ban;
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Mehr zu ${user.name}',
+      icon: const Icon(Icons.more_vert_rounded, size: 18),
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+      onPressed: () => showDialog<void>(
+        context: context,
+        builder: (_) => _UserDialog(controller: controller, userId: user.id),
+      ),
+    );
+  }
+}
+
+class _UserDialog extends StatefulWidget {
+  const _UserDialog({required this.controller, required this.userId});
+
+  final TalkieController controller;
+  final int userId;
+
+  @override
+  State<_UserDialog> createState() => _UserDialogState();
+}
+
+class _UserDialogState extends State<_UserDialog> {
+  double? _volume; // während des Ziehens
+
+  UserDto? get _user {
+    for (final u in widget.controller.state?.users ?? const <UserDto>[]) {
+      if (u.id == widget.userId) return u;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: (context, _) {
+        final u = _user;
+        if (u == null) {
+          return AlertDialog(
+            content: const Text('Diese Person ist nicht mehr da.'),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+          );
+        }
+        final theme = Theme.of(context);
+        final v = _volume ?? u.volume;
+        return AlertDialog(
+          title: Row(
+            children: [
+              Avatar(name: u.name, talking: u.talking && !u.localMuted, size: 32),
+              const SizedBox(width: 12),
+              Expanded(child: Text(u.name, overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Lautstärke für dich: ${(v * 100).round()} %', style: theme.textTheme.titleSmall),
+                Text('Nur bei dir. Die anderen hören ${u.name} wie immer.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Slider(
+                  value: v.clamp(0.0, 3.0),
+                  max: 3,
+                  divisions: 30,
+                  label: '${(v * 100).round()} %',
+                  onChanged: u.localMuted ? null : (x) => setState(() => _volume = x),
+                  onChangeEnd: (x) {
+                    widget.controller.setUserVolume(u, x);
+                    _volume = null;
+                  },
+                ),
+                if ((v - 1).abs() > 0.01 && !u.localMuted)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => widget.controller.setUserVolume(u, 1),
+                      child: const Text('Normal (100 %)'),
+                    ),
+                  ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Für mich stumm'),
+                  value: u.localMuted,
+                  onChanged: (_) => widget.controller.toggleUserMuted(u),
+                ),
+                if (widget.controller.moderator) ...[
+                  const Divider(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _confirmModerate(context, widget.controller, u, false),
+                          icon: const Icon(Icons.logout_rounded),
+                          label: const Text('Rauswerfen'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(foregroundColor: kDanger),
+                          onPressed: () => _confirmModerate(context, widget.controller, u, true),
+                          icon: const Icon(Icons.block_rounded),
+                          label: const Text('Sperren'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fertig'))],
+        );
+      },
+    );
+  }
+}
+
+/// Handy: Umschalter zwischen Räumen (wer ist da, wer spricht) und Chat.
+class _PhoneTabs extends StatelessWidget {
+  const _PhoneTabs({required this.controller});
+
+  final TalkieController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    final otherUnread = c.unread.values.any((n) => n > 0);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: SegmentedButton<bool>(
+        showSelectedIcon: false,
+        segments: [
+          ButtonSegment(
+            value: false,
+            label: const Text('Räume'),
+            icon: Badge(
+              isLabelVisible: otherUnread,
+              backgroundColor: kDanger,
+              smallSize: 8,
+              child: const Icon(Icons.groups_rounded),
+            ),
+          ),
+          ButtonSegment(
+            value: true,
+            label: const Text('Chat'),
+            icon: Badge(
+              isLabelVisible: c.unreadHere > 0,
+              label: Text('${c.unreadHere}'),
+              backgroundColor: kDanger,
+              child: const Icon(Icons.chat_bubble_rounded),
+            ),
+          ),
+        ],
+        selected: {c.phoneChat},
+        onSelectionChanged: (s) => c.showPhoneChat(s.first),
+      ),
+    );
+  }
+}
+
+/// Nur für Admins: Chat dieses Raums oder aller Räume leeren, mit Rückfrage.
+class _ClearChatMenu extends StatelessWidget {
+  const _ClearChatMenu({required this.controller, required this.roomName});
+
+  final TalkieController controller;
+  final String roomName;
+
+  Future<void> _confirm(BuildContext context, bool all) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(ban ? '${user.name} sperren?' : '${user.name} rauswerfen?'),
-        content: Text(ban
-            ? '${user.name} fliegt raus und kann erst wieder rein, wenn ein Admin auf der Verwaltungsseite entsperrt.'
-            : '${user.name} fliegt raus, kann sich aber gleich wieder verbinden.'),
+        title: Text(all ? 'Chat in allen Räumen leeren?' : 'Chat in „$roomName“ leeren?'),
+        content: const Text('Die Nachrichten sind dann für alle weg.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: kDanger, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(context, true),
-            child: Text(ban ? 'Sperren' : 'Rauswerfen'),
+            child: const Text('Leeren'),
           ),
         ],
       ),
     );
-    if (ok == true) controller.moderate(user, ban: ban);
+    if (ok == true) controller.clearChat(all: all);
   }
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<_ModAction>(
-      tooltip: 'Mehr zu ${user.name}',
-      icon: const Icon(Icons.more_vert_rounded, size: 18),
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 160),
-      style: IconButton.styleFrom(
-        fixedSize: const Size(30, 30),
-        minimumSize: const Size(30, 30),
-        visualDensity: VisualDensity.compact,
-      ),
-      onSelected: (a) => _confirm(context, a),
-      itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: _ModAction.kick,
-          child: ListTile(leading: Icon(Icons.logout_rounded), title: Text('Rauswerfen'), dense: true),
-        ),
-        PopupMenuItem(
-          value: _ModAction.ban,
-          child: ListTile(
-            leading: Icon(Icons.block_rounded, color: kDanger),
-            title: Text('Sperren', style: TextStyle(color: kDanger)),
-            dense: true,
-          ),
-        ),
+    return PopupMenuButton<bool>(
+      tooltip: 'Chat leeren',
+      icon: const Icon(Icons.delete_sweep_rounded),
+      onSelected: (all) => _confirm(context, all),
+      itemBuilder: (_) => [
+        PopupMenuItem(value: false, child: Text('„$roomName“ leeren')),
+        const PopupMenuItem(value: true, child: Text('Alle Räume leeren')),
       ],
     );
   }
 }
 
 class _ChatPanel extends StatefulWidget {
-  const _ChatPanel({required this.controller, this.onMenu});
+  const _ChatPanel({required this.controller, this.compact = false, this.onShowRooms});
 
   final TalkieController controller;
-  /// Gesetzt im schmalen Layout: öffnet die Räume.
-  final VoidCallback? onMenu;
+  /// Handy: schlanker Kopf mit den Leuten im Raum, Knopf zum Einklappen der Tastatur.
+  final bool compact;
+  /// Handy: Antippen der Leute oben zeigt die Räume.
+  final VoidCallback? onShowRooms;
 
   @override
   State<_ChatPanel> createState() => _ChatPanelState();
@@ -367,7 +591,16 @@ class _ChatPanelState extends State<_ChatPanel> {
   final _focus = FocusNode();
 
   @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_onFocus); // Tastatur-Knopf ein-/ausblenden
+  }
+
+  void _onFocus() => setState(() {});
+
+  @override
   void dispose() {
+    _focus.removeListener(_onFocus);
     _text.dispose();
     _focus.dispose();
     super.dispose();
@@ -398,41 +631,35 @@ class _ChatPanelState extends State<_ChatPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: widget.onMenu != null
-              ? const EdgeInsets.fromLTRB(4, 4, 16, 4)
+          padding: widget.compact
+              ? const EdgeInsets.fromLTRB(20, 4, 12, 4)
               : const EdgeInsets.fromLTRB(20, 16, 20, 8),
           child: Row(
             children: [
-              if (widget.onMenu != null)
-                IconButton(
-                  onPressed: widget.onMenu,
-                  tooltip: 'Räume',
-                  icon: Badge(
-                    isLabelVisible: widget.controller.unread.values.any((n) => n > 0),
-                    backgroundColor: kDanger,
-                    smallSize: 9,
-                    child: const Icon(Icons.menu_rounded),
-                  ),
-                )
-              else ...[
-                const Icon(Icons.chat_bubble_rounded, size: 18, color: kAccent),
-                const SizedBox(width: 10),
-              ],
+              const Icon(Icons.chat_bubble_rounded, size: 18, color: kAccent),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(_roomName(), overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
               ),
-              if (widget.onMenu != null) _RoomPeople(controller: widget.controller, onTap: widget.onMenu!),
+              if (widget.onShowRooms != null) _RoomPeople(controller: widget.controller, onTap: widget.onShowRooms!),
+              if (widget.controller.admin) _ClearChatMenu(controller: widget.controller, roomName: _roomName()),
             ],
           ),
         ),
         const Divider(height: 1),
         Expanded(
-          child: msgs.isEmpty
+          // Tippen in den Verlauf klappt die Tastatur ein
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _focus.unfocus,
+            child: msgs.isEmpty
               ? Center(
                   child: Text('Noch keine Nachrichten. Schreib was!',
                       style: TextStyle(color: theme.colorScheme.onSurfaceVariant)))
               : ListView.builder(
                   reverse: true,
+                  // Wischen durch den Verlauf klappt die Tastatur ein
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   itemCount: msgs.length,
                   itemBuilder: (context, i) {
@@ -442,11 +669,20 @@ class _ChatPanelState extends State<_ChatPanel> {
                     return _ChatLine(msg: m, grouped: grouped);
                   },
                 ),
+          ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
           child: Row(
             children: [
+              if (widget.compact && _focus.hasFocus) ...[
+                IconButton(
+                  onPressed: _focus.unfocus,
+                  icon: const Icon(Icons.keyboard_hide_rounded),
+                  tooltip: 'Tastatur einklappen',
+                ),
+                const SizedBox(width: 4),
+              ],
               Expanded(
                 child: TextField(
                   controller: _text,
@@ -599,6 +835,10 @@ class _ControlBar extends StatelessWidget {
             ),
           ),
           SizedBox(width: compact ? 8 : 24),
+          if (c.config.settings.ptt) ...[
+            _PttButton(controller: c, compact: compact),
+            SizedBox(width: compact ? 6 : 10),
+          ],
           _RoundButton(
             icon: c.muted ? Icons.mic_off_rounded : Icons.mic_rounded,
             label: c.muted ? 'Stumm' : 'Mikro an',
@@ -623,6 +863,63 @@ class _ControlBar extends StatelessWidget {
             tooltip: 'Einstellungen',
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Push-to-Talk: gedrückt halten zum Sprechen (Maus, Finger). Die Taste aus den Einstellungen
+/// funktioniert zusätzlich systemweit.
+class _PttButton extends StatefulWidget {
+  const _PttButton({required this.controller, required this.compact});
+
+  final TalkieController controller;
+  final bool compact;
+
+  @override
+  State<_PttButton> createState() => _PttButtonState();
+}
+
+class _PttButtonState extends State<_PttButton> {
+  bool _down = false;
+
+  void _set(bool down) {
+    if (_down == down) return;
+    setState(() => _down = down);
+    widget.controller.setPttPressed(down);
+  }
+
+  @override
+  void dispose() {
+    if (_down) widget.controller.setPttPressed(false);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Tooltip(
+      message: 'Gedrückt halten zum Sprechen',
+      child: Listener(
+        onPointerDown: (_) => _set(true),
+        onPointerUp: (_) => _set(false),
+        onPointerCancel: (_) => _set(false),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 80),
+              padding: EdgeInsets.symmetric(horizontal: widget.compact ? 14 : 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: _down ? kTalking : theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Icon(Icons.record_voice_over_rounded, size: 24, color: _down ? Colors.black : null),
+            ),
+            const SizedBox(height: 4),
+            Text(_down ? 'Sprichst …' : 'Halten', style: theme.textTheme.labelSmall),
+          ],
+        ),
       ),
     );
   }

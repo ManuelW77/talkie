@@ -25,6 +25,8 @@ struct Speaker {
     pcm: VecDeque<f32>,
     prebuffering: bool,
     last_rx: Instant,
+    /// Lautstärke nur für diese Person (1.0 = normal).
+    gain: f32,
 }
 
 impl Speaker {
@@ -37,6 +39,7 @@ impl Speaker {
             pcm: VecDeque::with_capacity(MAX_BUFFER),
             prebuffering: true,
             last_rx: Instant::now(),
+            gain: 1.0,
         })
     }
 
@@ -59,6 +62,10 @@ pub struct Mixer {
     pub deaf: bool,
     /// Nur für sich stumm geschaltete Nutzer (falls der Server sie doch schickt).
     pub ignored: HashSet<i64>,
+    /// Hinweistöne, die gerade abgespielt werden.
+    cues: VecDeque<f32>,
+    /// Lautstärke pro Person (fehlt = 1.0).
+    gains: HashMap<i64, f32>,
     /// Zähler für Tests/Diagnose
     pub packets: u64,
     pub lost: u64,
@@ -72,6 +79,8 @@ impl Default for Mixer {
             volume: 1.0,
             deaf: false,
             ignored: HashSet::new(),
+            cues: VecDeque::new(),
+            gains: HashMap::new(),
             packets: 0,
             lost: 0,
         }
@@ -87,7 +96,10 @@ impl Mixer {
         let sp = match self.speakers.entry(uid) {
             std::collections::hash_map::Entry::Occupied(o) => o.into_mut(),
             std::collections::hash_map::Entry::Vacant(v) => match Speaker::new() {
-                Ok(s) => v.insert(s),
+                Ok(mut s) => {
+                    s.gain = self.gains.get(&uid).copied().unwrap_or(1.0);
+                    v.insert(s)
+                }
                 Err(e) => {
                     log::warn!("decoder: {e}");
                     return;
@@ -142,10 +154,38 @@ impl Mixer {
         }
     }
 
+    /// Lautstärke einer Person (0.0 … 3.0, 1.0 = normal).
+    pub fn set_gain(&mut self, uid: i64, gain: f32) {
+        let g = gain.clamp(0.0, 3.0);
+        if (g - 1.0).abs() < 1e-3 {
+            self.gains.remove(&uid);
+        } else {
+            self.gains.insert(uid, g);
+        }
+        if let Some(sp) = self.speakers.get_mut(&uid) {
+            sp.gain = g;
+        }
+    }
+
+    pub fn gains_snapshot(&self) -> HashMap<i64, f32> {
+        self.gains.clone()
+    }
+
+    pub fn gain(&self, uid: i64) -> f32 {
+        self.gains.get(&uid).copied().unwrap_or(1.0)
+    }
+
+    /// Hinweiston einreihen. Mehr als eine Sekunde Rückstau wird verworfen (z. B. viele Leute auf einmal).
+    pub fn play_cue(&mut self, samples: &[f32]) {
+        if self.cues.len() < RATE as usize {
+            self.cues.extend(samples);
+        }
+    }
+
     /// Ein gemischtes Sample bei 48 kHz.
     #[inline]
     pub fn next_sample(&mut self) -> f32 {
-        let mut acc = 0.0;
+        let mut acc = self.cues.pop_front().unwrap_or(0.0);
         for sp in self.speakers.values_mut() {
             if sp.prebuffering {
                 if sp.pcm.len() >= PREBUFFER {
@@ -155,7 +195,7 @@ impl Mixer {
                 }
             }
             match sp.pcm.pop_front() {
-                Some(s) => acc += s,
+                Some(s) => acc += s * sp.gain,
                 None => sp.prebuffering = true,
             }
         }
@@ -203,7 +243,7 @@ mod tests {
         let mut pkts = Vec::new();
         c.process(
             &tone,
-            CaptureParams { threshold_db: -45.0, noise_suppression: false, gain: 1.0, muted: false },
+            CaptureParams { threshold_db: -45.0, noise_suppression: false, gain: 1.0, muted: false, ptt: None },
             |e| pkts.push(e.data),
         );
         pkts
@@ -276,6 +316,45 @@ mod tests {
         }
         assert_eq!(m.talking(), vec![2]);
         assert!(drain(&mut m, 9600) > 0.05);
+    }
+
+    #[test]
+    fn per_person_volume() {
+        let pkts = encoded_tone(0.5);
+        let level = |gain: f32| {
+            let mut m = Mixer::default();
+            m.set_gain(1, gain);
+            for (i, p) in pkts.iter().enumerate() {
+                m.push(1, i as u16, p);
+            }
+            drain(&mut m, 9600)
+        };
+        let normal = level(1.0);
+        assert!(level(0.5) < normal * 0.6 && level(0.5) > normal * 0.4, "halb so laut");
+        assert!(level(0.0) < 1e-6, "0 = still");
+        // Änderung wirkt auch auf laufende Sprecher
+        let mut m = Mixer::default();
+        for (i, p) in pkts.iter().enumerate() {
+            m.push(1, i as u16, p);
+        }
+        m.set_gain(1, 0.0);
+        assert!(drain(&mut m, 9600) < 1e-6);
+        assert_eq!(m.gain(1), 0.0);
+        m.set_gain(1, 1.0);
+        assert!(m.gains.is_empty(), "1.0 wird nicht gespeichert");
+    }
+
+    #[test]
+    fn cue_is_played_and_capped() {
+        let mut m = Mixer::default();
+        let c = crate::core::cues::render(crate::core::cues::Cue::Chat);
+        m.play_cue(&c);
+        assert!(drain(&mut m, c.len()) > 0.01);
+        assert!(drain(&mut m, 480) < 1e-6, "danach still");
+        for _ in 0..100 {
+            m.play_cue(&c);
+        }
+        assert!(m.cues.len() < 2 * RATE as usize, "Rückstau begrenzt");
     }
 
     #[test]

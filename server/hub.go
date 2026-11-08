@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"log"
 	"sort"
 	"sync"
@@ -9,6 +11,8 @@ import (
 
 // Hub hält alle verbundenen Sessions und die Raumliste.
 type Hub struct {
+	// Updates kennt die neueste App-Version (nil = keine Hinweise).
+	Updates  *UpdateChecker
 	store    *Store
 	certHash []byte
 	maxUsers int
@@ -78,6 +82,7 @@ func (h *Hub) broadcastLocked(e *Envelope, except *Session) {
 // Liefert false, wenn der Server voll ist.
 func (h *Hub) Add(s *Session) (old *Session, ok bool) {
 	_, mod := h.store.Moderator(s.userID)
+	admin := h.store.LinkedToAdmin(s.userID)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	old = h.sessions[s.userID]
@@ -93,6 +98,13 @@ func (h *Hub) Add(s *Session) (old *Session, ok bool) {
 	welcome := &Envelope{T: "welcome", You: ptr(s.wireLocked()), Rooms: h.rooms, Users: h.usersLocked()}
 	if mod {
 		welcome.Mod = boolPtr(true)
+	}
+	if admin {
+		welcome.Admin = boolPtr(true)
+	}
+	welcome.ChatHours = int(h.store.ChatKeep / time.Hour)
+	if up := h.Updates.Get(); up.Version != "" {
+		welcome.Latest, welcome.LatestURL = up.Version, up.URL
 	}
 	s.send(welcome)
 	h.broadcastLocked(&Envelope{T: "user_joined", User: ptr(s.wireLocked())}, s)
@@ -277,6 +289,75 @@ func (h *Hub) Moderate(s *Session, target int64, ban bool) {
 	}
 	h.store.Audit(acc.Email+" (App)", "Talkie-Nutzer "+u.Name+" rausgeworfen")
 	s.send(&Envelope{T: "info", Reason: u.Name + " wurde rausgeworfen."})
+}
+
+// deviceCodeValid: so lange gilt ein Geräte-Code aus der App.
+const deviceCodeValid = 15 * time.Minute
+
+// SendDeviceCode erzeugt einen Code, mit dem s ein weiteres Gerät anmelden kann.
+func (h *Hub) SendDeviceCode(s *Session) {
+	inv, err := h.store.CreateDeviceCode(s.userID, deviceCodeValid)
+	switch {
+	case errors.Is(err, ErrTooManyDevices):
+		s.send(&Envelope{T: "error", Code: "too_many_devices", Reason: "Du hast schon 5 Geräte. Lass erst eins auf der Verwaltungsseite entfernen."})
+	case err != nil:
+		s.send(&Envelope{T: "error", Code: "internal", Reason: "Das hat nicht geklappt."})
+	default:
+		s.send(&Envelope{T: "device_code", Code: inv.Code})
+	}
+}
+
+// KickDevice trennt die Verbindung, falls sie von diesem Gerät kommt (Gerät wurde entfernt).
+func (h *Hub) KickDevice(userID int64, pk []byte, reason string) {
+	h.mu.RLock()
+	s := h.sessions[userID]
+	h.mu.RUnlock()
+	if s != nil && bytes.Equal(s.pubkey, pk) {
+		s.kick(reason)
+	}
+}
+
+// ClearChat leert den Chat eines Raums (0 = alle) und sagt es allen Apps.
+func (h *Hub) ClearChat(room int64) (int64, error) {
+	n, err := h.store.ClearChat(room)
+	if err != nil {
+		return 0, err
+	}
+	h.mu.RLock()
+	h.broadcastLocked(&Envelope{T: "chat_cleared", Room: room}, nil)
+	h.mu.RUnlock()
+	return n, nil
+}
+
+// ClearChatFrom: Leeren aus der App, nur mit verknüpftem Admin-Konto.
+func (h *Hub) ClearChatFrom(s *Session, room int64) {
+	accs, _ := h.store.LinkedAccounts(s.userID)
+	var admin *Account
+	for i := range accs {
+		if accs[i].IsAdmin() {
+			admin = &accs[i]
+			break
+		}
+	}
+	if admin == nil {
+		s.send(&Envelope{T: "error", Code: "forbidden", Reason: "Das darfst du nicht."})
+		return
+	}
+	name := "allen Räumen"
+	if room != 0 {
+		r, err := h.store.RoomByID(room)
+		if err != nil {
+			s.send(&Envelope{T: "error", Code: "not_found", Reason: "Diesen Raum gibt es nicht mehr."})
+			return
+		}
+		name = "„" + r.Name + "“"
+	}
+	if _, err := h.ClearChat(room); err != nil {
+		s.send(&Envelope{T: "error", Code: "internal", Reason: "Leeren hat nicht geklappt."})
+		return
+	}
+	h.store.Audit(admin.Email+" (App)", "Chat in "+name+" geleert")
+	s.send(&Envelope{T: "info", Reason: "Chat in " + name + " geleert."})
 }
 
 func (h *Hub) Renamed(userID int64, name string) {

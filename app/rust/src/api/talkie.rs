@@ -32,6 +32,8 @@ pub struct UserDto {
     pub talking: bool,
     /// Nur für mich stumm geschaltet.
     pub local_muted: bool,
+    /// Lautstärke nur für mich (1.0 = normal).
+    pub volume: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -62,6 +64,13 @@ pub struct StateDto {
     pub deaf: bool,
     /// Darf andere rauswerfen/sperren.
     pub moderator: bool,
+    /// Verknüpftes Admin-Konto (darf den Chat leeren).
+    pub admin: bool,
+    /// So viele Stunden bleibt der Chat erhalten (0 = unbegrenzt).
+    pub chat_hours: i64,
+    /// Neueste App-Version laut Server ("" = unbekannt) und Download-Adresse.
+    pub latest_version: String,
+    pub latest_url: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +80,8 @@ pub enum EventKind {
     History,
     Level,
     Notice,
+    /// Geräte-Code (steht in `notice`).
+    DeviceCode,
 }
 
 /// Ein Ereignis an die Oberfläche; welche Felder gefüllt sind, hängt von `kind` ab.
@@ -93,6 +104,19 @@ pub struct SettingsDto {
     pub output_device: String,
     pub input_gain: f32,
     pub output_volume: f32,
+    /// Hinweistöne bei Kommen/Gehen und neuen Chatnachrichten.
+    pub sounds: bool,
+    /// Push-to-Talk statt Sprach-Erkennung, und die Taste dafür.
+    pub ptt: bool,
+    pub ptt_key: String,
+    /// Handy: Echo-Unterdrückung des Systems (ohne Kopfhörer wichtig).
+    pub echo_cancel: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct PttKeyDto {
+    pub id: String,
+    pub label: String,
 }
 
 #[derive(Debug, Clone)]
@@ -132,11 +156,16 @@ fn state_dto(s: Snapshot) -> StateDto {
                 deaf: u.deaf,
                 talking: u.talking,
                 local_muted: u.local_muted,
+                volume: u.volume,
             })
             .collect(),
         muted: s.muted,
         deaf: s.deaf,
         moderator: s.moderator,
+        admin: s.admin,
+        chat_hours: s.chat_hours,
+        latest_version: s.latest_version,
+        latest_url: s.latest_url,
     }
 }
 
@@ -169,6 +198,10 @@ fn ui_event(e: CoreEvent) -> UiEvent {
             ev.level = l;
         }
         CoreEvent::Notice(n) => ev.notice = n,
+        CoreEvent::DeviceCode(c) => {
+            ev.kind = EventKind::DeviceCode;
+            ev.notice = c;
+        }
     }
     ev
 }
@@ -181,6 +214,10 @@ fn settings_dto(s: &Settings) -> SettingsDto {
         output_device: s.output_device.clone(),
         input_gain: s.input_gain,
         output_volume: s.output_volume,
+        sounds: s.sounds,
+        ptt: s.ptt,
+        ptt_key: s.ptt_key.clone(),
+        echo_cancel: s.echo_cancel,
     }
 }
 
@@ -249,6 +286,13 @@ pub fn talkie_set_muted(muted: bool) -> Result<()> {
     Ok(())
 }
 
+/// Lautstärke einer Person nur für mich (0.0 … 3.0, 1.0 = normal). Bleibt gespeichert.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_set_user_volume(user: i64, volume: f32) -> Result<()> {
+    engine()?.set_user_volume(user, volume);
+    Ok(())
+}
+
 /// Einen anderen Nutzer nur für mich stumm schalten (bleibt gespeichert).
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_set_user_muted(user: i64, muted: bool) -> Result<()> {
@@ -256,10 +300,60 @@ pub fn talkie_set_user_muted(user: i64, muted: bool) -> Result<()> {
     Ok(())
 }
 
+/// Code für ein weiteres Gerät anfordern; kommt als Ereignis DeviceCode zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_request_device_code() -> Result<()> {
+    engine()?.request_device_code();
+    Ok(())
+}
+
+/// Push-to-Talk-Knopf in der App gedrückt halten / loslassen.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_set_ptt_pressed(down: bool) -> Result<()> {
+    engine()?.set_ptt_pressed(down);
+    Ok(())
+}
+
+/// Wählbare Push-to-Talk-Tasten.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_ptt_keys() -> Vec<PttKeyDto> {
+    crate::core::ptt::KEYS.iter().map(|(id, label)| PttKeyDto { id: (*id).into(), label: (*label).into() }).collect()
+}
+
+/// "ok", "permission" (macOS: Eingabeüberwachung fehlt) oder "unsupported" (nur Knopf in der App).
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_ptt_access() -> String {
+    use crate::core::ptt::Access;
+    match crate::core::ptt::access() {
+        Access::Ok => "ok",
+        Access::NeedsPermission => "permission",
+        Access::Unsupported => "unsupported",
+    }
+    .into()
+}
+
+/// macOS: nach „Eingabeüberwachung“ fragen.
+pub fn talkie_ptt_request_access() {
+    crate::core::ptt::request_access();
+}
+
+/// Chat leeren (room 0 = alle Räume). Ergebnis kommt als Hinweis zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_clear_chat(room: i64) -> Result<()> {
+    engine()?.clear_chat(room);
+    Ok(())
+}
+
 /// Jemanden rauswerfen (`ban` = auch sperren). Ergebnis kommt als Hinweis zurück.
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_moderate(user: i64, ban: bool) -> Result<()> {
     engine()?.moderate(user, ban);
+    Ok(())
+}
+
+/// Audio neu starten, z. B. nachdem das Mikrofon erlaubt wurde.
+pub fn talkie_restart_audio() -> Result<()> {
+    engine()?.restart_audio();
     Ok(())
 }
 
@@ -277,6 +371,10 @@ pub fn talkie_set_settings(s: SettingsDto) -> Result<()> {
         output_device: s.output_device,
         input_gain: s.input_gain,
         output_volume: s.output_volume,
+        sounds: s.sounds,
+        ptt: s.ptt,
+        ptt_key: s.ptt_key,
+        echo_cancel: s.echo_cancel,
     });
     Ok(())
 }

@@ -8,6 +8,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, Sample, SampleFormat, SizedSample};
 use parking_lot::Mutex;
 use std::sync::mpsc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 fn device_name(d: &cpal::Device) -> String {
@@ -57,7 +58,27 @@ fn find_output(name: &str) -> Option<cpal::Device> {
     host.default_output_device()
 }
 
-fn build_input<T>(dev: &cpal::Device, cfg: cpal::StreamConfig, tx: mpsc::Sender<Vec<f32>>) -> Result<cpal::Stream>
+/// Fehler aus einem laufenden Strom: kurzes Stottern nur melden, echte Abbrüche
+/// (Gerät weg, Anruf, Mediendienste neu gestartet) markieren, damit die Engine neu öffnet.
+fn on_stream_error(what: &'static str, failed: Arc<AtomicBool>) -> impl FnMut(cpal::Error) + Send + 'static {
+    move |e: cpal::Error| {
+        use cpal::ErrorKind as K;
+        match e.kind() {
+            K::Xrun | K::DeviceChanged | K::RealtimeDenied => log::debug!("{what}: {e}"),
+            _ => {
+                log::warn!("{what}: {e} – öffne neu");
+                failed.store(true, Ordering::Relaxed);
+            }
+        }
+    }
+}
+
+fn build_input<T>(
+    dev: &cpal::Device,
+    cfg: cpal::StreamConfig,
+    tx: mpsc::Sender<Vec<f32>>,
+    failed: Arc<AtomicBool>,
+) -> Result<cpal::Stream>
 where
     T: SizedSample + Send + 'static,
     f32: FromSample<T>,
@@ -77,13 +98,18 @@ where
             rs.process(&mono, &mut out);
             let _ = tx.send(out);
         },
-        |e| log::warn!("mikrofon: {e}"),
+        on_stream_error("mikrofon", failed),
         None,
     )?;
     Ok(stream)
 }
 
-fn build_output<T>(dev: &cpal::Device, cfg: cpal::StreamConfig, mixer: Arc<Mutex<Mixer>>) -> Result<cpal::Stream>
+fn build_output<T>(
+    dev: &cpal::Device,
+    cfg: cpal::StreamConfig,
+    mixer: Arc<Mutex<Mixer>>,
+    failed: Arc<AtomicBool>,
+) -> Result<cpal::Stream>
 where
     T: SizedSample + FromSample<f32> + Send + 'static,
 {
@@ -98,23 +124,23 @@ where
                 f.fill(v);
             }
         },
-        |e| log::warn!("lautsprecher: {e}"),
+        on_stream_error("lautsprecher", failed),
         None,
     )?;
     Ok(stream)
 }
 
-fn open_input(name: &str, tx: mpsc::Sender<Vec<f32>>) -> Result<cpal::Stream> {
+fn open_input(name: &str, tx: mpsc::Sender<Vec<f32>>, failed: Arc<AtomicBool>) -> Result<cpal::Stream> {
     let dev = find_input(name).ok_or_else(|| anyhow!("Kein Mikrofon gefunden"))?;
     let sup = dev.default_input_config()?;
     let cfg: cpal::StreamConfig = sup.config();
     let build = |cfg: cpal::StreamConfig| match sup.sample_format() {
-        SampleFormat::F32 => build_input::<f32>(&dev, cfg, tx.clone()),
-        SampleFormat::I16 => build_input::<i16>(&dev, cfg, tx.clone()),
-        SampleFormat::U16 => build_input::<u16>(&dev, cfg, tx.clone()),
-        SampleFormat::I32 => build_input::<i32>(&dev, cfg, tx.clone()),
-        SampleFormat::U8 => build_input::<u8>(&dev, cfg, tx.clone()),
-        SampleFormat::F64 => build_input::<f64>(&dev, cfg, tx.clone()),
+        SampleFormat::F32 => build_input::<f32>(&dev, cfg, tx.clone(), failed.clone()),
+        SampleFormat::I16 => build_input::<i16>(&dev, cfg, tx.clone(), failed.clone()),
+        SampleFormat::U16 => build_input::<u16>(&dev, cfg, tx.clone(), failed.clone()),
+        SampleFormat::I32 => build_input::<i32>(&dev, cfg, tx.clone(), failed.clone()),
+        SampleFormat::U8 => build_input::<u8>(&dev, cfg, tx.clone(), failed.clone()),
+        SampleFormat::F64 => build_input::<f64>(&dev, cfg, tx.clone(), failed.clone()),
         f => Err(anyhow!("Mikrofonformat {f:?} nicht unterstützt")),
     };
     // Manche Mikrofone (v. a. Android) melden Stereo, öffnen aber nur Mono
@@ -130,17 +156,17 @@ fn open_input(name: &str, tx: mpsc::Sender<Vec<f32>>) -> Result<cpal::Stream> {
     Ok(s)
 }
 
-fn open_output(name: &str, mixer: Arc<Mutex<Mixer>>) -> Result<cpal::Stream> {
+fn open_output(name: &str, mixer: Arc<Mutex<Mixer>>, failed: Arc<AtomicBool>) -> Result<cpal::Stream> {
     let dev = find_output(name).ok_or_else(|| anyhow!("Kein Lautsprecher gefunden"))?;
     let sup = dev.default_output_config()?;
     let cfg: cpal::StreamConfig = sup.config();
     let s = match sup.sample_format() {
-        SampleFormat::F32 => build_output::<f32>(&dev, cfg, mixer),
-        SampleFormat::I16 => build_output::<i16>(&dev, cfg, mixer),
-        SampleFormat::U16 => build_output::<u16>(&dev, cfg, mixer),
-        SampleFormat::I32 => build_output::<i32>(&dev, cfg, mixer),
-        SampleFormat::U8 => build_output::<u8>(&dev, cfg, mixer),
-        SampleFormat::F64 => build_output::<f64>(&dev, cfg, mixer),
+        SampleFormat::F32 => build_output::<f32>(&dev, cfg, mixer.clone(), failed.clone()),
+        SampleFormat::I16 => build_output::<i16>(&dev, cfg, mixer.clone(), failed.clone()),
+        SampleFormat::U16 => build_output::<u16>(&dev, cfg, mixer.clone(), failed.clone()),
+        SampleFormat::I32 => build_output::<i32>(&dev, cfg, mixer.clone(), failed.clone()),
+        SampleFormat::U8 => build_output::<u8>(&dev, cfg, mixer.clone(), failed.clone()),
+        SampleFormat::F64 => build_output::<f64>(&dev, cfg, mixer.clone(), failed.clone()),
         f => Err(anyhow!("Lautsprecherformat {f:?} nicht unterstützt")),
     }?;
     s.play()?;
@@ -149,6 +175,8 @@ fn open_output(name: &str, mixer: Arc<Mutex<Mixer>>) -> Result<cpal::Stream> {
 
 /// Hält Mikrofon- und Lautsprecher-Stream offen, bis es fallen gelassen wird.
 pub struct AudioIo {
+    /// Ein Strom ist abgerissen und muss neu geöffnet werden.
+    pub failed: Arc<AtomicBool>,
     stop: Option<mpsc::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
@@ -169,17 +197,32 @@ pub fn start(
     output_name: String,
     capture_tx: mpsc::Sender<Vec<f32>>,
     mixer: Arc<Mutex<Mixer>>,
+    echo_cancel: bool,
 ) -> (AudioIo, Vec<String>) {
     let (stop_tx, stop_rx) = mpsc::channel::<()>();
+    let failed = Arc::new(AtomicBool::new(false));
+    let (f_in, f_out) = (failed.clone(), failed.clone());
     let (res_tx, res_rx) = mpsc::channel::<Vec<String>>();
     let thread = std::thread::Builder::new()
         .name("talkie-audio".into())
         .spawn(move || {
             let mut warnings = Vec::new();
-            let input = open_input(&input_name, capture_tx)
+            // Handy: erst die Sprachverarbeitung des Systems (Echo-Unterdrückung), sonst cpal
+            if echo_cancel && crate::core::voice::AVAILABLE {
+                match crate::core::voice::open(capture_tx.clone(), mixer.clone(), f_in.clone()) {
+                    Ok(voice) => {
+                        let _ = res_tx.send(warnings);
+                        let _ = stop_rx.recv();
+                        drop(voice);
+                        return;
+                    }
+                    Err(e) => log::warn!("sprachverarbeitung: {e} – nehme normalen weg"),
+                }
+            }
+            let input = open_input(&input_name, capture_tx, f_in)
                 .map_err(|e| warnings.push(format!("Mikrofon: {e}")))
                 .ok();
-            let output = open_output(&output_name, mixer)
+            let output = open_output(&output_name, mixer, f_out)
                 .map_err(|e| warnings.push(format!("Lautsprecher: {e}")))
                 .ok();
             let _ = res_tx.send(warnings);
@@ -189,5 +232,5 @@ pub fn start(
         })
         .expect("audio-thread");
     let warnings = res_rx.recv().unwrap_or_default();
-    (AudioIo { stop: Some(stop_tx), thread: Some(thread) }, warnings)
+    (AudioIo { failed, stop: Some(stop_tx), thread: Some(thread) }, warnings)
 }

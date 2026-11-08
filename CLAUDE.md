@@ -7,6 +7,12 @@ datensparsam (die Kids zocken nebenher) und lauffähig auf älteren Rechnern.
 - **Desktop-Client:** Flutter-Oberfläche + Rust-Kern über flutter_rust_bridge (`app/`)
 - **Handy/Tablet:** dieselbe Flutter-App mit demselben Rust-Kern (`app/android`, `app/ios`)
 
+## Parallele Sitzungen
+
+Arbeiten mehrere Claude-Sitzungen gleichzeitig, bekommt jede einen eigenen Arbeitsordner
+(`git worktree add ../talkie-<name> -b feature/<name> devel`). Im selben Ordner wechseln sich die
+Sitzungen sonst gegenseitig den Branch weg. Beim Committen nur eigene Dateien hinzufügen.
+
 ## Sprache
 
 - Antworten, Kommentare, UI-Texte, Commit-Nachrichten und Doku auf **Deutsch** mit korrekten Umlauten
@@ -27,6 +33,9 @@ datensparsam (die Kids zocken nebenher) und lauffähig auf älteren Rechnern.
 3. Am Ende der Arbeit: Feature-Branch pushen, nach `devel` mergen (`git merge --no-ff`) und **`devel` pushen**.
    Die CI baut dann Windows, Linux und macOS zum Testen.
 4. Merge `devel` → `main` und Release-Tags **nur auf ausdrückliche Anweisung von Manuel**.
+   Versionsnummer: `version:` in `app/pubspec.yaml` und `kAppVersion` in `app/lib/version.dart` gleich halten
+   (Test prüft das), Tag heißt `v<version>`. Der Server meldet den Apps das neueste GitHub-Release.
+   Ablauf und Secrets für die Mac-Notarisierung: `docs/RELEASE.md`.
 5. Nie direkt auf `main` committen. Kein Force-Push auf `main` oder `devel`.
 6. Commit-Nachrichten auf Deutsch: kurze Betreffzeile, darunter Stichpunkte.
 
@@ -41,8 +50,8 @@ Repo-Variablen `TALKIE_SERVER` / `TALKIE_FINGERPRINT` in die CI.
 - `ToDo Build.md` – alles, was noch zu bauen ist. **Neue Ideen und Aufträge von Manuel hier eintragen.**
 - `ToDo Tests.md` – was Manuel aktiv testen soll
 
-Pflege: Ist eine Aufgabe gebaut, kommt sie aus `ToDo Build` raus und mit konkreten Testschritten
-(Abschnitt mit Branch-Namen) nach `ToDo Tests`. Ändern sich Befehle, Ports oder Links, die beiden
+Pflege: Ist eine Aufgabe gebaut, wird sie in `ToDo Build` abgehakt (`- [x]`) und unter „Erledigt“
+verschoben; konkrete Testschritte (Abschnitt mit Branch-Namen) kommen nach `ToDo Tests`. Ändern sich Befehle, Ports oder Links, die beiden
 anderen Notizen mitziehen. Bearbeiten über die Obsidian-MCP-Tools.
 
 ## Aufbau

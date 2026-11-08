@@ -3,6 +3,8 @@ package de.talkie.talkie
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -18,6 +20,32 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "dataDir" -> result.success(filesDir.absolutePath)
                 "requestMic" -> requestMic(result)
+                "micStatus" -> result.success(
+                    if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) "granted"
+                    else "undetermined"
+                )
+                "openUrl" -> {
+                    val url = call.arguments as? String
+                    if (url != null && url.startsWith("https://")) {
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                        } catch (e: Exception) {
+                            android.util.Log.w("Talkie", "Browser fehlt: $e")
+                        }
+                    }
+                    result.success(null)
+                }
+                "openSettings" -> {
+                    startActivity(
+                        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(android.net.Uri.fromParts("package", packageName, null))
+                    )
+                    result.success(null)
+                }
+                "setVoiceMode" -> {
+                    setVoiceMode(call.arguments as? Boolean ?: false)
+                    result.success(null)
+                }
                 "setActive" -> {
                     setActive(call.arguments as? Boolean ?: false)
                     result.success(null)
@@ -49,6 +77,48 @@ class MainActivity : FlutterActivity() {
         micResult = null
     }
 
+    /**
+     * Sprach-Modus für die Echo-Unterdrückung: nur ohne Kopfhörer (mit Kopfhörer gibt es kein Echo,
+     * und Bluetooth-Kopfhörer würden im Kommunikationsmodus auf schlechte Telefonqualität fallen).
+     * Ton dann über den Lautsprecher statt die Hörmuschel.
+     */
+    private fun setVoiceMode(on: Boolean) {
+        val am = getSystemService(AudioManager::class.java) ?: return
+        if (on && !hasHeadset(am)) {
+            am.mode = AudioManager.MODE_IN_COMMUNICATION
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                am.availableCommunicationDevices
+                    .firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                    ?.let { am.setCommunicationDevice(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                am.isSpeakerphoneOn = true
+            }
+            voiceMode = true
+        } else if (voiceMode) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                am.clearCommunicationDevice()
+            } else {
+                @Suppress("DEPRECATION")
+                am.isSpeakerphoneOn = false
+            }
+            am.mode = AudioManager.MODE_NORMAL
+            voiceMode = false
+        }
+    }
+
+    private fun hasHeadset(am: AudioManager): Boolean {
+        val headsets = mutableSetOf(
+            AudioDeviceInfo.TYPE_WIRED_HEADSET,
+            AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+            AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+            AudioDeviceInfo.TYPE_USB_HEADSET,
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) headsets.add(AudioDeviceInfo.TYPE_BLE_HEADSET)
+        return am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.type in headsets }
+    }
+
     private fun setActive(on: Boolean) {
         val intent = Intent(this, VoiceService::class.java)
         if (!on) {
@@ -63,6 +133,8 @@ class MainActivity : FlutterActivity() {
             android.util.Log.w("Talkie", "Dienst nicht gestartet: $e")
         }
     }
+
+    private var voiceMode = false
 
     companion object {
         private const val REQ_MIC = 7

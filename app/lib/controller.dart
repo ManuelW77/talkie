@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 
 import 'platform.dart';
+import 'version.dart';
 import 'src/rust/api/talkie.dart';
 
 /// Beim Bauen festlegbar: flutter build ... --dart-define=TALKIE_SERVER=talkie.example.org
@@ -29,16 +31,44 @@ class TalkieController extends ChangeNotifier {
   final _notices = StreamController<String>.broadcast();
   /// Ungelesene Nachrichten pro Raum (nur andere Räume).
   final Map<int, int> unread = {};
+
+  /// Handy: Chat statt Räumen zeigen.
+  bool phoneChat = false;
+  /// Handy: neue Nachrichten im eigenen Raum, während die Räume angezeigt werden.
+  int unreadHere = 0;
+
+  void showPhoneChat(bool chat) {
+    phoneChat = chat;
+    if (chat) unreadHere = 0;
+    notifyListeners();
+  }
   StreamSubscription<UiEvent>? _sub;
 
   /// Kurze Hinweise für eine Snackbar.
   Stream<String> get notices => _notices.stream;
 
+  /// Zuletzt angeforderter Geräte-Code (null = noch keiner da).
+  final ValueNotifier<String?> deviceCode = ValueNotifier(null);
+
+  /// Code für ein weiteres Gerät anfordern; landet in [deviceCode].
+  void requestDeviceCode() {
+    deviceCode.value = null;
+    talkieRequestDeviceCode();
+  }
+
   /// Getrennt vom ChangeNotifier, damit der Pegel nicht alles neu zeichnet.
   final ValueNotifier<double> levelNotifier = ValueNotifier(0);
 
+  AppLifecycleListener? _life;
+
   void start() {
     _sub = talkieEvents().listen(_onEvent);
+    // Zurück aus den Einstellungen: Mikrofon-Erlaubnis neu prüfen
+    _life = AppLifecycleListener(onResume: () => checkMic());
+    // iPhone: nach Anruf/Siri den Ton neu öffnen
+    TalkiePlatform.onNative((m) {
+      if (m == 'audioResume' && _active) talkieRestartAudio();
+    });
     if (!showSetup) {
       talkieConnect(server: config.server, name: config.name, invite: '', fingerprint: kServerFingerprint);
     }
@@ -47,6 +77,7 @@ class TalkieController extends ChangeNotifier {
   @override
   void dispose() {
     _sub?.cancel();
+    _life?.dispose();
     _notices.close();
     levelNotifier.dispose();
     super.dispose();
@@ -59,7 +90,40 @@ class TalkieController extends ChangeNotifier {
   bool get deaf => state?.deaf ?? false;
   /// Darf andere rauswerfen/sperren (verknüpftes Webkonto mit Recht).
   bool get moderator => state?.moderator ?? false;
-  List<ChatDto> get currentChat => chats[currentRoom] ?? const [];
+  String? _dismissedUpdate;
+
+  /// Neuere App-Version, auf die hingewiesen werden soll (null = keine).
+  /// Auf dem iPhone kommen Updates über TestFlight/App Store von selbst.
+  String? get updateVersion {
+    final v = state?.latestVersion ?? '';
+    if (v.isEmpty || TalkiePlatform.isIOS || v == _dismissedUpdate) return null;
+    if (!RegExp(r'^\d+(\.\d+){1,3}$').hasMatch(v)) return null;
+    return isNewerVersion(v, kAppVersion) ? v : null;
+  }
+
+  /// Nur https-Links öffnen.
+  String get updateUrl {
+    final u = state?.latestUrl ?? '';
+    return u.startsWith('https://') ? u : '';
+  }
+
+  void dismissUpdate() {
+    _dismissedUpdate = state?.latestVersion;
+    notifyListeners();
+  }
+
+  /// Darf den Chat leeren (verknüpftes Admin-Konto).
+  bool get admin => state?.admin ?? false;
+
+  /// Nachrichten des aktuellen Raums; ältere als die Aufbewahrungsfrist des Servers fallen weg
+  /// (die App kann tagelang offen sein).
+  List<ChatDto> get currentChat {
+    final all = chats[currentRoom] ?? const <ChatDto>[];
+    final hours = state?.chatHours ?? 0;
+    if (hours <= 0) return all;
+    final cutoff = DateTime.now().millisecondsSinceEpoch ~/ 1000 - hours * 3600;
+    return all.where((m) => m.ts >= cutoff).toList();
+  }
 
   UserDto? get meUser {
     final s = state;
@@ -102,22 +166,61 @@ class TalkieController extends ChangeNotifier {
           }
           setupBusy = false;
         }
-        if (prev?.room != s.room) unread.remove(s.room);
+        if (prev?.room != s.room) {
+          unread.remove(s.room);
+          unreadHere = 0;
+        }
         _updateBackground(s.status);
         notifyListeners();
       case EventKind.chat:
         final m = e.chat!;
         (chats[m.room] ??= []).add(m);
-        if (m.room != currentRoom) unread[m.room] = (unread[m.room] ?? 0) + 1;
+        if (m.room != currentRoom) {
+          unread[m.room] = (unread[m.room] ?? 0) + 1;
+        } else if (!phoneChat && m.from != me) {
+          unreadHere++;
+        }
         notifyListeners();
       case EventKind.history:
-        chats[e.historyRoom] = List.of(e.history);
+        if (e.historyRoom == 0) {
+          // Admin hat den Chat in allen Räumen geleert
+          chats.clear();
+          unread.clear();
+          unreadHere = 0;
+        } else {
+          chats[e.historyRoom] = List.of(e.history);
+          if (e.history.isEmpty) unread.remove(e.historyRoom);
+        }
         notifyListeners();
       case EventKind.level:
         level = e.level;
         levelNotifier.value = e.level;
       case EventKind.notice:
         if (e.notice.isNotEmpty) _notices.add(e.notice);
+      case EventKind.deviceCode:
+        deviceCode.value = e.notice;
+    }
+  }
+
+  /// Handy: Mikrofon ist nicht erlaubt → Hinweis mit Knopf zu den Einstellungen.
+  bool micDenied = false;
+
+  /// Prüft die Mikrofon-Erlaubnis (ask = ggf. nachfragen). Kommt sie neu dazu,
+  /// wird das Audio neu geöffnet, damit das Mikrofon wirklich läuft.
+  Future<void> checkMic({bool ask = false}) async {
+    if (!TalkiePlatform.isMobile) return;
+    final before = await TalkiePlatform.micStatus();
+    var st = before;
+    if (st != 'granted' && ask) {
+      st = await TalkiePlatform.requestMic() ? 'granted' : 'denied';
+    }
+    final denied = st != 'granted';
+    if (!denied && (before != 'granted' || micDenied)) {
+      await talkieRestartAudio(); // Erlaubnis kam gerade dazu
+    }
+    if (denied != micDenied) {
+      micDenied = denied;
+      notifyListeners();
     }
   }
 
@@ -129,6 +232,7 @@ class TalkieController extends ChangeNotifier {
     if (on == _active) return;
     _active = on;
     TalkiePlatform.setActive(on);
+    TalkiePlatform.setVoiceMode(on && config.settings.echoCancel);
   }
 
   // --- Aktionen ---
@@ -167,8 +271,17 @@ class TalkieController extends ChangeNotifier {
 
   void toggleDeaf() => talkieSetDeaf(deaf: !deaf);
 
+  /// Chat leeren: aktueller Raum oder alle Räume. Ergebnis kommt als Hinweis.
+  void clearChat({required bool all}) => talkieClearChat(room: all ? 0 : currentRoom);
+
   /// Rauswerfen (ban = auch sperren). Das Ergebnis kommt als Hinweis (Snackbar).
   void moderate(UserDto u, {required bool ban}) => talkieModerate(user: u.id, ban: ban);
+
+  /// Push-to-Talk-Knopf in der App gedrückt/losgelassen.
+  void setPttPressed(bool down) => talkieSetPttPressed(down: down);
+
+  /// Lautstärke einer Person nur für mich (0 … 3, 1 = normal).
+  void setUserVolume(UserDto u, double v) => talkieSetUserVolume(user: u.id, volume: v);
 
   /// Schaltet jemanden nur für mich stumm – die anderen hören ihn weiter.
   void toggleUserMuted(UserDto u) => talkieSetUserMuted(user: u.id, muted: !u.localMuted);
@@ -176,6 +289,7 @@ class TalkieController extends ChangeNotifier {
   Future<void> saveSettings(SettingsDto s) async {
     await talkieSetSettings(s: s);
     config = talkieConfig();
+    if (_active) TalkiePlatform.setVoiceMode(config.settings.echoCancel);
     notifyListeners();
   }
 

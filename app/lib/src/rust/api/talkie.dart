@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `chat_dto`, `engine`, `settings_dto`, `state_dto`, `ui_event`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Startet die Engine (einmal pro Programmstart) und liefert die gespeicherte Konfiguration.
 /// `data_dir` leer = Standardordner des Systems.
@@ -48,6 +48,15 @@ void talkieChat({required String text}) =>
 void talkieSetMuted({required bool muted}) =>
     RustLib.instance.api.crateApiTalkieTalkieSetMuted(muted: muted);
 
+/// Lautstärke einer Person nur für mich (0.0 … 3.0, 1.0 = normal). Bleibt gespeichert.
+void talkieSetUserVolume({
+  required PlatformInt64 user,
+  required double volume,
+}) => RustLib.instance.api.crateApiTalkieTalkieSetUserVolume(
+  user: user,
+  volume: volume,
+);
+
 /// Einen anderen Nutzer nur für mich stumm schalten (bleibt gespeichert).
 void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
     RustLib.instance.api.crateApiTalkieTalkieSetUserMuted(
@@ -55,9 +64,37 @@ void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
       muted: muted,
     );
 
+/// Code für ein weiteres Gerät anfordern; kommt als Ereignis DeviceCode zurück.
+void talkieRequestDeviceCode() =>
+    RustLib.instance.api.crateApiTalkieTalkieRequestDeviceCode();
+
+/// Push-to-Talk-Knopf in der App gedrückt halten / loslassen.
+void talkieSetPttPressed({required bool down}) =>
+    RustLib.instance.api.crateApiTalkieTalkieSetPttPressed(down: down);
+
+/// Wählbare Push-to-Talk-Tasten.
+List<PttKeyDto> talkiePttKeys() =>
+    RustLib.instance.api.crateApiTalkieTalkiePttKeys();
+
+/// "ok", "permission" (macOS: Eingabeüberwachung fehlt) oder "unsupported" (nur Knopf in der App).
+String talkiePttAccess() =>
+    RustLib.instance.api.crateApiTalkieTalkiePttAccess();
+
+/// macOS: nach „Eingabeüberwachung“ fragen.
+Future<void> talkiePttRequestAccess() =>
+    RustLib.instance.api.crateApiTalkieTalkiePttRequestAccess();
+
+/// Chat leeren (room 0 = alle Räume). Ergebnis kommt als Hinweis zurück.
+void talkieClearChat({required PlatformInt64 room}) =>
+    RustLib.instance.api.crateApiTalkieTalkieClearChat(room: room);
+
 /// Jemanden rauswerfen (`ban` = auch sperren). Ergebnis kommt als Hinweis zurück.
 void talkieModerate({required PlatformInt64 user, required bool ban}) =>
     RustLib.instance.api.crateApiTalkieTalkieModerate(user: user, ban: ban);
+
+/// Audio neu starten, z. B. nachdem das Mikrofon erlaubt wurde.
+Future<void> talkieRestartAudio() =>
+    RustLib.instance.api.crateApiTalkieTalkieRestartAudio();
 
 void talkieSetDeaf({required bool deaf}) =>
     RustLib.instance.api.crateApiTalkieTalkieSetDeaf(deaf: deaf);
@@ -136,7 +173,34 @@ class ConfigDto {
 
 enum ConnStatus { idle, connecting, connected, reconnecting, failed }
 
-enum EventKind { state, chat, history, level, notice }
+enum EventKind {
+  state,
+  chat,
+  history,
+  level,
+  notice,
+
+  /// Geräte-Code (steht in `notice`).
+  deviceCode,
+}
+
+class PttKeyDto {
+  final String id;
+  final String label;
+
+  const PttKeyDto({required this.id, required this.label});
+
+  @override
+  int get hashCode => id.hashCode ^ label.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PttKeyDto &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          label == other.label;
+}
 
 class RoomDto {
   final PlatformInt64 id;
@@ -164,6 +228,16 @@ class SettingsDto {
   final double inputGain;
   final double outputVolume;
 
+  /// Hinweistöne bei Kommen/Gehen und neuen Chatnachrichten.
+  final bool sounds;
+
+  /// Push-to-Talk statt Sprach-Erkennung, und die Taste dafür.
+  final bool ptt;
+  final String pttKey;
+
+  /// Handy: Echo-Unterdrückung des Systems (ohne Kopfhörer wichtig).
+  final bool echoCancel;
+
   const SettingsDto({
     required this.vadThresholdDb,
     required this.noiseSuppression,
@@ -171,6 +245,10 @@ class SettingsDto {
     required this.outputDevice,
     required this.inputGain,
     required this.outputVolume,
+    required this.sounds,
+    required this.ptt,
+    required this.pttKey,
+    required this.echoCancel,
   });
 
   @override
@@ -180,7 +258,11 @@ class SettingsDto {
       inputDevice.hashCode ^
       outputDevice.hashCode ^
       inputGain.hashCode ^
-      outputVolume.hashCode;
+      outputVolume.hashCode ^
+      sounds.hashCode ^
+      ptt.hashCode ^
+      pttKey.hashCode ^
+      echoCancel.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -192,7 +274,11 @@ class SettingsDto {
           inputDevice == other.inputDevice &&
           outputDevice == other.outputDevice &&
           inputGain == other.inputGain &&
-          outputVolume == other.outputVolume;
+          outputVolume == other.outputVolume &&
+          sounds == other.sounds &&
+          ptt == other.ptt &&
+          pttKey == other.pttKey &&
+          echoCancel == other.echoCancel;
 }
 
 class StateDto {
@@ -209,6 +295,16 @@ class StateDto {
   /// Darf andere rauswerfen/sperren.
   final bool moderator;
 
+  /// Verknüpftes Admin-Konto (darf den Chat leeren).
+  final bool admin;
+
+  /// So viele Stunden bleibt der Chat erhalten (0 = unbegrenzt).
+  final PlatformInt64 chatHours;
+
+  /// Neueste App-Version laut Server ("" = unbekannt) und Download-Adresse.
+  final String latestVersion;
+  final String latestUrl;
+
   const StateDto({
     required this.status,
     required this.message,
@@ -220,6 +316,10 @@ class StateDto {
     required this.muted,
     required this.deaf,
     required this.moderator,
+    required this.admin,
+    required this.chatHours,
+    required this.latestVersion,
+    required this.latestUrl,
   });
 
   @override
@@ -233,7 +333,11 @@ class StateDto {
       users.hashCode ^
       muted.hashCode ^
       deaf.hashCode ^
-      moderator.hashCode;
+      moderator.hashCode ^
+      admin.hashCode ^
+      chatHours.hashCode ^
+      latestVersion.hashCode ^
+      latestUrl.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -249,7 +353,11 @@ class StateDto {
           users == other.users &&
           muted == other.muted &&
           deaf == other.deaf &&
-          moderator == other.moderator;
+          moderator == other.moderator &&
+          admin == other.admin &&
+          chatHours == other.chatHours &&
+          latestVersion == other.latestVersion &&
+          latestUrl == other.latestUrl;
 }
 
 /// Ein Ereignis an die Oberfläche; welche Felder gefüllt sind, hängt von `kind` ab.
@@ -307,6 +415,9 @@ class UserDto {
   /// Nur für mich stumm geschaltet.
   final bool localMuted;
 
+  /// Lautstärke nur für mich (1.0 = normal).
+  final double volume;
+
   const UserDto({
     required this.id,
     required this.name,
@@ -315,6 +426,7 @@ class UserDto {
     required this.deaf,
     required this.talking,
     required this.localMuted,
+    required this.volume,
   });
 
   @override
@@ -325,7 +437,8 @@ class UserDto {
       muted.hashCode ^
       deaf.hashCode ^
       talking.hashCode ^
-      localMuted.hashCode;
+      localMuted.hashCode ^
+      volume.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -338,5 +451,6 @@ class UserDto {
           muted == other.muted &&
           deaf == other.deaf &&
           talking == other.talking &&
-          localMuted == other.localMuted;
+          localMuted == other.localMuted &&
+          volume == other.volume;
 }

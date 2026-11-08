@@ -19,6 +19,14 @@ pub struct Settings {
     pub input_gain: f32,
     /// Lautstärke, 1.0 = unverändert.
     pub output_volume: f32,
+    /// Hinweistöne bei Kommen/Gehen und neuen Chatnachrichten.
+    pub sounds: bool,
+    /// Push-to-Talk statt Sprach-Erkennung.
+    pub ptt: bool,
+    /// Taste für Push-to-Talk (siehe ptt::KEYS).
+    pub ptt_key: String,
+    /// Handy: Echo-Unterdrückung des Systems nutzen (ohne Kopfhörer wichtig).
+    pub echo_cancel: bool,
 }
 
 impl Default for Settings {
@@ -30,6 +38,10 @@ impl Default for Settings {
             output_device: String::new(),
             input_gain: 1.0,
             output_volume: 1.0,
+            sounds: true,
+            ptt: false,
+            ptt_key: crate::core::ptt::DEFAULT_KEY.into(),
+            echo_cancel: true,
         }
     }
 }
@@ -45,6 +57,8 @@ pub struct Config {
     pub last_room: i64,
     /// Nutzer-IDs, die man nur für sich selbst stumm geschaltet hat.
     pub muted_users: Vec<i64>,
+    /// Lautstärke pro Person (Nutzer-ID → Faktor, 1.0 = normal).
+    pub user_volumes: std::collections::BTreeMap<i64, f32>,
     pub settings: Settings,
 }
 

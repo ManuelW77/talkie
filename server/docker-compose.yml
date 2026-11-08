@@ -12,6 +12,12 @@ services:
       - talkie-data:/data
     environment:
       TALKIE_MAX_USERS: "50"
+      # Chatnachrichten nach so vielen Stunden löschen (0 = nie)
+      TALKIE_CHAT_HOURS: ${TALKIE_CHAT_HOURS:-24}
+      # Hinweis auf neue App-Versionen: der Server fragt täglich bei GitHub nach (leer = aus)
+      TALKIE_UPDATE_REPO: ${TALKIE_UPDATE_REPO-ManuelW77/talkie}
+      # oder fest vorgeben (z. B. 1.2.0), dann ohne GitHub
+      TALKIE_LATEST_VERSION: ${TALKIE_LATEST_VERSION:-}
       TZ: Europe/Berlin
       # --- Verwaltungsseite (aus, solange TALKIE_PUBLIC_URL leer ist) ---
       TALKIE_PUBLIC_URL: ${TALKIE_PUBLIC_URL:-}

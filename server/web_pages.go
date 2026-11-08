@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/mail"
@@ -93,7 +94,14 @@ func (w *webApp) userPage(rw http.ResponseWriter, r *http.Request) {
 		w.fail(rw, r, "/users", err)
 		return
 	}
-	w.render(rw, r, "user", u.Name, map[string]any{"U": userRow{*u, w.hub.OnlineIDs()[u.ID]}})
+	devs, err := w.store.Devices(u.ID)
+	if err != nil {
+		w.fail(rw, r, "/users", err)
+		return
+	}
+	w.render(rw, r, "user", u.Name, map[string]any{
+		"U": userRow{*u, w.hub.OnlineIDs()[u.ID]}, "Devices": devs, "Code": adminDeviceCode(me(r), w.store, u.ID), "MaxDevices": MaxDevices,
+	})
 }
 
 func (w *webApp) userAction(rw http.ResponseWriter, r *http.Request) {
@@ -155,6 +163,37 @@ func (w *webApp) userAction(rw http.ResponseWriter, r *http.Request) {
 			w.audit(r, "Talkie-Nutzer "+u.Name+" entsperrt")
 		}
 		w.done(rw, r, back, msg, false)
+	case "device_code":
+		// Mit dem Code kann man sich als dieser Nutzer anmelden → nur Admins
+		if !me(r).IsAdmin() {
+			rw.WriteHeader(http.StatusForbidden)
+			w.render(rw, r, "forbidden", "Kein Zugriff", nil)
+			return
+		}
+		inv, err := w.store.CreateDeviceCode(u.ID, 24*time.Hour)
+		if errors.Is(err, ErrTooManyDevices) {
+			w.done(rw, r, back, fmt.Sprintf("%s hat schon %d Geräte. Erst eins entfernen.", u.Name, MaxDevices), true)
+			return
+		}
+		if err != nil {
+			w.fail(rw, r, back, err)
+			return
+		}
+		w.audit(r, "Geräte-Code für "+u.Name+" erstellt")
+		w.done(rw, r, back, "Geräte-Code "+inv.Code+" erstellt (24 Stunden gültig).", false)
+	case "device_delete":
+		did, _ := strconv.ParseInt(r.PostFormValue("device"), 10, 64)
+		pk, err := w.store.DevicePubKey(u.ID, did)
+		if err == nil {
+			err = w.store.DeleteDevice(u.ID, did)
+		}
+		if err != nil {
+			w.fail(rw, r, back, err)
+			return
+		}
+		w.hub.KickDevice(u.ID, pk, "Dieses Gerät wurde entfernt.")
+		w.audit(r, "Gerät von "+u.Name+" entfernt")
+		w.done(rw, r, back, "Gerät entfernt.", false)
 	case "delete":
 		if _, err := w.store.DeleteUser(u.Name); err != nil {
 			w.fail(rw, r, back, err)
@@ -373,7 +412,32 @@ func (w *webApp) chatPage(rw http.ResponseWriter, r *http.Request) {
 		w.fail(rw, r, "/", err)
 		return
 	}
-	w.render(rw, r, "chat", "Chat", map[string]any{"Rooms": rooms, "Room": sel, "Messages": msgs})
+	w.render(rw, r, "chat", "Chat", map[string]any{
+		"Rooms": rooms, "Room": sel, "Messages": msgs, "KeepHours": int(w.store.ChatKeep / time.Hour),
+	})
+}
+
+// chatClear leert den Chat eines Raums oder aller Räume (nur Admins).
+func (w *webApp) chatClear(rw http.ResponseWriter, r *http.Request) {
+	room, _ := strconv.ParseInt(r.PostFormValue("room"), 10, 64)
+	back := "/chat"
+	name := "allen Räumen"
+	if room != 0 {
+		rm, err := w.store.RoomByID(room)
+		if err != nil {
+			w.fail(rw, r, back, err)
+			return
+		}
+		back += "?room=" + strconv.FormatInt(room, 10)
+		name = "„" + rm.Name + "“"
+	}
+	n, err := w.hub.ClearChat(room)
+	if err != nil {
+		w.fail(rw, r, back, err)
+		return
+	}
+	w.audit(r, "Chat in "+name+" geleert")
+	w.done(rw, r, back, fmt.Sprintf("Chat in %s geleert (%d Nachrichten).", name, n), false)
 }
 
 // --- Web-Konten (nur Admin) ---
@@ -554,4 +618,12 @@ func (w *webApp) auditPage(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.render(rw, r, "audit", "Protokoll", map[string]any{"Log": log})
+}
+
+// adminDeviceCode: offene Geräte-Codes sieht nur ein Admin (damit meldet man sich als der Nutzer an).
+func adminDeviceCode(a *Account, s *Store, userID int64) *DBInvite {
+	if a == nil || !a.IsAdmin() {
+		return nil
+	}
+	return s.DeviceCode(userID)
 }

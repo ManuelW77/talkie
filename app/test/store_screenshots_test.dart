@@ -24,6 +24,10 @@ const _settings = SettingsDto(
   outputDevice: '',
   inputGain: 1,
   outputVolume: 1,
+  sounds: true,
+  ptt: false,
+  pttKey: 'f8',
+  echoCancel: true,
 );
 
 /// Zielgröße in Pixeln, Pixeldichte und Größe des gezeigten Geräte-Bildschirms.
@@ -76,16 +80,20 @@ TalkieController _mainController() {
         RoomDto(id: 13, name: 'Hausaufgaben'),
       ],
       users: [
-        UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true, localMuted: false),
-        UserDto(id: 2, name: 'Lena', room: 10, muted: false, deaf: false, talking: false, localMuted: false),
-        UserDto(id: 5, name: 'Paul', room: 10, muted: true, deaf: false, talking: false, localMuted: false),
-        UserDto(id: 3, name: 'Jonas', room: 11, muted: false, deaf: false, talking: true, localMuted: false),
-        UserDto(id: 4, name: 'Emil', room: 11, muted: false, deaf: false, talking: false, localMuted: false),
-        UserDto(id: 6, name: 'Mia', room: 12, muted: false, deaf: false, talking: false, localMuted: false),
+        UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true, localMuted: false, volume: 1),
+        UserDto(id: 2, name: 'Lena', room: 10, muted: false, deaf: false, talking: false, localMuted: false, volume: 1),
+        UserDto(id: 5, name: 'Paul', room: 10, muted: true, deaf: false, talking: false, localMuted: false, volume: 1),
+        UserDto(id: 3, name: 'Jonas', room: 11, muted: false, deaf: false, talking: true, localMuted: false, volume: 1),
+        UserDto(id: 4, name: 'Emil', room: 11, muted: false, deaf: false, talking: false, localMuted: false, volume: 1),
+        UserDto(id: 6, name: 'Mia', room: 12, muted: false, deaf: false, talking: false, localMuted: false, volume: 1),
       ],
       muted: false,
       deaf: false,
       moderator: false,
+      admin: false,
+      chatHours: 0,
+      latestVersion: '',
+      latestUrl: '',
     );
   c.chats[10] = const [
     ChatDto(room: 10, from: 2, name: 'Lena', text: 'Wer ist dabei? Die Runde startet gleich!', ts: 1762500000),
