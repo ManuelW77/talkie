@@ -927,8 +927,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SettingsDto dco_decode_settings_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return SettingsDto(
       vadThresholdDb: dco_decode_f_32(arr[0]),
       noiseSuppression: dco_decode_bool(arr[1]),
@@ -939,6 +939,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       sounds: dco_decode_bool(arr[6]),
       ptt: dco_decode_bool(arr[7]),
       pttKey: dco_decode_String(arr[8]),
+      echoCancel: dco_decode_bool(arr[9]),
     );
   }
 
@@ -1242,6 +1243,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_sounds = sse_decode_bool(deserializer);
     var var_ptt = sse_decode_bool(deserializer);
     var var_pttKey = sse_decode_String(deserializer);
+    var var_echoCancel = sse_decode_bool(deserializer);
     return SettingsDto(
       vadThresholdDb: var_vadThresholdDb,
       noiseSuppression: var_noiseSuppression,
@@ -1252,6 +1254,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       sounds: var_sounds,
       ptt: var_ptt,
       pttKey: var_pttKey,
+      echoCancel: var_echoCancel,
     );
   }
 
@@ -1566,6 +1569,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self.sounds, serializer);
     sse_encode_bool(self.ptt, serializer);
     sse_encode_String(self.pttKey, serializer);
+    sse_encode_bool(self.echoCancel, serializer);
   }
 
   @protected

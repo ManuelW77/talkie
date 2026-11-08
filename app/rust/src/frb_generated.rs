@@ -1058,6 +1058,7 @@ impl SseDecode for crate::api::talkie::SettingsDto {
         let mut var_sounds = <bool>::sse_decode(deserializer);
         let mut var_ptt = <bool>::sse_decode(deserializer);
         let mut var_pttKey = <String>::sse_decode(deserializer);
+        let mut var_echoCancel = <bool>::sse_decode(deserializer);
         return crate::api::talkie::SettingsDto {
             vad_threshold_db: var_vadThresholdDb,
             noise_suppression: var_noiseSuppression,
@@ -1068,6 +1069,7 @@ impl SseDecode for crate::api::talkie::SettingsDto {
             sounds: var_sounds,
             ptt: var_ptt,
             ptt_key: var_pttKey,
+            echo_cancel: var_echoCancel,
         };
     }
 }
@@ -1360,6 +1362,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::talkie::SettingsDto {
             self.sounds.into_into_dart().into_dart(),
             self.ptt.into_into_dart().into_dart(),
             self.ptt_key.into_into_dart().into_dart(),
+            self.echo_cancel.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1671,6 +1674,7 @@ impl SseEncode for crate::api::talkie::SettingsDto {
         <bool>::sse_encode(self.sounds, serializer);
         <bool>::sse_encode(self.ptt, serializer);
         <String>::sse_encode(self.ptt_key, serializer);
+        <bool>::sse_encode(self.echo_cancel, serializer);
     }
 }
 

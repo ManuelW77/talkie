@@ -53,6 +53,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     bool? sounds,
     bool? ptt,
     String? pttKey,
+    bool? echoCancel,
   }) => SettingsDto(
     vadThresholdDb: vad ?? _s.vadThresholdDb,
     noiseSuppression: ns ?? _s.noiseSuppression,
@@ -63,6 +64,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     sounds: sounds ?? _s.sounds,
     ptt: ptt ?? _s.ptt,
     pttKey: pttKey ?? _s.pttKey,
+    echoCancel: echoCancel ?? _s.echoCancel,
   );
 
   Widget _pttSection(ThemeData theme) {
@@ -232,6 +234,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   onChangeEnd: (v) => _update(_copy(vad: v)),
                 ),
               ],
+              // Handy: Echo-Unterdrückung des Systems (ohne Kopfhörer wichtig)
+              if (TalkiePlatform.isMobile)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Echo-Unterdrückung'),
+                  subtitle: const Text('Damit die anderen sich nicht selbst hören, wenn du ohne Kopfhörer sprichst'),
+                  value: _s.echoCancel,
+                  onChanged: (v) => _update(_copy(echoCancel: v)),
+                ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Rauschfilter'),

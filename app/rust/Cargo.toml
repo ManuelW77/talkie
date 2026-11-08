@@ -35,10 +35,16 @@ windows-sys = { version = "0.61", features = ["Win32_UI_Input_KeyboardAndMouse"]
 [target.'cfg(all(target_os = "linux", not(target_os = "android")))'.dependencies]
 x11-dl = "2.21"
 
-# Android: cpal braucht den Java-Kontext der App (siehe src/android.rs)
+# Android: cpal braucht den Java-Kontext der App (siehe src/android.rs);
+# libc zum Laden von AAudio zur Laufzeit (Echo-Unterdrückung, src/core/voice)
 [target.'cfg(target_os = "android")'.dependencies]
 jni-sys = "0.3"
 ndk-context = "0.1"
+libc = "0.2"
+
+# iOS: Voice Processing IO (Echo-Unterdrückung), gleiche Version wie in cpal
+[target.'cfg(target_os = "ios")'.dependencies]
+coreaudio-rs = { version = "0.14.2", default-features = false, features = ["audio_unit", "core_audio"] }
 
 # Debug-Builds: keine Debug-Infos für Abhängigkeiten (sonst 200 MB große Android-APK)
 [profile.dev.package."*"]

@@ -70,6 +70,16 @@ class TalkiePlatform {
     }
   }
 
+  /// Android: Kommunikationsmodus für die Echo-Unterdrückung (iOS regelt das selbst).
+  static Future<void> setVoiceMode(bool on) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _ch.invokeMethod<void>('setVoiceMode', on);
+    } on PlatformException {
+      // dann eben ohne
+    }
+  }
+
   /// Verbunden: Android startet den Hintergrund-Dienst, iOS aktiviert die Audio-Sitzung.
   static Future<void> setActive(bool on) async {
     if (!isMobile) return;

@@ -241,7 +241,13 @@ impl Inner {
         }
         let s = self.config.lock().settings.clone();
         let (io, warnings) =
-            device::start(s.input_device, s.output_device, self.capture_tx.clone(), self.mixer.clone());
+            device::start(
+                s.input_device,
+                s.output_device,
+                self.capture_tx.clone(),
+                self.mixer.clone(),
+                s.echo_cancel,
+            );
         *a = Some(io);
         drop(a);
         for w in warnings {
@@ -595,7 +601,9 @@ impl Engine {
     pub fn set_settings(&self, s: Settings) {
         let devices_changed = {
             let mut c = self.inner.config.lock();
-            let changed = c.settings.input_device != s.input_device || c.settings.output_device != s.output_device;
+            let changed = c.settings.input_device != s.input_device
+                || c.settings.output_device != s.output_device
+                || c.settings.echo_cancel != s.echo_cancel;
             c.settings = s.clone();
             changed
         };
