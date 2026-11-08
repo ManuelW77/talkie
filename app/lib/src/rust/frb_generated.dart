@@ -66,7 +66,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -872308923;
+  int get rustContentHash => -400022947;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -123,6 +123,11 @@ abstract class RustLibApi extends BaseApi {
   void crateApiTalkieTalkieSetUserMuted({
     required PlatformInt64 user,
     required bool muted,
+  });
+
+  void crateApiTalkieTalkieSetUserVolume({
+    required PlatformInt64 user,
+    required double volume,
   });
 }
 
@@ -610,6 +615,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         argNames: ["user", "muted"],
       );
 
+  @override
+  void crateApiTalkieTalkieSetUserVolume({
+    required PlatformInt64 user,
+    required double volume,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_i_64(user, serializer);
+          sse_encode_f_32(volume, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiTalkieTalkieSetUserVolumeConstMeta,
+        argValues: [user, volume],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTalkieTalkieSetUserVolumeConstMeta =>
+      const TaskConstMeta(
+        debugName: "talkie_set_user_volume",
+        argNames: ["user", "volume"],
+      );
+
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -837,8 +872,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   UserDto dco_decode_user_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return UserDto(
       id: dco_decode_i_64(arr[0]),
       name: dco_decode_String(arr[1]),
@@ -847,6 +882,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       deaf: dco_decode_bool(arr[4]),
       talking: dco_decode_bool(arr[5]),
       localMuted: dco_decode_bool(arr[6]),
+      volume: dco_decode_f_32(arr[7]),
     );
   }
 
@@ -1141,6 +1177,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_deaf = sse_decode_bool(deserializer);
     var var_talking = sse_decode_bool(deserializer);
     var var_localMuted = sse_decode_bool(deserializer);
+    var var_volume = sse_decode_f_32(deserializer);
     return UserDto(
       id: var_id,
       name: var_name,
@@ -1149,6 +1186,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       deaf: var_deaf,
       talking: var_talking,
       localMuted: var_localMuted,
+      volume: var_volume,
     );
   }
 
@@ -1404,5 +1442,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self.deaf, serializer);
     sse_encode_bool(self.talking, serializer);
     sse_encode_bool(self.localMuted, serializer);
+    sse_encode_f_32(self.volume, serializer);
   }
 }

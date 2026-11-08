@@ -48,6 +48,8 @@ pub struct Config {
     pub last_room: i64,
     /// Nutzer-IDs, die man nur für sich selbst stumm geschaltet hat.
     pub muted_users: Vec<i64>,
+    /// Lautstärke pro Person (Nutzer-ID → Faktor, 1.0 = normal).
+    pub user_volumes: std::collections::BTreeMap<i64, f32>,
     pub settings: Settings,
 }
 
