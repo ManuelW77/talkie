@@ -10,5 +10,5 @@ export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$CLEAN_PATH"
 export FLUTTER_XCODE_ARCHS=arm64 FLUTTER_XCODE_ONLY_ACTIVE_ARCH=YES
 flutter build ios --simulator --debug "$@"
 echo
-echo "Fertig: build/ios/iphonesimulator/Runner.app"
-echo "Installieren: xcrun simctl install booted build/ios/iphonesimulator/Runner.app"
+echo "Fertig: build/ios/iphonesimulator/Talkie.app"
+echo "Installieren: xcrun simctl install booted build/ios/iphonesimulator/Talkie.app"
