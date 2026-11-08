@@ -60,6 +60,8 @@ pub struct StateDto {
     pub users: Vec<UserDto>,
     pub muted: bool,
     pub deaf: bool,
+    /// Darf andere rauswerfen/sperren.
+    pub moderator: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -134,6 +136,7 @@ fn state_dto(s: Snapshot) -> StateDto {
             .collect(),
         muted: s.muted,
         deaf: s.deaf,
+        moderator: s.moderator,
     }
 }
 
@@ -250,6 +253,13 @@ pub fn talkie_set_muted(muted: bool) -> Result<()> {
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_set_user_muted(user: i64, muted: bool) -> Result<()> {
     engine()?.set_user_muted(user, muted);
+    Ok(())
+}
+
+/// Jemanden rauswerfen (`ban` = auch sperren). Ergebnis kommt als Hinweis zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_moderate(user: i64, ban: bool) -> Result<()> {
+    engine()?.moderate(user, ban);
     Ok(())
 }
 

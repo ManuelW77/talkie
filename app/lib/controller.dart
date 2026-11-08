@@ -57,6 +57,8 @@ class TalkieController extends ChangeNotifier {
   int get currentRoom => state?.room ?? 0;
   bool get muted => state?.muted ?? false;
   bool get deaf => state?.deaf ?? false;
+  /// Darf andere rauswerfen/sperren (verknüpftes Webkonto mit Recht).
+  bool get moderator => state?.moderator ?? false;
   List<ChatDto> get currentChat => chats[currentRoom] ?? const [];
 
   UserDto? get meUser {
@@ -164,6 +166,9 @@ class TalkieController extends ChangeNotifier {
   void toggleMute() => talkieSetMuted(muted: !muted);
 
   void toggleDeaf() => talkieSetDeaf(deaf: !deaf);
+
+  /// Rauswerfen (ban = auch sperren). Das Ergebnis kommt als Hinweis (Snackbar).
+  void moderate(UserDto u, {required bool ban}) => talkieModerate(user: u.id, ban: ban);
 
   /// Schaltet jemanden nur für mich stumm – die anderen hören ihn weiter.
   void toggleUserMuted(UserDto u) => talkieSetUserMuted(user: u.id, muted: !u.localMuted);

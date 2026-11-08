@@ -379,3 +379,66 @@ func TestIgnoreOnlyForSelf(t *testing.T) {
 		t.Fatalf("Ben hört Anna nach Aufheben nicht (%d)", got)
 	}
 }
+
+func TestModerationFromApp(t *testing.T) {
+	srv := startTestServer(t)
+	inv, err := srv.store.CreateInvite(4, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyMod := newKey(t)
+	// Zuerst registrieren, dann Webkonten verknüpfen, dann neu anmelden (mod kommt im welcome)
+	m0, wm := login(t, srv.addr, keyMod, "Mama", inv.Code)
+	_, wa := login(t, srv.addr, newKey(t), "Anna", inv.Code)
+	b, wb := login(t, srv.addr, newKey(t), "Ben", inv.Code)
+	_, wc := login(t, srv.addr, newKey(t), "Chef", inv.Code)
+	if wm.Mod != nil {
+		t.Fatal("ohne verknüpftes Konto darf niemand moderieren")
+	}
+	m0.conn.CloseWithError(0, "")
+
+	if _, err := srv.store.AddAccount(Account{Email: "mama@x.de", Role: RoleUser, Perms: PermUsersEdit, TalkieID: wm.You.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.store.AddAccount(Account{Email: "oma@x.de", Role: RoleUser, Perms: PermInvite, TalkieID: wb.You.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.store.AddAccount(Account{Email: "chef@x.de", Role: RoleAdmin, TalkieID: wc.You.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	m, wm2 := login(t, srv.addr, keyMod, "", "")
+	if wm2.Mod == nil || !*wm2.Mod {
+		t.Fatalf("Mama muss moderieren dürfen: %+v", wm2)
+	}
+
+	// Ben hat nur „Kids einladen“ → darf nicht
+	writeEnv(t, b.stream, &Envelope{T: "kick", ID: wa.You.ID})
+	if e := b.expect("error"); e.Code != "forbidden" {
+		t.Fatalf("Ben: %+v", e)
+	}
+	// Admin ist geschützt
+	writeEnv(t, m.stream, &Envelope{T: "kick", ID: wc.You.ID})
+	if e := m.expect("error"); !strings.Contains(e.Reason, "Admins") {
+		t.Fatalf("Admin-Schutz: %+v", e)
+	}
+	// Ben rauswerfen
+	writeEnv(t, m.stream, &Envelope{T: "kick", ID: wb.You.ID})
+	if e := m.expect("info"); !strings.Contains(e.Reason, "rausgeworfen") {
+		t.Fatalf("kick: %+v", e)
+	}
+	if k := b.expect("kicked"); !strings.Contains(k.Reason, "Mama") {
+		t.Fatalf("Ben bekam: %+v", k)
+	}
+	// Anna sperren → fliegt raus und kommt nicht wieder rein
+	writeEnv(t, m.stream, &Envelope{T: "ban", ID: wa.You.ID})
+	if e := m.expect("info"); !strings.Contains(e.Reason, "gesperrt") {
+		t.Fatalf("ban: %+v", e)
+	}
+	if u, _ := srv.store.UserByID(wa.You.ID); u == nil || !u.Banned {
+		t.Fatal("Anna nicht gesperrt")
+	}
+	if log, _ := srv.store.AuditLog(10); len(log) == 0 || !strings.Contains(log[0].Who, "(App)") {
+		t.Fatalf("Protokoll fehlt: %+v", log)
+	}
+}

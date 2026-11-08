@@ -26,6 +26,7 @@
       <option value="0">– keiner –</option>
       {{range .D.Users}}<option value="{{.ID}}" {{if eq .ID $a.TalkieID}}selected{{end}}>{{.Name}}</option>{{end}}
     </select>
+    <small class="muted">Mit dem Recht „Talkie-Nutzer bearbeiten, rauswerfen, sperren“ (Admins immer) kann dieser Talkie-Nutzer dann direkt in der App rauswerfen und sperren.</small>
   </label>
   {{if not .D.New}}
   <label class="check full"><input type="checkbox" name="disabled" value="1" {{if $a.Disabled}}checked{{end}}> Konto deaktivieren (Anmeldung gesperrt)</label>
