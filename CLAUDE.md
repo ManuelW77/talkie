@@ -86,6 +86,7 @@ export PATH=/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbi
 | macOS-App bauen | `app/tool/build_macos.sh` |
 | Icons neu erzeugen | `app/tool/make_icons.sh` |
 | Lokaler Testbetrieb mit Verwaltung + Mailpit | `server/dev.sh up` → http://localhost:8090 (admin@talkie.local), Mails: http://localhost:8026 |
+| Browser-Smoke-Test der Verwaltungsseite (echter Chrome, braucht `dev.sh up`) | `node server/tool/browser_smoke.mjs` |
 | Lokaler Server ohne Webseite | `cd server && docker compose up -d --build` |
 | Einladung (lokal) | `docker exec talkie talkie-server invite 3` |
 | Screenshots der Verwaltungsseite | `TALKIE_SNAPSHOT=<ordner> go test -run Snapshot ./...` in `server/`, dann Headless-Chrome |
@@ -105,7 +106,9 @@ wieder löschen (`user-del`, `invite-del`).
 
 ## Qualität
 
-- Vor jedem Merge nach `devel`: alle betroffenen Tests grün (Server mit `-race`). Bei Protokoll- oder
+- Vor jedem Merge nach `devel`: alle betroffenen Tests grün (Server mit `-race`). Bei Änderungen an der
+  Verwaltungsseite zusätzlich `browser_smoke.mjs` – Go-Tests sehen kein echtes Browserverhalten
+  (z. B. schickt Chrome bei `Referrer-Policy: no-referrer` „Origin: null“). Bei Protokoll- oder
   Kernänderungen zusätzlich den Ende-zu-Ende-Test laufen lassen.
 - Sicherheit ernst nehmen: Rate-Limits, atomare Prüfungen, keine Nutzerdaten in Logs, CSRF auf der
   Verwaltungsseite. Neue Abhängigkeiten in der CI auf Commit-SHAs pinnen (Fremd-Actions).

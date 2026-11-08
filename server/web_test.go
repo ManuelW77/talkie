@@ -320,6 +320,11 @@ func TestWebPermissions(t *testing.T) {
 		t.Fatalf("fremder Origin: %d", resp.StatusCode)
 	}
 	resp.Body.Close()
+	// Die Seite muss Browsern erlauben, den eigenen Origin bei Formularen mitzuschicken
+	// (bei no-referrer kommt „Origin: null“ und jedes Formular würde abgelehnt).
+	if p := resp.Header.Get("Referrer-Policy"); p == "no-referrer" || p == "" {
+		t.Fatalf("Referrer-Policy %q bricht Formulare", p)
+	}
 }
 
 func itoa(i int64) string { return strconv.FormatInt(i, 10) }
