@@ -204,8 +204,15 @@ func TestRegisterChatVoice(t *testing.T) {
 
 	// B wechselt den Raum → A's Sprache kommt nicht mehr an
 	writeEnv(t, b.stream, &Envelope{T: "join", Room: w.Rooms[1].ID})
-	if h := b.expect("history"); h.Room != w.Rooms[1].ID {
-		t.Fatalf("history: %+v", h)
+	// Der Verlauf des Startraums kann noch unterwegs sein – bis zum neuen Raum überspringen.
+	for i := 0; ; i++ {
+		h := b.expect("history")
+		if h.Room == w.Rooms[1].ID {
+			break
+		}
+		if i >= 2 {
+			t.Fatalf("history: %+v", h)
+		}
 	}
 	a.expect("user_update")
 	_ = a.conn.SendDatagram(pkt)
