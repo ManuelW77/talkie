@@ -111,6 +111,56 @@ func (h *Hub) TempRoomNameTaken(name string) bool {
 	return false
 }
 
+// TempRoomInfo: Angaben zu einem App-Raum für die Verwaltungsseite (nie das Passwort).
+type TempRoomInfo struct {
+	ID      int64
+	Name    string
+	Creator string
+	Locked  bool
+	Online  int
+}
+
+// TempRoomList liefert die gerade bestehenden temporären Räume mit Ersteller und Anzahl Online.
+func (h *Hub) TempRoomList() []TempRoomInfo {
+	h.mu.RLock()
+	out := make([]TempRoomInfo, 0, len(h.temp))
+	creators := make([]int64, 0, len(h.temp))
+	for _, r := range h.temp {
+		info := TempRoomInfo{ID: r.id, Name: r.name, Locked: r.locked()}
+		if s := h.sessions[r.creator]; s != nil {
+			info.Creator = s.name
+		}
+		for _, s := range h.sessions {
+			if s.room == r.id {
+				info.Online++
+			}
+		}
+		out = append(out, info)
+		creators = append(creators, r.creator)
+	}
+	h.mu.RUnlock()
+
+	// Ersteller, die nicht mehr online sind: Name aus der Datenbank, ohne dabei den Hub zu sperren
+	var users []DBUser
+	loaded := false
+	for i := range out {
+		if out[i].Creator != "" {
+			continue
+		}
+		if !loaded {
+			users, _ = h.store.Users()
+			loaded = true
+		}
+		for _, u := range users {
+			if u.ID == creators[i] {
+				out[i].Creator = u.Name
+				break
+			}
+		}
+	}
+	return out
+}
+
 // dropEmptyTempLocked löscht den temporären Raum id, falls niemand mehr drin ist.
 func (h *Hub) dropEmptyTempLocked(id int64) {
 	idx := -1

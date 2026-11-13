@@ -31,6 +31,26 @@
 </table>
 <p class="muted">Der oberste Raum ist der Startraum.</p>
 
+<h2>Räume aus der App</h2>
+{{if .D.Temp}}
+<table>
+  <thead><tr><th>Raum</th><th>Erstellt von</th><th>Passwort</th><th>Online</th></tr></thead>
+  <tbody>
+  {{range .D.Temp}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td>{{if .Creator}}{{.Creator}}{{else}}<span class="muted">unbekannt</span>{{end}}</td>
+    <td>{{if .Locked}}<span class="tag">🔒 mit Passwort</span>{{else}}<span class="muted">offen</span>{{end}}</td>
+    <td>{{.Online}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+<p class="muted">Diese Räume wurden in der App erstellt und verschwinden, wenn alle sie verlassen haben.</p>
+{{else}}
+<p class="muted">Gerade gibt es keine Räume aus der App.</p>
+{{end}}
+
 {{if .Can.rooms}}
 <section class="card">
   <h2>Neuer Raum</h2>
