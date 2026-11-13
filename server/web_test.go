@@ -807,3 +807,34 @@ func TestTempRoomNamesInWeb(t *testing.T) {
 		t.Fatal("Raum ohne Namenskollision nicht angelegt")
 	}
 }
+
+func TestRoomsPageShowsTempRooms(t *testing.T) {
+	wt := newWebTest(t, nil)
+	wt.account("chef@example.org", "admin", 0)
+	b := wt.browser()
+	b.login("chef@example.org")
+	_, _, body := b.get("/rooms")
+	if !strings.Contains(body, "Gerade gibt es keine Räume aus der App.") {
+		t.Fatal("Leer-Text fehlt")
+	}
+	salt := []byte("salz")
+	wt.hub.mu.Lock()
+	wt.hub.sessions[77] = &Session{hub: wt.hub, userID: 77, name: "Emil", room: tempRoomFirstID,
+		out: make(chan []byte, 4), done: make(chan struct{})}
+	wt.hub.temp = append(wt.hub.temp,
+		&tempRoom{id: tempRoomFirstID, name: "Zockerhöhle", creator: 77, salt: salt, hash: hashPassword(salt, "streng-geheim")},
+		&tempRoom{id: tempRoomFirstID + 1, name: "Offenes Zimmer", creator: 77})
+	wt.hub.mu.Unlock()
+	_, _, body = b.get("/rooms")
+	for _, want := range []string{"Räume aus der App", "Zockerhöhle", "Emil", "mit Passwort", "Offenes Zimmer", "offen"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("%q fehlt", want)
+		}
+	}
+	if strings.Contains(body, "streng-geheim") || strings.Contains(body, "salz") {
+		t.Fatal("Passwortdaten im HTML")
+	}
+	if strings.Contains(body, "Gerade gibt es keine Räume aus der App.") {
+		t.Fatal("Leer-Text trotz Räumen")
+	}
+}
