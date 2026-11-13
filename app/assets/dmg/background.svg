@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF3E2"/><stop offset="1" stop-color="#FFD9B5"/></linearGradient>
+<linearGradient id="ar" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFB13B"/><stop offset="1" stop-color="#F2661D"/></linearGradient>
+</defs>
+<rect width="600" height="400" fill="url(#bg)"/>
+<g fill="none" stroke="#fff" stroke-opacity="0.55" stroke-width="10" stroke-linecap="round">
+<path d="M-20 60 A120 120 0 0 1 60 -20"/><path d="M-20 110 A170 170 0 0 1 110 -20"/>
+<path d="M620 340 A120 120 0 0 1 540 420"/><path d="M620 290 A170 170 0 0 1 490 420"/>
+</g>
+<circle cx="560" cy="50" r="14" fill="#2EC4B6" fill-opacity="0.35"/>
+<circle cx="40" cy="352" r="10" fill="#F2661D" fill-opacity="0.25"/>
+<g fill="none" stroke="url(#ar)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+<path d="M240 190 H350"/><path d="M325 163 L355 190 L325 217"/></g>
+<text x="300" y="360" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#8A4A1E">Talkie in „Programme“ ziehen</text>
+</svg>

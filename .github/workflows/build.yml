@@ -86,8 +86,7 @@ jobs:
         run: |
           APP=build/macos/Build/Products/Release/Talkie.app
           lipo -info "$APP/Contents/MacOS/Talkie"
-          mkdir -p dmg && cp -R "$APP" dmg/ && ln -s /Applications dmg/Programme
-          hdiutil create -volname Talkie -srcfolder dmg -ov -format UDZO Talkie-macOS.dmg
+          tool/make_dmg.sh "$APP" Talkie-macOS.dmg
       # Release: mit Developer ID signieren und bei Apple notarisieren (Secrets siehe docs/RELEASE.md)
       - name: Signieren und notarisieren
         if: startsWith(github.ref, 'refs/tags/v')
