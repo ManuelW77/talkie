@@ -75,10 +75,10 @@ TalkieController _mainController() {
       me: 1,
       room: 10,
       rooms: [
-        RoomDto(id: 10, name: 'Lobby'),
-        RoomDto(id: 11, name: 'Minecraft'),
-        RoomDto(id: 12, name: 'Fortnite'),
-        RoomDto(id: 13, name: 'Hausaufgaben'),
+        RoomDto(id: 10, name: 'Lobby', temp: false, locked: false),
+        RoomDto(id: 11, name: 'Minecraft', temp: false, locked: false),
+        RoomDto(id: 12, name: 'Fortnite', temp: false, locked: false),
+        RoomDto(id: 13, name: 'Hausaufgaben', temp: false, locked: false),
       ],
       users: [
         UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true, localMuted: false, volume: 1),

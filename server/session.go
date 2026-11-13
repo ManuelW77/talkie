@@ -137,9 +137,16 @@ func (s *Session) controlLoop() {
 		}
 		switch e.T {
 		case "join":
-			if s.hub.Join(s, e.Room) {
+			switch err := s.hub.Join(s, e.Room, e.Password); {
+			case err == nil:
 				s.sendHistory(e.Room)
+			case errors.Is(err, errRoomPassword):
+				s.send(&Envelope{T: "error", Code: "room_password", Room: e.Room, Reason: "Das Passwort stimmt nicht."})
+			case errors.Is(err, errTooManyTries):
+				s.send(&Envelope{T: "error", Code: "rate_limited", Reason: "Zu viele Versuche. Warte bitte kurz."})
 			}
+		case "create_room":
+			s.hub.CreateRoom(s, e.Name, e.Password)
 		case "chat":
 			text, ok := cleanChat(e.Text)
 			if !ok {
@@ -172,10 +179,13 @@ func (s *Session) controlLoop() {
 }
 
 func (s *Session) sendHistory(room int64) {
-	msgs, err := s.hub.store.History(room, historySize)
-	if err != nil {
-		log.Printf("history: %v", err)
-		return
+	msgs, isTemp := s.hub.tempHistory(room)
+	if !isTemp {
+		var err error
+		if msgs, err = s.hub.store.History(room, historySize); err != nil {
+			log.Printf("history: %v", err)
+			return
+		}
 	}
 	// Älteste Nachrichten weglassen, bis der Verlauf in einen Frame passt
 	for len(msgs) > 0 {

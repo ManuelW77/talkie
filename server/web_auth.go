@@ -87,7 +87,9 @@ Oder melde dich mit diesem Link an:
 Code und Link gelten 15 Minuten und nur einmal.
 Wenn du das nicht angefordert hast, ignoriere diese Mail einfach.
 `, acc.Name, code[:4], code[4:], w.cfg.PublicURL, link)
-	if err := w.cfg.Mailer.Send(acc.Email, "Dein Talkie-Anmeldecode: "+code[:4]+" "+code[4:], body); err != nil {
+	if err := w.cfg.Mailer.Send(acc.Email, "Dein Talkie-Anmeldecode: "+code[:4]+" "+code[4:], body,
+		renderMail("login.html", map[string]any{"Name": acc.Name, "Code": code[:4] + "\u00a0" + code[4:],
+			"Link": w.cfg.PublicURL + "/login/link?t=" + link})); err != nil {
 		log.Printf("web: login-mail an %s: %v", acc.Email, err)
 	}
 }

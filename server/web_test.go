@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/mail"
 	"net/url"
 	"path/filepath"
 	"regexp"
@@ -23,12 +27,14 @@ import (
 type fakeMailer struct {
 	mu   sync.Mutex
 	sent []string // "to|subject|body"
+	html []string // HTML-Fassung, parallel zu sent
 }
 
-func (f *fakeMailer) Send(to, subject, body string) error {
+func (f *fakeMailer) Send(to, subject, body, html string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sent = append(f.sent, to+"|"+subject+"|"+body)
+	f.html = append(f.html, html)
 	return nil
 }
 
@@ -687,5 +693,117 @@ func TestInviteMailInstallHints(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("%q fehlt in der Mail:\n%s", want, body)
 		}
+	}
+}
+
+func TestInviteMailHTML(t *testing.T) {
+	wt := newWebTest(t, nil)
+	inv := &DBInvite{Code: "ABCD2345", Expires: time.Now().Add(24 * time.Hour)}
+	wt.app.cfg.ServerAddr = ""
+	h := wt.app.inviteMailHTML(inv, "<script>alert(1)</script>")
+	if !strings.Contains(h, "ABCD2345") || !strings.Contains(h, "cid:talkie-icon") || !strings.Contains(h, appStoreURL) {
+		t.Fatalf("Code, Icon oder App Store fehlt:\n%s", h)
+	}
+	if strings.Contains(h, "<script>") || !strings.Contains(h, "&lt;script&gt;") {
+		t.Fatal("Absendername nicht escaped")
+	}
+	if strings.Contains(h, "data:image") || strings.Contains(h, "Talkie-Windows.zip") || strings.Contains(h, "Server</b>") {
+		t.Fatal("Download- oder Server-Schritt ohne Konfiguration sichtbar")
+	}
+	if !strings.Contains(h, ">3</div>") || strings.Contains(h, ">4</div>") {
+		t.Fatal("Schrittnummern ohne Server falsch")
+	}
+	wt.app.cfg.DownloadURL = "https://example.test/dl"
+	wt.app.cfg.ServerAddr = "talkie.test:7777"
+	h = wt.app.inviteMailHTML(inv, "Manuel")
+	for _, want := range []string{"https://example.test/dl", "Talkie-Windows.zip", "talkie.test:7777", ">4</div>"} {
+		if !strings.Contains(h, want) {
+			t.Errorf("%q fehlt", want)
+		}
+	}
+}
+
+func TestLoginMailHTML(t *testing.T) {
+	h := renderMail("login.html", map[string]any{"Name": "<b>x</b>", "Code": "1234 5678", "Link": "https://t.test/login/link?t=abc&x=1"})
+	for _, want := range []string{"1234 5678", "cid:talkie-icon", "https://t.test/login/link?t=abc&amp;x=1", "&lt;b&gt;x"} {
+		if !strings.Contains(h, want) {
+			t.Errorf("%q fehlt:\n%s", want, h)
+		}
+	}
+}
+
+func TestBuildMailMIME(t *testing.T) {
+	from := &mail.Address{Name: "Talkie", Address: "talkie@example.test"}
+	raw := buildMail(from, "a@example.test", "Betreff ä", "Text ä\nzwei", "<p>"+strings.Repeat("lang ä ", 500)+"</p>")
+	msg, err := mail.ReadMessage(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mt, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
+	if err != nil || mt != "multipart/alternative" {
+		t.Fatalf("Content-Type %q %v", mt, err)
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if len(line) > 998 {
+			t.Fatalf("Zeile zu lang: %d", len(line))
+		}
+	}
+	mr := multipart.NewReader(msg.Body, params["boundary"])
+	var kinds []string
+	var cid string
+	for {
+		p, err := mr.NextPart()
+		if err != nil {
+			break
+		}
+		pt, pp, _ := mime.ParseMediaType(p.Header.Get("Content-Type"))
+		kinds = append(kinds, pt)
+		if pt == "multipart/related" {
+			rr := multipart.NewReader(p, pp["boundary"])
+			for {
+				q, err := rr.NextPart()
+				if err != nil {
+					break
+				}
+				kinds = append(kinds, q.Header.Get("Content-Type"))
+				if c := q.Header.Get("Content-ID"); c != "" {
+					cid = c
+				}
+			}
+		}
+	}
+	if len(kinds) != 4 || kinds[0] != "text/plain" || kinds[1] != "multipart/related" || cid != "<talkie-icon>" {
+		t.Fatalf("Aufbau falsch: %v cid=%q", kinds, cid)
+	}
+	plain := buildMail(from, "a@example.test", "x", "nur Text", "")
+	if !strings.Contains(string(plain), "text/plain") || strings.Contains(string(plain), "multipart") {
+		t.Fatal("ohne HTML nur Text erwartet")
+	}
+}
+
+func TestTempRoomNamesInWeb(t *testing.T) {
+	wt := newWebTest(t, nil)
+	wt.account("chef@example.org", "admin", 0)
+	b := wt.browser()
+	b.login("chef@example.org")
+	tok := b.csrf()
+	wt.hub.mu.Lock()
+	wt.hub.temp = append(wt.hub.temp, &tempRoom{id: tempRoomFirstID, name: "Geheim"})
+	wt.hub.mu.Unlock()
+	if got := wt.app.roomNames()[tempRoomFirstID]; got != "Geheim (App-Raum)" {
+		t.Fatalf("Raumname: %q", got)
+	}
+	dbCount := func() int { r, _ := wt.store.Rooms(); return len(r) }
+	before := dbCount()
+	b.post("/rooms", url.Values{"csrf": {tok}, "name": {"GEHEIM"}})
+	if dbCount() != before {
+		t.Fatal("Raum mit Namen eines App-Raums wurde angelegt")
+	}
+	if f := b.flash(); !strings.Contains(f, "aus der App") {
+		t.Fatalf("Meldung: %q", f)
+	}
+	b.post("/rooms", url.Values{"csrf": {tok}, "name": {"Anders"}})
+	if dbCount() != before+1 {
+		t.Fatal("Raum ohne Namenskollision nicht angelegt")
 	}
 }

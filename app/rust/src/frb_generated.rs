@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1240692123;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 343425383;
 
 // Section: executor
 
@@ -216,6 +216,39 @@ fn wire__crate__api__talkie__talkie_connect_impl(
         },
     )
 }
+fn wire__crate__api__talkie__talkie_create_room_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "talkie_create_room",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            let api_password = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                (move || {
+                    let output_ok = crate::api::talkie::talkie_create_room(api_name, api_password)?;
+                    std::result::Result::Ok(output_ok)
+                })(),
+            )
+        },
+    )
+}
 fn wire__crate__api__talkie__talkie_disconnect_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -374,10 +407,11 @@ fn wire__crate__api__talkie__talkie_join_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_room = <i64>::sse_decode(&mut deserializer);
+            let api_password = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
                 (move || {
-                    let output_ok = crate::api::talkie::talkie_join(api_room)?;
+                    let output_ok = crate::api::talkie::talkie_join(api_room, api_password)?;
                     std::result::Result::Ok(output_ok)
                 })(),
             )
@@ -1032,6 +1066,17 @@ impl SseDecode for Vec<crate::api::talkie::UserDto> {
     }
 }
 
+impl SseDecode for Option<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<String>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::api::talkie::ChatDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1071,9 +1116,13 @@ impl SseDecode for crate::api::talkie::RoomDto {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_id = <i64>::sse_decode(deserializer);
         let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_temp = <bool>::sse_decode(deserializer);
+        let mut var_locked = <bool>::sse_decode(deserializer);
         return crate::api::talkie::RoomDto {
             id: var_id,
             name: var_name,
+            temp: var_temp,
+            locked: var_locked,
         };
     }
 }
@@ -1212,23 +1261,25 @@ fn pde_ffi_dispatcher_primary_impl(
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
         1 => wire__crate__api__talkie__init_app_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__talkie__talkie_events_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__talkie__talkie_init_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__talkie__talkie_input_devices_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__talkie__talkie_logout_impl(port, ptr, rust_vec_len, data_len),
-        13 => {
+        8 => wire__crate__api__talkie__talkie_events_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__talkie__talkie_init_impl(port, ptr, rust_vec_len, data_len),
+        10 => {
+            wire__crate__api__talkie__talkie_input_devices_impl(port, ptr, rust_vec_len, data_len)
+        }
+        12 => wire__crate__api__talkie__talkie_logout_impl(port, ptr, rust_vec_len, data_len),
+        14 => {
             wire__crate__api__talkie__talkie_output_devices_impl(port, ptr, rust_vec_len, data_len)
         }
-        16 => wire__crate__api__talkie__talkie_ptt_request_access_impl(
+        17 => wire__crate__api__talkie__talkie_ptt_request_access_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        18 => {
+        19 => {
             wire__crate__api__talkie__talkie_restart_audio_impl(port, ptr, rust_vec_len, data_len)
         }
-        22 => wire__crate__api__talkie__talkie_set_settings_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__talkie__talkie_set_settings_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1245,19 +1296,20 @@ fn pde_ffi_dispatcher_sync_impl(
         3 => wire__crate__api__talkie__talkie_clear_chat_impl(ptr, rust_vec_len, data_len),
         4 => wire__crate__api__talkie__talkie_config_impl(ptr, rust_vec_len, data_len),
         5 => wire__crate__api__talkie__talkie_connect_impl(ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__talkie__talkie_disconnect_impl(ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__talkie__talkie_join_impl(ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__talkie__talkie_moderate_impl(ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__talkie__talkie_ptt_access_impl(ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__talkie__talkie_ptt_keys_impl(ptr, rust_vec_len, data_len),
-        17 => {
+        6 => wire__crate__api__talkie__talkie_create_room_impl(ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__talkie__talkie_disconnect_impl(ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__talkie__talkie_join_impl(ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__talkie__talkie_moderate_impl(ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__talkie__talkie_ptt_access_impl(ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__talkie__talkie_ptt_keys_impl(ptr, rust_vec_len, data_len),
+        18 => {
             wire__crate__api__talkie__talkie_request_device_code_impl(ptr, rust_vec_len, data_len)
         }
-        19 => wire__crate__api__talkie__talkie_set_deaf_impl(ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__talkie__talkie_set_muted_impl(ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__talkie__talkie_set_ptt_pressed_impl(ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__talkie__talkie_set_user_muted_impl(ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__talkie__talkie_set_user_volume_impl(ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__talkie__talkie_set_deaf_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__talkie__talkie_set_muted_impl(ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__talkie__talkie_set_ptt_pressed_impl(ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__talkie__talkie_set_user_muted_impl(ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__talkie__talkie_set_user_volume_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1375,6 +1427,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::talkie::RoomDto {
         [
             self.id.into_into_dart().into_dart(),
             self.name.into_into_dart().into_dart(),
+            self.temp.into_into_dart().into_dart(),
+            self.locked.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1666,6 +1720,16 @@ impl SseEncode for Vec<crate::api::talkie::UserDto> {
     }
 }
 
+impl SseEncode for Option<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::api::talkie::ChatDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1699,6 +1763,8 @@ impl SseEncode for crate::api::talkie::RoomDto {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i64>::sse_encode(self.id, serializer);
         <String>::sse_encode(self.name, serializer);
+        <bool>::sse_encode(self.temp, serializer);
+        <bool>::sse_encode(self.locked, serializer);
     }
 }
 

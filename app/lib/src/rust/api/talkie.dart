@@ -39,8 +39,15 @@ void talkieDisconnect() =>
 Future<void> talkieLogout() =>
     RustLib.instance.api.crateApiTalkieTalkieLogout();
 
-void talkieJoin({required PlatformInt64 room}) =>
-    RustLib.instance.api.crateApiTalkieTalkieJoin(room: room);
+void talkieJoin({required PlatformInt64 room, String? password}) => RustLib
+    .instance
+    .api
+    .crateApiTalkieTalkieJoin(room: room, password: password);
+
+void talkieCreateRoom({required String name, String? password}) => RustLib
+    .instance
+    .api
+    .crateApiTalkieTalkieCreateRoom(name: name, password: password);
 
 void talkieChat({required String text}) =>
     RustLib.instance.api.crateApiTalkieTalkieChat(text: text);
@@ -206,10 +213,22 @@ class RoomDto {
   final PlatformInt64 id;
   final String name;
 
-  const RoomDto({required this.id, required this.name});
+  /// Von einem Nutzer erstellt, verschwindet, wenn alle gegangen sind.
+  final bool temp;
+
+  /// Braucht ein Passwort zum Betreten.
+  final bool locked;
+
+  const RoomDto({
+    required this.id,
+    required this.name,
+    required this.temp,
+    required this.locked,
+  });
 
   @override
-  int get hashCode => id.hashCode ^ name.hashCode;
+  int get hashCode =>
+      id.hashCode ^ name.hashCode ^ temp.hashCode ^ locked.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -217,7 +236,9 @@ class RoomDto {
       other is RoomDto &&
           runtimeType == other.runtimeType &&
           id == other.id &&
-          name == other.name;
+          name == other.name &&
+          temp == other.temp &&
+          locked == other.locked;
 }
 
 class SettingsDto {

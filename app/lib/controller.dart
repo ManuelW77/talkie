@@ -261,8 +261,14 @@ class TalkieController extends ChangeNotifier {
     talkieConnect(server: config.server, name: config.name, invite: '', fingerprint: kServerFingerprint);
   }
 
-  void join(int room) {
-    if (room != currentRoom) talkieJoin(room: room);
+  void join(int room, {String? password}) {
+    if (room != currentRoom) talkieJoin(room: room, password: password);
+  }
+
+  /// Eigenen, temporären Raum erstellen; man landet gleich darin.
+  void createRoom(String name, {String? password}) {
+    final pw = (password ?? '').isEmpty ? null : password;
+    talkieCreateRoom(name: name.trim(), password: pw);
   }
 
   void sendChat(String text) => talkieChat(text: text);

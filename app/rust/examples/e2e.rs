@@ -128,7 +128,7 @@ fn main() {
 
     // Raumwechsel: Ben in Raum 2 → keine Sprache mehr
     let room2 = sa.rooms.get(1).map(|r| r.id).expect("zweiter raum");
-    b.join(room2);
+    b.join(room2, "");
     std::thread::sleep(Duration::from_millis(400));
     check(b.snapshot().room == room2, "Ben ist im zweiten Raum");
     let (q0, _) = b.mixer_stats();
@@ -141,7 +141,7 @@ fn main() {
     check(b.mixer_stats().0 == q0, "keine Sprache aus anderem Raum");
 
     // Stumm: nichts wird gesendet
-    b.join(sa.room);
+    b.join(sa.room, "");
     std::thread::sleep(Duration::from_millis(300));
     a.set_muted(true);
     let (m0, _) = b.mixer_stats();

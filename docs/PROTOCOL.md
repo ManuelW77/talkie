@@ -33,7 +33,8 @@ Fehlercodes: `bad_request`, `version`, `invite_invalid`, `name_invalid`,
 ### Danach
 
 ```
-C → S  {"t":"join","room":3}
+C → S  {"t":"join","room":3,"password":"…"}   password nur für gesperrte Räume
+C → S  {"t":"create_room","name":"Zimmer","password":"…"}   eigenen, temporären Raum erstellen (password optional); der Ersteller ist sofort drin
 C → S  {"t":"chat","text":"Hi"}
 C → S  {"t":"state","muted":false,"deaf":false}
 C → S  {"t":"ignore","ids":[7,9]}   ersetzt die Liste der für sich stumm geschalteten Nutzer
@@ -58,8 +59,25 @@ S → C  {"t":"error","code":"forbidden","reason":"..."}  Meldung für den Nutze
 ```
 User = {"id":7,"name":"Max","room":3,"muted":false,"deaf":false}
 Room = {"id":3,"name":"Lobby"}
+       temporäre Räume zusätzlich {"temp":true} und bei Passwort {"locked":true}
 Chat = {"room":3,"from":7,"name":"Max","text":"Hi","ts":1731000000}
 ```
+
+### Temporäre Räume
+
+Jeder angemeldete Nutzer kann mit `create_room` einen Raum erstellen, optional mit Passwort.
+Diese Räume gibt es nur im Speicher des Servers (IDs ab 1 000 000 000, kollidieren nie mit
+Räumen aus der Verwaltungsseite). Verlässt der letzte Nutzer den Raum (Wechsel, Trennung,
+Rauswurf), wird er samt Chat gelöscht und die Raumliste neu verschickt. Der Chat solcher
+Räume wird nie in der Datenbank gespeichert.
+
+- Name: gleiche Regeln wie bei Verwaltungs-Räumen, darf noch nicht existieren (Groß/Klein egal).
+- Grenzen: 1 temporärer Raum pro Ersteller gleichzeitig, höchstens 20 insgesamt, Passwort höchstens 64 Zeichen.
+- Das Passwort wird nur gesalzen gehasht im Speicher gehalten und nie an Clients geschickt
+  (nur `"locked":true`). Falsches oder fehlendes Passwort bei `join` → `error` mit Code
+  `room_password`. Höchstens 5 Fehlversuche pro Minute und Nutzer, danach `rate_limited`.
+- Nutzer mit verknüpftem Admin-Konto kommen ohne Passwort hinein.
+- Fehlercodes von `create_room`: `name_invalid`, `password_invalid`, `room_exists`, `room_limit`.
 
 ### Mehrere Geräte
 

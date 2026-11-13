@@ -1,22 +1,34 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/tls"
+	_ "embed"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"mime"
+	"mime/multipart"
+	"mime/quotedprintable"
 	"net"
 	"net/mail"
 	"net/smtp"
+	"net/textproto"
 	"strings"
 	"time"
 )
 
-// Mailer verschickt Text-Mails (Login-Links, Einladungen).
+// mailIcon ist das Talkie-Icon, das als Inline-Bild (cid:talkie-icon) in den HTML-Mails steckt.
+//
+//go:embed web/mail/icon.png
+var mailIcon []byte
+
+// Mailer verschickt Mails (Login-Links, Einladungen). Ist html leer, geht nur der Text raus,
+// sonst als multipart/alternative mit Text- und HTML-Fassung.
 type Mailer interface {
-	Send(to, subject, body string) error
+	Send(to, subject, text, html string) error
 }
 
 type SMTPConfig struct {
@@ -50,7 +62,7 @@ func smtpFromEnv() *SMTPConfig {
 
 type smtpMailer struct{ c SMTPConfig }
 
-func (m *smtpMailer) Send(to, subject, body string) error {
+func (m *smtpMailer) Send(to, subject, text, html string) error {
 	from, err := mail.ParseAddress(m.c.From)
 	if err != nil {
 		return fmt.Errorf("TALKIE_SMTP_FROM ungültig: %w", err)
@@ -102,7 +114,7 @@ func (m *smtpMailer) Send(to, subject, body string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := w.Write(buildMail(from, rcpt.Address, subject, body)); err != nil {
+	if _, err := w.Write(buildMail(from, rcpt.Address, subject, text, html)); err != nil {
 		return err
 	}
 	if err := w.Close(); err != nil {
@@ -111,14 +123,17 @@ func (m *smtpMailer) Send(to, subject, body string) error {
 	return cl.Quit()
 }
 
-func buildMail(from *mail.Address, to, subject, body string) []byte {
+func buildMail(from *mail.Address, to, subject, text, html string) []byte {
 	id := make([]byte, 12)
 	_, _ = rand.Read(id)
 	domain := "talkie.local"
 	if i := strings.LastIndex(from.Address, "@"); i >= 0 {
 		domain = from.Address[i+1:]
 	}
-	var b strings.Builder
+	crlf := func(s string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\n", "\r\n")
+	}
+	var b bytes.Buffer
 	h := func(k, v string) { b.WriteString(k + ": " + v + "\r\n") }
 	h("From", from.String())
 	h("To", to)
@@ -126,9 +141,50 @@ func buildMail(from *mail.Address, to, subject, body string) []byte {
 	h("Date", time.Now().Format(time.RFC1123Z))
 	h("Message-ID", "<"+hex.EncodeToString(id)+"@"+domain+">")
 	h("MIME-Version", "1.0")
-	h("Content-Type", "text/plain; charset=utf-8")
-	h("Content-Transfer-Encoding", "8bit")
+	if html == "" {
+		h("Content-Type", "text/plain; charset=utf-8")
+		h("Content-Transfer-Encoding", "8bit")
+		b.WriteString("\r\n")
+		b.WriteString(crlf(text))
+		return b.Bytes()
+	}
+
+	// Teil schreiben: Kopfzeilen + Inhalt (quoted-printable bricht Zeilen automatisch bei 76 Zeichen)
+	qp := func(mw *multipart.Writer, ctype, content string) {
+		pw, _ := mw.CreatePart(textproto.MIMEHeader{
+			"Content-Type":              {ctype + "; charset=utf-8"},
+			"Content-Transfer-Encoding": {"quoted-printable"},
+		})
+		w := quotedprintable.NewWriter(pw)
+		_, _ = w.Write([]byte(crlf(content)))
+		_ = w.Close()
+	}
+	alt := multipart.NewWriter(&b)
+	h("Content-Type", "multipart/alternative; boundary="+alt.Boundary())
 	b.WriteString("\r\n")
-	b.WriteString(strings.ReplaceAll(strings.ReplaceAll(body, "\r\n", "\n"), "\n", "\r\n"))
-	return []byte(b.String())
+	qp(alt, "text/plain", text)
+
+	var rel bytes.Buffer
+	rw := multipart.NewWriter(&rel)
+	qp(rw, "text/html", html)
+	ip, _ := rw.CreatePart(textproto.MIMEHeader{
+		"Content-Type":              {"image/png; name=\"talkie.png\""},
+		"Content-Transfer-Encoding": {"base64"},
+		"Content-ID":                {"<talkie-icon>"},
+		"Content-Disposition":       {"inline; filename=\"talkie.png\""},
+	})
+	enc := base64.StdEncoding.EncodeToString(mailIcon)
+	for len(enc) > 76 {
+		_, _ = ip.Write([]byte(enc[:76] + "\r\n"))
+		enc = enc[76:]
+	}
+	_, _ = ip.Write([]byte(enc + "\r\n"))
+	_ = rw.Close()
+
+	rp, _ := alt.CreatePart(textproto.MIMEHeader{
+		"Content-Type": {"multipart/related; type=\"text/html\"; boundary=" + rw.Boundary()},
+	})
+	_, _ = rp.Write(rel.Bytes())
+	_ = alt.Close()
+	return b.Bytes()
 }
