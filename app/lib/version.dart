@@ -1,6 +1,6 @@
 /// Version dieser App. Muss zu `version:` in pubspec.yaml passen (prüft test/version_test.dart).
 /// Release-Tags heißen genauso: v1.0.0.
-const String kAppVersion = '1.0.1';
+const String kAppVersion = '1.1.0';
 
 /// true, wenn [latest] neuer ist als [current] (Versionen wie „1.2.3“).
 bool isNewerVersion(String latest, String current) {
