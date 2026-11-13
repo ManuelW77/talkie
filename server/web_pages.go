@@ -284,7 +284,12 @@ func (w *webApp) inviteMail(inv *DBInvite, from string) string {
 		step++
 	}
 	fmt.Fprintf(&b, "%d. Einladungscode eingeben:  %s\n\n", step, inv.Code)
-	fmt.Fprintf(&b, "Der Code gilt bis %s.\n\nViel Spaß!\n", inv.Expires.Local().Format("02.01.2006"))
+	fmt.Fprintf(&b, "Der Code gilt bis %s und nur für ein Gerät.\n\n", inv.Expires.Local().Format("02.01.2006"))
+	b.WriteString("Du willst Talkie auf mehreren Geräten nutzen, z. B. am PC und auf dem Handy?\n" +
+		"Dafür brauchst du keine neue Einladung: Öffne in der App die Einstellungen und tippe auf\n" +
+		"„Auf weiterem Gerät nutzen“. Dort bekommst du einen Gerätecode. Auf dem anderen Gerät\n" +
+		"wählst du „Ich nutze Talkie schon auf einem anderen Gerät“ und gibst den Code ein.\n\n" +
+		"Viel Spaß!\n")
 	return b.String()
 }
 
