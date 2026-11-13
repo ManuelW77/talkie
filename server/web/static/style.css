@@ -110,3 +110,8 @@ dl.kv dd { margin: 0; word-break: break-all; }
 .chat li { padding: .45rem .9rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .chat li:last-child { border-bottom: 0; }
 .chat time { color: var(--muted); font-size: .85em; margin-right: .4rem; }
+
+.foot { text-align: center; color: var(--muted); font-size: .8rem; padding: 1.5rem 1rem 1.2rem; }
+.heart { color: var(--bad); }
+.foot a { color: var(--muted); }
+.foot a:hover { text-decoration: underline; }
