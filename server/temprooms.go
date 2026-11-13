@@ -88,6 +88,29 @@ func (h *Hub) roomNameTakenLocked(name string) bool {
 	return false
 }
 
+// TempRoomNames liefert ID und Name der gerade bestehenden temporären Räume.
+func (h *Hub) TempRoomNames() map[int64]string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	out := make(map[int64]string, len(h.temp))
+	for _, r := range h.temp {
+		out[r.id] = r.name
+	}
+	return out
+}
+
+// TempRoomNameTaken sagt, ob ein temporärer Raum diesen Namen trägt (Groß/Klein egal).
+func (h *Hub) TempRoomNameTaken(name string) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, r := range h.temp {
+		if strings.EqualFold(r.name, name) {
+			return true
+		}
+	}
+	return false
+}
+
 // dropEmptyTempLocked löscht den temporären Raum id, falls niemand mehr drin ist.
 func (h *Hub) dropEmptyTempLocked(id int64) {
 	idx := -1

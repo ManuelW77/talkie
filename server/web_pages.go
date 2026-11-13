@@ -24,12 +24,16 @@ func pathID(r *http.Request) (int64, bool) {
 	return id, err == nil && id > 0
 }
 
+// roomNames liefert die Namen aller Räume, auch der temporären App-Räume.
 func (w *webApp) roomNames() map[int64]string {
 	out := map[int64]string{}
 	if rooms, err := w.store.Rooms(); err == nil {
 		for _, r := range rooms {
 			out[r.ID] = r.Name
 		}
+	}
+	for id, name := range w.hub.TempRoomNames() {
+		out[id] = name + " (App-Raum)"
 	}
 	return out
 }
@@ -43,6 +47,7 @@ type onlineRow struct {
 
 func (w *webApp) dashboard(rw http.ResponseWriter, r *http.Request) {
 	rooms := w.roomNames()
+	dbRooms, _ := w.store.Rooms()
 	var online []onlineRow
 	for _, u := range w.hub.OnlineDetails() {
 		online = append(online, onlineRow{u.Name, rooms[u.Room], u.Device, u.Muted, u.Deaf, u.Talking})
@@ -54,7 +59,7 @@ func (w *webApp) dashboard(rw http.ResponseWriter, r *http.Request) {
 		"Online":      online,
 		"Users":       len(users),
 		"Invites":     len(invites),
-		"Rooms":       len(rooms),
+		"Rooms":       len(dbRooms),
 		"Fingerprint": FormatFingerprint(w.hub.certHash),
 		"ServerAddr":  w.cfg.ServerAddr,
 	})
@@ -362,12 +367,18 @@ func (w *webApp) roomsPage(rw http.ResponseWriter, r *http.Request) {
 	w.render(rw, r, "rooms", "Räume", map[string]any{"Rooms": rows, "Last": len(rows) - 1})
 }
 
+const tempNameTaken = "Diesen Namen nutzt gerade ein Raum aus der App. Nimm bitte einen anderen."
+
 const badRoomName = "Ungültiger Raumname: 2–20 Zeichen, nur Buchstaben, Ziffern, Leerzeichen, - _ ."
 
 func (w *webApp) addRoom(rw http.ResponseWriter, r *http.Request) {
 	name, ok := cleanName(r.PostFormValue("name"))
 	if !ok {
 		w.done(rw, r, "/rooms", badRoomName, true)
+		return
+	}
+	if w.hub.TempRoomNameTaken(name) {
+		w.done(rw, r, "/rooms", tempNameTaken, true)
 		return
 	}
 	if _, err := w.store.AddRoom(name); err != nil {
@@ -399,6 +410,10 @@ func (w *webApp) roomAction(rw http.ResponseWriter, r *http.Request) {
 		name, ok := cleanName(r.PostFormValue("name"))
 		if !ok {
 			w.done(rw, r, "/rooms", badRoomName, true)
+			return
+		}
+		if w.hub.TempRoomNameTaken(name) {
+			w.done(rw, r, "/rooms", tempNameTaken, true)
 			return
 		}
 		err = w.store.RenameRoom(id, name)
