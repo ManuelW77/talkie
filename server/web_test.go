@@ -670,3 +670,22 @@ func TestWebDevices(t *testing.T) {
 		t.Fatalf("nicht entfernt: %d", len(devs))
 	}
 }
+
+func TestInviteMailInstallHints(t *testing.T) {
+	wt := newWebTest(t, nil)
+	inv := &DBInvite{Code: "ABCD2345", Expires: time.Now().Add(24 * time.Hour)}
+
+	body := wt.app.inviteMail(inv, "Manuel")
+	if !strings.Contains(body, appStoreURL) || strings.Contains(body, "Talkie-Windows.zip") {
+		t.Fatalf("ohne Download-Link nur App Store erwartet:\n%s", body)
+	}
+
+	wt.app.cfg.DownloadURL = "https://example.test/releases/latest"
+	body = wt.app.inviteMail(inv, "Manuel")
+	for _, want := range []string{appStoreURL, "https://example.test/releases/latest", "Talkie-macOS.dmg",
+		"Talkie-Windows.zip", "Talkie-Android.apk", "ABCD2345", "talkie.test:7777", "4. Einladungscode", "Auf weiterem Gerät nutzen"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("%q fehlt in der Mail:\n%s", want, body)
+		}
+	}
+}
