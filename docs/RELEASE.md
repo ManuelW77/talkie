@@ -9,9 +9,13 @@ nach dem Upload diese Änderung committen. Nie von Hand zurücksetzen.
 
 ## Neue Version veröffentlichen
 
-1. Versionsnummer an **beiden** Stellen gleich setzen (ein Test prüft das):
+1. Versionsnummer an **allen drei** Stellen gleich setzen (Tests prüfen das):
    - `app/pubspec.yaml` → `version: 1.0.0+1`
    - `app/lib/version.dart` → `kAppVersion = '1.0.0'`
+   - `server/version.go` → `ServerVersion = "1.0.0"`
+
+   Die iOS-App übernimmt Version und Buildnummer aus `pubspec.yaml`
+   (vor Xcode einmal `flutter build ios --config-only --release`).
 2. `devel` nach `main` mergen und pushen.
 3. Tag setzen und pushen – genau passend zur Version:
 
