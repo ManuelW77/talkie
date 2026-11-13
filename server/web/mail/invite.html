@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Talkie</title></head>
+<body style="margin:0;padding:0;background:#f6f3ee;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f3ee;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#22201c;">
+<tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #ebe5dc;">
+  <tr><td style="background:linear-gradient(180deg,#FFB13B,#F2661D);background-color:#F58A2B;padding:28px 24px;text-align:center;">
+    <img src="cid:talkie-icon" width="72" height="72" alt="Talkie" style="display:block;margin:0 auto 10px;border-radius:16px;box-shadow:0 4px 14px rgba(120,40,0,.25);">
+    <div style="font-size:24px;font-weight:800;color:#ffffff;letter-spacing:.2px;">Du bist eingeladen!</div>
+    <div style="font-size:15px;color:#fff3e6;margin-top:4px;">{{.From}} lädt dich zu Talkie ein, unserem Sprach-Chat zum Zocken.</div>
+  </td></tr>
+
+  <tr><td style="padding:26px 24px 6px;text-align:center;">
+    <div style="font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#8a8275;">Dein Einladungscode</div>
+    <div style="display:inline-block;margin-top:10px;padding:14px 22px;background:#fff6ec;border:2px dashed #F58A2B;border-radius:12px;font-family:'SF Mono',Menlo,Consolas,'Courier New',monospace;font-size:32px;font-weight:700;letter-spacing:4px;color:#22201c;">{{.Code}}</div>
+    <div style="font-size:13px;color:#8a8275;margin-top:10px;">gilt bis {{.Expires}} und für ein Gerät</div>
+  </td></tr>
+
+  <tr><td style="padding:22px 24px 4px;">
+    <div style="font-size:17px;font-weight:700;margin-bottom:12px;">So geht’s</div>
+    <!-- Schritt 1 -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;"><tr>
+      <td width="34" valign="top"><div style="width:26px;height:26px;line-height:26px;border-radius:13px;background:#F58A2B;color:#fff;font-weight:700;font-size:14px;text-align:center;">1</div></td>
+      <td valign="top" style="font-size:15px;line-height:1.5;">
+        <b>App installieren</b>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:10px 0 4px;"><tr>
+          <td style="padding:0 8px 8px 0;"><a href="{{.AppStoreURL}}" style="display:inline-block;padding:10px 16px;background:#22201c;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:600;font-size:14px;">iPhone &amp; iPad: App Store</a></td>
+{{if .DownloadURL}}          <td style="padding:0 0 8px 0;"><a href="{{.DownloadURL}}" style="display:inline-block;padding:10px 16px;background:#F58A2B;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:600;font-size:14px;">Mac, Windows, Linux, Android</a></td>
+{{end}}        </tr></table>
+{{if .DownloadURL}}        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf8f5;border-radius:10px;font-size:13.5px;color:#4a463f;">
+          <tr><td style="padding:10px 12px 4px;"><b style="color:#22201c;">Mac:</b> „Talkie-macOS.dmg“ öffnen und Talkie in „Programme“ ziehen.</td></tr>
+          <tr><td style="padding:4px 12px;"><b style="color:#22201c;">Windows:</b> „Talkie-Windows.zip“ entpacken, „talkie.exe“ starten. Warnt Windows: „Weitere Informationen“, dann „Trotzdem ausführen“.</td></tr>
+          <tr><td style="padding:4px 12px;"><b style="color:#22201c;">Android:</b> „Talkie-Android.apk“ auf dem Handy öffnen. Fragt das Handy, die Installation aus dieser Quelle erlauben.</td></tr>
+          <tr><td style="padding:4px 12px 10px;"><b style="color:#22201c;">Linux:</b> „Talkie-Linux-x64.tar.gz“ entpacken und „./install.sh“ ausführen.</td></tr>
+        </table>
+{{end}}      </td></tr></table>
+    <!-- Schritt 2 -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;"><tr>
+      <td width="34" valign="top"><div style="width:26px;height:26px;line-height:26px;border-radius:13px;background:#F58A2B;color:#fff;font-weight:700;font-size:14px;text-align:center;">{{.StepStart}}</div></td>
+      <td valign="top" style="font-size:15px;line-height:1.5;"><b>App starten</b>, einen Namen ausdenken und das Mikrofon erlauben.</td></tr></table>
+{{if .ServerAddr}}    <!-- Schritt 3 -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;"><tr>
+      <td width="34" valign="top"><div style="width:26px;height:26px;line-height:26px;border-radius:13px;background:#F58A2B;color:#fff;font-weight:700;font-size:14px;text-align:center;">{{.StepServer}}</div></td>
+      <td valign="top" style="font-size:15px;line-height:1.5;"><b>Server</b> (nur falls gefragt): <span style="font-family:'SF Mono',Menlo,Consolas,monospace;background:#f2eee8;padding:2px 6px;border-radius:5px;">{{.ServerAddr}}</span></td></tr></table>
+{{end}}    <!-- Schritt 4 -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;"><tr>
+      <td width="34" valign="top"><div style="width:26px;height:26px;line-height:26px;border-radius:13px;background:#F58A2B;color:#fff;font-weight:700;font-size:14px;text-align:center;">{{.StepCode}}</div></td>
+      <td valign="top" style="font-size:15px;line-height:1.5;"><b>Einladungscode eingeben:</b> <span style="font-family:'SF Mono',Menlo,Consolas,monospace;font-weight:700;letter-spacing:1px;">{{.Code}}</span></td></tr></table>
+  </td></tr>
+
+  <tr><td style="padding:14px 24px 24px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef7f6;border-radius:12px;"><tr><td style="padding:14px 16px;font-size:14px;line-height:1.5;color:#1f3b38;">
+      <b>Mehrere Geräte, z. B. PC und Handy?</b><br>
+      Dafür brauchst du keine neue Einladung. Öffne in der App die Einstellungen und tippe auf „Auf weiterem Gerät nutzen“. Auf dem anderen Gerät wählst du „Ich nutze Talkie schon auf einem anderen Gerät“ und gibst den Gerätecode ein.
+    </td></tr></table>
+  </td></tr>
+
+  <tr><td style="padding:0 24px 26px;text-align:center;font-size:16px;font-weight:700;color:#F2661D;">Viel Spaß!</td></tr>
+</table>
+<div style="font-size:12px;color:#9b9387;padding-top:14px;">Diese Mail kommt vom Talkie-Server deiner Freunde.</div>
+</td></tr></table>
+</body></html>
