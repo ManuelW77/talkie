@@ -41,13 +41,9 @@ if codesign -d --entitlements - "$APP" 2>/dev/null | grep -q "get-task-allow"; t
 fi
 "$LIPO" -info "$APP/Contents/MacOS/Talkie"
 
-# 2. DMG mit Verknüpfung zu „Programme“
-STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
-cp -R "$APP" "$STAGE/"
-ln -s /Applications "$STAGE/Programme"
+# 2. DMG mit Hintergrund, Laufwerk-Icon und Verknüpfung zu „Programme“
 rm -f "$DMG"
-hdiutil create -volname Talkie -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+"$(dirname "$0")/make_dmg.sh" "$APP" "$DMG"
 "${SIGN[@]}" "$DMG"
 
 if [ "${NOTARIZE:-1}" = "0" ] || [ "$IDENTITY" = "-" ]; then
