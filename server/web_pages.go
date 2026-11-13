@@ -1,8 +1,11 @@
 package main
 
 import (
+	"embed"
 	"errors"
 	"fmt"
+	"html/template"
+	"log"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -248,7 +251,7 @@ func (w *webApp) createInvite(rw http.ResponseWriter, r *http.Request) {
 	w.audit(r, fmt.Sprintf("Einladung %s erstellt (%d Person(en), %d Tage)", inv.Code, uses, days))
 	msg := "Einladung erstellt: " + inv.Code
 	if email != "" {
-		if err := w.cfg.Mailer.Send(email, "Einladung zu Talkie", w.inviteMail(inv, me(r).Name)); err != nil {
+		if err := w.cfg.Mailer.Send(email, "Einladung zu Talkie", w.inviteMail(inv, me(r).Name), w.inviteMailHTML(inv, me(r).Name)); err != nil {
 			w.done(rw, r, "/invites?new="+urlq(inv.Code), msg+" – die Mail konnte aber nicht verschickt werden.", true)
 			return
 		}
@@ -256,6 +259,38 @@ func (w *webApp) createInvite(rw http.ResponseWriter, r *http.Request) {
 		msg += " und an " + email + " geschickt."
 	}
 	w.done(rw, r, "/invites?new="+urlq(inv.Code), msg, false)
+}
+
+//go:embed web/mail/invite.html web/mail/login.html
+var mailFS embed.FS
+
+var mailTmpl = template.Must(template.ParseFS(mailFS, "web/mail/*.html"))
+
+// renderMail setzt die Werte in eine HTML-Mailvorlage ein (html/template escaped automatisch).
+func renderMail(name string, data any) string {
+	var b strings.Builder
+	if err := mailTmpl.ExecuteTemplate(&b, name, data); err != nil {
+		log.Printf("web: mailvorlage %s: %v", name, err)
+		return "" // dann geht die Mail nur als Text raus
+	}
+	return b.String()
+}
+
+// inviteMailHTML ist die HTML-Fassung der Einladung; Schrittnummern laufen wie in der Textfassung.
+func (w *webApp) inviteMailHTML(inv *DBInvite, from string) string {
+	step := 2
+	d := map[string]any{
+		"From": from, "Code": inv.Code, "Expires": inv.Expires.Local().Format("02.01.2006"),
+		"AppStoreURL": appStoreURL, "DownloadURL": w.cfg.DownloadURL, "ServerAddr": w.cfg.ServerAddr,
+		"StepStart": step,
+	}
+	step++
+	if w.cfg.ServerAddr != "" {
+		d["StepServer"] = step
+		step++
+	}
+	d["StepCode"] = step
+	return renderMail("invite.html", d)
 }
 
 // appStoreURL ist der Eintrag im App Store für iPhone und iPad.
