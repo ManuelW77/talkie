@@ -258,15 +258,26 @@ func (w *webApp) createInvite(rw http.ResponseWriter, r *http.Request) {
 	w.done(rw, r, "/invites?new="+urlq(inv.Code), msg, false)
 }
 
+// appStoreURL ist der Eintrag im App Store für iPhone und iPad.
+const appStoreURL = "https://apps.apple.com/de/app/talkie/id6832222100"
+
 func (w *webApp) inviteMail(inv *DBInvite, from string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Hallo!\n\n%s lädt dich zu Talkie ein, unserem Sprach-Chat zum Zocken.\n\n", from)
 	step := 1
+	fmt.Fprintf(&b, "%d. App installieren:\n\n", step)
+	fmt.Fprintf(&b, "   iPhone und iPad: Talkie im App Store laden\n   %s\n\n", appStoreURL)
 	if w.cfg.DownloadURL != "" {
-		fmt.Fprintf(&b, "%d. App herunterladen: %s\n", step, w.cfg.DownloadURL)
-		step++
+		fmt.Fprintf(&b, "   Mac, Windows, Linux und Android: hier herunterladen\n   %s\n\n", w.cfg.DownloadURL)
+		b.WriteString("   - Mac: „Talkie-macOS.dmg“ öffnen und Talkie in den Ordner „Programme“ ziehen.\n" +
+			"   - Windows: „Talkie-Windows.zip“ entpacken und „talkie.exe“ starten. Warnt Windows,\n" +
+			"     auf „Weitere Informationen“ und dann „Trotzdem ausführen“ klicken.\n" +
+			"   - Android: „Talkie-Android.apk“ auf dem Handy öffnen und installieren. Fragt das Handy,\n" +
+			"     die Installation aus dieser Quelle erlauben.\n" +
+			"   - Linux: „Talkie-Linux-x64.tar.gz“ entpacken und im Ordner „./install.sh“ ausführen.\n\n")
 	}
-	fmt.Fprintf(&b, "%d. App starten und einen Namen ausdenken\n", step)
+	step++
+	fmt.Fprintf(&b, "%d. App starten, einen Namen ausdenken und das Mikrofon erlauben\n", step)
 	step++
 	if w.cfg.ServerAddr != "" {
 		fmt.Fprintf(&b, "%d. Server (falls gefragt): %s\n", step, w.cfg.ServerAddr)
