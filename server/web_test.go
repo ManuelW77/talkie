@@ -780,3 +780,30 @@ func TestBuildMailMIME(t *testing.T) {
 		t.Fatal("ohne HTML nur Text erwartet")
 	}
 }
+
+func TestTempRoomNamesInWeb(t *testing.T) {
+	wt := newWebTest(t, nil)
+	wt.account("chef@example.org", "admin", 0)
+	b := wt.browser()
+	b.login("chef@example.org")
+	tok := b.csrf()
+	wt.hub.mu.Lock()
+	wt.hub.temp = append(wt.hub.temp, &tempRoom{id: tempRoomFirstID, name: "Geheim"})
+	wt.hub.mu.Unlock()
+	if got := wt.app.roomNames()[tempRoomFirstID]; got != "Geheim (App-Raum)" {
+		t.Fatalf("Raumname: %q", got)
+	}
+	dbCount := func() int { r, _ := wt.store.Rooms(); return len(r) }
+	before := dbCount()
+	b.post("/rooms", url.Values{"csrf": {tok}, "name": {"GEHEIM"}})
+	if dbCount() != before {
+		t.Fatal("Raum mit Namen eines App-Raums wurde angelegt")
+	}
+	if f := b.flash(); !strings.Contains(f, "aus der App") {
+		t.Fatalf("Meldung: %q", f)
+	}
+	b.post("/rooms", url.Values{"csrf": {tok}, "name": {"Anders"}})
+	if dbCount() != before+1 {
+		t.Fatal("Raum ohne Namenskollision nicht angelegt")
+	}
+}
