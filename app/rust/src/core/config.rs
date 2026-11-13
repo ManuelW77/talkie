@@ -27,6 +27,8 @@ pub struct Settings {
     pub ptt_key: String,
     /// Handy: Echo-Unterdrückung des Systems nutzen (ohne Kopfhörer wichtig).
     pub echo_cancel: bool,
+    /// Mikrofon automatisch stumm, solange Talkie nicht im Vordergrund ist.
+    pub mute_in_background: bool,
 }
 
 impl Default for Settings {
@@ -42,6 +44,7 @@ impl Default for Settings {
             ptt: false,
             ptt_key: crate::core::ptt::DEFAULT_KEY.into(),
             echo_cancel: true,
+            mute_in_background: false,
         }
     }
 }

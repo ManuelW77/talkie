@@ -844,7 +844,10 @@ class _ControlBar extends StatelessWidget {
             label: c.muted ? 'Stumm' : 'Mikro an',
             active: c.muted,
             onTap: c.toggleMute,
-            tooltip: 'Mikrofon an/aus (Strg+M)',
+            tooltip: c.config.settings.muteInBackground
+                ? 'Mikrofon an/aus (Strg+M). Im Hintergrund stumm.'
+                : 'Mikrofon an/aus (Strg+M)',
+            badge: c.config.settings.muteInBackground ? Icons.visibility_off_rounded : null,
           ),
           SizedBox(width: compact ? 6 : 10),
           _RoundButton(
@@ -932,6 +935,7 @@ class _RoundButton extends StatelessWidget {
     required this.active,
     required this.onTap,
     required this.tooltip,
+    this.badge,
   });
 
   final IconData icon;
@@ -939,6 +943,8 @@ class _RoundButton extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
   final String tooltip;
+  /// Kleines Zusatzsymbol oben rechts am Knopf (ändert die Größe nicht).
+  final IconData? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -948,14 +954,35 @@ class _RoundButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Material(
-            color: active ? kDanger : theme.colorScheme.surfaceContainerHighest,
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onTap,
-              child: Padding(padding: const EdgeInsets.all(12), child: Icon(icon, size: 24)),
-            ),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Material(
+                color: active ? kDanger : theme.colorScheme.surfaceContainerHighest,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onTap,
+                  child: Padding(padding: const EdgeInsets.all(12), child: Icon(icon, size: 24)),
+                ),
+              ),
+              if (badge != null)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: IgnorePointer(
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: theme.colorScheme.outlineVariant),
+                      ),
+                      child: Icon(badge, size: 11, color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(label, style: theme.textTheme.labelSmall),
