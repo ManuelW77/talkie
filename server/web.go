@@ -131,6 +131,7 @@ type page struct {
 	Nav      string
 	OIDCName string
 	MailOn   bool
+	Version  string
 	D        map[string]any
 }
 
@@ -147,7 +148,7 @@ func me(r *http.Request) *Account {
 }
 
 func (w *webApp) render(rw http.ResponseWriter, r *http.Request, name, title string, d map[string]any) {
-	p := page{Title: title, Me: me(r), Nav: name, MailOn: w.cfg.Mailer != nil, D: d, Can: map[string]bool{}}
+	p := page{Title: title, Me: me(r), Nav: name, MailOn: w.cfg.Mailer != nil, Version: ServerVersion, D: d, Can: map[string]bool{}}
 	if w.cfg.OIDC != nil {
 		p.OIDCName = w.cfg.OIDC.Name
 	}
