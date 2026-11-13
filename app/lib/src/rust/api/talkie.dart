@@ -238,6 +238,9 @@ class SettingsDto {
   /// Handy: Echo-Unterdrückung des Systems (ohne Kopfhörer wichtig).
   final bool echoCancel;
 
+  /// Mikrofon stumm, solange die App nicht im Vordergrund ist.
+  final bool muteInBackground;
+
   const SettingsDto({
     required this.vadThresholdDb,
     required this.noiseSuppression,
@@ -249,6 +252,7 @@ class SettingsDto {
     required this.ptt,
     required this.pttKey,
     required this.echoCancel,
+    required this.muteInBackground,
   });
 
   @override
@@ -262,7 +266,8 @@ class SettingsDto {
       sounds.hashCode ^
       ptt.hashCode ^
       pttKey.hashCode ^
-      echoCancel.hashCode;
+      echoCancel.hashCode ^
+      muteInBackground.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -278,7 +283,8 @@ class SettingsDto {
           sounds == other.sounds &&
           ptt == other.ptt &&
           pttKey == other.pttKey &&
-          echoCancel == other.echoCancel;
+          echoCancel == other.echoCancel &&
+          muteInBackground == other.muteInBackground;
 }
 
 class StateDto {
