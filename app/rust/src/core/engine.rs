@@ -493,9 +493,18 @@ impl Engine {
         Ok(())
     }
 
-    pub fn join(&self, room: i64) {
+    pub fn join(&self, room: i64, password: &str) {
         let mut e = Envelope::new("join");
         e.room = room;
+        e.password = password.chars().take(256).collect();
+        self.inner.send_cmd(e);
+    }
+
+    /// Eigenen, temporären Raum erstellen (Passwort optional); man landet gleich darin.
+    pub fn create_room(&self, name: &str, password: &str) {
+        let mut e = Envelope::new("create_room");
+        e.name = name.trim().to_string();
+        e.password = password.chars().take(64).collect();
         self.inner.send_cmd(e);
     }
 
@@ -941,7 +950,10 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
                 {
                     let mut n = inner.net.lock();
                     if u.id == n.me {
-                        save_room = Some(u.room);
+                        // Temporäre Räume nicht merken: es gibt sie nach dem Neustart nicht mehr
+                        if !n.rooms.iter().any(|r| r.id == u.room && r.temp) {
+                            save_room = Some(u.room);
+                        }
                     } else {
                         // Kommt jemand in meinen Raum oder geht er?
                         let my = n.users.get(&n.me).map(|m| m.room).unwrap_or(0);

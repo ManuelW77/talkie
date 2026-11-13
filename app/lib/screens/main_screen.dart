@@ -223,6 +223,15 @@ class _RoomsPanel extends StatelessWidget {
                     ?.copyWith(letterSpacing: 1.5, color: theme.colorScheme.onSurfaceVariant)),
           ),
           for (final r in rooms) _RoomTile(controller: controller, room: r),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: TextButton.icon(
+              onPressed: () => _createRoom(context, controller),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Raum erstellen'),
+              style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+            ),
+          ),
         ],
       ),
     );
@@ -234,6 +243,20 @@ class _RoomTile extends StatelessWidget {
 
   final TalkieController controller;
   final RoomDto room;
+
+  /// Gesperrte Räume fragen nach dem Passwort (Admins kommen ohne hinein).
+  Future<void> _open(BuildContext context) async {
+    if (controller.currentRoom == room.id) return;
+    if (!room.locked || controller.admin) {
+      controller.join(room.id);
+      return;
+    }
+    final pw = await showDialog<String>(
+      context: context,
+      builder: (_) => _PasswordDialog(roomName: room.name),
+    );
+    if (pw != null) controller.join(room.id, password: pw);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +271,7 @@ class _RoomTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () => controller.join(room.id),
+          onTap: () => _open(context),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             child: Column(
@@ -263,6 +286,23 @@ class _RoomTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleSmall?.copyWith(fontWeight: current ? FontWeight.w700 : null)),
                     ),
+                    if (room.temp)
+                      Tooltip(
+                        message: 'Verschwindet, wenn alle gegangen sind',
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: Icon(Icons.hourglass_bottom_rounded,
+                              size: 15, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
+                        ),
+                      ),
+                    if (room.locked)
+                      Tooltip(
+                        message: 'Mit Passwort',
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: Icon(Icons.lock_rounded, size: 15, color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ),
                     if (unread > 0)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -309,6 +349,118 @@ class _RoomTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// „Raum erstellen“: Name und optional ein Passwort.
+Future<void> _createRoom(BuildContext context, TalkieController controller) async {
+  final r = await showDialog<({String name, String password})>(
+    context: context,
+    builder: (_) => const _CreateRoomDialog(),
+  );
+  if (r != null) controller.createRoom(r.name, password: r.password);
+}
+
+class _CreateRoomDialog extends StatefulWidget {
+  const _CreateRoomDialog();
+
+  @override
+  State<_CreateRoomDialog> createState() => _CreateRoomDialogState();
+}
+
+class _CreateRoomDialogState extends State<_CreateRoomDialog> {
+  final _name = TextEditingController();
+  final _password = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _name.text.trim();
+    if (name.length < 2) return;
+    Navigator.pop(context, (name: name, password: _password.text));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Raum erstellen'),
+      content: SizedBox(
+        width: 340,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _name,
+              autofocus: true,
+              maxLength: 20,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Name des Raums'),
+            ),
+            TextField(
+              controller: _password,
+              maxLength: 64,
+              obscureText: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submit(),
+              decoration: const InputDecoration(labelText: 'Passwort (kann leer bleiben)'),
+            ),
+            const SizedBox(height: 8),
+            Text('Der Raum verschwindet, wenn alle ihn verlassen haben.',
+                style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(onPressed: _submit, child: const Text('Erstellen')),
+      ],
+    );
+  }
+}
+
+class _PasswordDialog extends StatefulWidget {
+  const _PasswordDialog({required this.roomName});
+
+  final String roomName;
+
+  @override
+  State<_PasswordDialog> createState() => _PasswordDialogState();
+}
+
+class _PasswordDialogState extends State<_PasswordDialog> {
+  final _password = TextEditingController();
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('„${widget.roomName}“ ist gesperrt'),
+      content: SizedBox(
+        width: 340,
+        child: TextField(
+          controller: _password,
+          autofocus: true,
+          obscureText: true,
+          onSubmitted: (v) => Navigator.pop(context, v),
+          decoration: const InputDecoration(labelText: 'Passwort'),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(onPressed: () => Navigator.pop(context, _password.text), child: const Text('Rein')),
+      ],
     );
   }
 }

@@ -27,6 +27,12 @@ pub struct WireUser {
 pub struct WireRoom {
     pub id: i64,
     pub name: String,
+    /// Von einem Nutzer erstellt, verschwindet, wenn alle gegangen sind.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub temp: bool,
+    /// Braucht ein Passwort zum Betreten.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub locked: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -56,6 +62,9 @@ pub struct Envelope {
     pub name: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub invite: String,
+    /// join / create_room: Raumpasswort
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub password: String,
     /// register: Art des Geräts (nur zur Anzeige)
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub device: String,
@@ -108,6 +117,9 @@ pub struct Envelope {
     pub reason: String,
 }
 
+fn is_false(v: &bool) -> bool {
+    !*v
+}
 fn is_zero_i32(v: &i32) -> bool {
     *v == 0
 }
@@ -194,6 +206,25 @@ mod tests {
         let e: Envelope = serde_json::from_str(j).unwrap();
         assert_eq!(e.you.unwrap().name, "A");
         assert_eq!(e.rooms[0].name, "Lobby");
+    }
+
+    #[test]
+    fn join_and_create_room_with_password() {
+        let mut e = Envelope::new("join");
+        e.room = 3;
+        e.password = "pudding".into();
+        assert_eq!(serde_json::to_string(&e).unwrap(), r#"{"t":"join","password":"pudding","room":3}"#);
+        let mut c = Envelope::new("create_room");
+        c.name = "Zimmer".into();
+        assert_eq!(serde_json::to_string(&c).unwrap(), r#"{"t":"create_room","name":"Zimmer"}"#);
+    }
+
+    #[test]
+    fn parses_temp_and_locked_rooms() {
+        let j = r#"{"t":"rooms","rooms":[{"id":2,"name":"Lobby"},{"id":1000000001,"name":"Geheim","temp":true,"locked":true}]}"#;
+        let e: Envelope = serde_json::from_str(j).unwrap();
+        assert!(!e.rooms[0].temp && !e.rooms[0].locked);
+        assert!(e.rooms[1].temp && e.rooms[1].locked);
     }
 
     #[test]

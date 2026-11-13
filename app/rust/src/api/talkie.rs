@@ -40,6 +40,10 @@ pub struct UserDto {
 pub struct RoomDto {
     pub id: i64,
     pub name: String,
+    /// Von einem Nutzer erstellt, verschwindet, wenn alle gegangen sind.
+    pub temp: bool,
+    /// Braucht ein Passwort zum Betreten.
+    pub locked: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -146,7 +150,7 @@ fn state_dto(s: Snapshot) -> StateDto {
         error_code: s.error_code,
         me: s.me,
         room: s.room,
-        rooms: s.rooms.into_iter().map(|r| RoomDto { id: r.id, name: r.name }).collect(),
+        rooms: s.rooms.into_iter().map(|r| RoomDto { id: r.id, name: r.name, temp: r.temp, locked: r.locked }).collect(),
         users: s
             .users
             .into_iter()
@@ -272,8 +276,14 @@ pub fn talkie_logout() -> Result<()> {
 }
 
 #[flutter_rust_bridge::frb(sync)]
-pub fn talkie_join(room: i64) -> Result<()> {
-    engine()?.join(room);
+pub fn talkie_join(room: i64, password: Option<String>) -> Result<()> {
+    engine()?.join(room, password.as_deref().unwrap_or(""));
+    Ok(())
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_create_room(name: String, password: Option<String>) -> Result<()> {
+    engine()?.create_room(&name, password.as_deref().unwrap_or(""));
     Ok(())
 }
 

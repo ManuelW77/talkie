@@ -30,6 +30,9 @@ type DBUser struct {
 type DBRoom struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
+	// Temp/Locked nur für Räume, die App-Nutzer erstellt haben (nie in der Datenbank)
+	Temp   bool `json:"temp,omitempty"`
+	Locked bool `json:"locked,omitempty"`
 }
 
 type DBInvite struct {

@@ -44,6 +44,9 @@ type Envelope struct {
 	Messages []DBMessage `json:"messages,omitempty"`
 	Msg      *DBMessage  `json:"msg,omitempty"`
 
+	// join / create_room: Raumpasswort (nie vom Server an Clients geschickt)
+	Password string `json:"password,omitempty"`
+
 	// chat / state
 	Text  string `json:"text,omitempty"`
 	Muted *bool  `json:"muted,omitempty"`

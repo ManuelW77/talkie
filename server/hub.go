@@ -19,9 +19,12 @@ type Hub struct {
 	limiter  *IPLimiter
 	pending  chan struct{} // begrenzt gleichzeitige, noch nicht angemeldete Verbindungen
 
-	mu       sync.RWMutex
-	sessions map[int64]*Session
-	rooms    []DBRoom
+	mu         sync.RWMutex
+	sessions   map[int64]*Session
+	rooms      []DBRoom // Räume aus der Datenbank
+	temp       []*tempRoom
+	nextTempID int64
+	pwLimiter  *IPLimiter // Passwort-Fehlversuche pro Nutzer
 }
 
 func NewHub(store *Store, certHash []byte, maxUsers int) (*Hub, error) {
@@ -30,13 +33,15 @@ func NewHub(store *Store, certHash []byte, maxUsers int) (*Hub, error) {
 		return nil, err
 	}
 	return &Hub{
-		store:    store,
-		certHash: certHash,
-		maxUsers: maxUsers,
-		limiter:  NewIPLimiter(10, 10*time.Minute),
-		pending:  make(chan struct{}, 64),
-		sessions: map[int64]*Session{},
-		rooms:    rooms,
+		store:      store,
+		certHash:   certHash,
+		maxUsers:   maxUsers,
+		limiter:    NewIPLimiter(10, 10*time.Minute),
+		pending:    make(chan struct{}, 64),
+		sessions:   map[int64]*Session{},
+		rooms:      rooms,
+		nextTempID: tempRoomFirstID - 1,
+		pwLimiter:  NewIPLimiter(passwordTries, passwordWindow),
 	}, nil
 }
 
@@ -53,7 +58,7 @@ func (h *Hub) roomExistsLocked(id int64) bool {
 			return true
 		}
 	}
-	return false
+	return h.tempByIDLocked(id) != nil
 }
 
 func (h *Hub) usersLocked() []WireUser {
@@ -92,10 +97,11 @@ func (h *Hub) Add(s *Session) (old *Session, ok bool) {
 	if old != nil {
 		delete(h.sessions, s.userID)
 		h.broadcastLocked(&Envelope{T: "user_left", ID: old.userID}, old)
+		h.dropEmptyTempLocked(old.room)
 	}
 	s.room = h.defaultRoomLocked()
 	h.sessions[s.userID] = s
-	welcome := &Envelope{T: "welcome", You: ptr(s.wireLocked()), Rooms: h.rooms, Users: h.usersLocked()}
+	welcome := &Envelope{T: "welcome", You: ptr(s.wireLocked()), Rooms: h.allRoomsLocked(), Users: h.usersLocked()}
 	if mod {
 		welcome.Mod = boolPtr(true)
 	}
@@ -119,19 +125,53 @@ func (h *Hub) Remove(s *Session) {
 	}
 	delete(h.sessions, s.userID)
 	h.broadcastLocked(&Envelope{T: "user_left", ID: s.userID}, nil)
+	h.dropEmptyTempLocked(s.room)
 }
 
-func (h *Hub) Join(s *Session, room int64) bool {
+// Join wechselt s in den Raum. Gesperrte temporäre Räume brauchen das Passwort;
+// Nutzer mit verknüpftem Admin-Konto kommen ohne hinein. Fehler: errNoRoom,
+// errRoomPassword, errTooManyTries.
+func (h *Hub) Join(s *Session, room int64, password string) error {
+	h.mu.RLock()
+	tr := h.tempByIDLocked(room)
+	needPw := tr != nil && tr.locked() && s.room != room
+	h.mu.RUnlock()
+	skip, reserved := !needPw, false
+	if needPw {
+		skip = h.store.LinkedToAdmin(s.userID)
+	}
+	if !skip {
+		if !h.pwLimiter.Reserve(passwordKey(s.userID)) {
+			return errTooManyTries
+		}
+		reserved = true
+	}
+	ok := false
+	defer func() {
+		if reserved && ok {
+			h.pwLimiter.Refund(passwordKey(s.userID))
+		}
+	}()
+	if len(password) > maxJoinPassword {
+		password = password[:maxJoinPassword]
+	}
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if !h.roomExistsLocked(room) || h.sessions[s.userID] != s {
-		return false
+		return errNoRoom
 	}
+	if tr := h.tempByIDLocked(room); tr != nil && s.room != room && !skip && !tr.check(password) {
+		return errRoomPassword
+	}
+	ok = true
 	if s.room != room {
+		old := s.room
 		s.room = room
 		h.broadcastLocked(&Envelope{T: "user_update", User: ptr(s.wireLocked())}, nil)
+		h.dropEmptyTempLocked(old)
 	}
-	return true
+	return nil
 }
 
 func (h *Hub) SetState(s *Session, muted, deaf bool) {
@@ -159,9 +199,20 @@ func (h *Hub) Chat(s *Session, text string) {
 	}
 	room := s.room
 	name := s.name
+	isTemp := h.tempByIDLocked(room) != nil
 	h.mu.RUnlock()
 	m := DBMessage{Room: room, From: s.userID, Name: name, Text: text, TS: time.Now().Unix()}
-	if err := h.store.AddMessage(m, 200); err != nil {
+	if isTemp {
+		// Temporäre Räume: Chat nur im Speicher, nie in der Datenbank
+		h.mu.Lock()
+		if tr := h.tempByIDLocked(room); tr != nil {
+			tr.msgs = append(tr.msgs, m)
+			if len(tr.msgs) > tempChatKeep {
+				tr.msgs = tr.msgs[len(tr.msgs)-tempChatKeep:]
+			}
+		}
+		h.mu.Unlock()
+	} else if err := h.store.AddMessage(m, 200); err != nil {
 		log.Printf("chat speichern: %v", err)
 	}
 	h.mu.RLock()
@@ -352,9 +403,14 @@ func (h *Hub) ClearChat(room int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	h.mu.RLock()
+	h.mu.Lock()
+	for _, tr := range h.temp {
+		if room == 0 || tr.id == room {
+			tr.msgs = nil
+		}
+	}
 	h.broadcastLocked(&Envelope{T: "chat_cleared", Room: room}, nil)
-	h.mu.RUnlock()
+	h.mu.Unlock()
 	return n, nil
 }
 
@@ -374,12 +430,19 @@ func (h *Hub) ClearChatFrom(s *Session, room int64) {
 	}
 	name := "allen Räumen"
 	if room != 0 {
-		r, err := h.store.RoomByID(room)
-		if err != nil {
-			s.send(&Envelope{T: "error", Code: "not_found", Reason: "Diesen Raum gibt es nicht mehr."})
-			return
+		h.mu.RLock()
+		tr := h.tempByIDLocked(room)
+		h.mu.RUnlock()
+		if tr != nil {
+			name = "„" + tr.name + "“"
+		} else {
+			r, err := h.store.RoomByID(room)
+			if err != nil {
+				s.send(&Envelope{T: "error", Code: "not_found", Reason: "Diesen Raum gibt es nicht mehr."})
+				return
+			}
+			name = "„" + r.Name + "“"
 		}
-		name = "„" + r.Name + "“"
 	}
 	if _, err := h.ClearChat(room); err != nil {
 		s.send(&Envelope{T: "error", Code: "internal", Reason: "Leeren hat nicht geklappt."})
@@ -406,8 +469,8 @@ func (h *Hub) ReloadRooms() error {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.rooms = rooms
-	h.broadcastLocked(&Envelope{T: "rooms", Rooms: rooms}, nil)
+	h.rooms = rooms // temporäre Räume bleiben erhalten
+	h.broadcastLocked(&Envelope{T: "rooms", Rooms: h.allRoomsLocked()}, nil)
 	def := h.defaultRoomLocked()
 	for _, s := range h.sessions {
 		if !h.roomExistsLocked(s.room) {
