@@ -831,6 +831,10 @@ class _ControlBar extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (c.config.settings.muteInBackground) ...[
+                  const SizedBox(height: 6),
+                  const _BackgroundMuteHint(),
+                ],
               ],
             ),
           ),
@@ -844,10 +848,7 @@ class _ControlBar extends StatelessWidget {
             label: c.muted ? 'Stumm' : 'Mikro an',
             active: c.muted,
             onTap: c.toggleMute,
-            tooltip: c.config.settings.muteInBackground
-                ? 'Mikrofon an/aus (Strg+M). Im Hintergrund stumm.'
-                : 'Mikrofon an/aus (Strg+M)',
-            badge: c.config.settings.muteInBackground ? Icons.visibility_off_rounded : null,
+            tooltip: 'Mikrofon an/aus (Strg+M)',
           ),
           SizedBox(width: compact ? 6 : 10),
           _RoundButton(
@@ -935,7 +936,6 @@ class _RoundButton extends StatelessWidget {
     required this.active,
     required this.onTap,
     required this.tooltip,
-    this.badge,
   });
 
   final IconData icon;
@@ -943,8 +943,6 @@ class _RoundButton extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
   final String tooltip;
-  /// Kleines Zusatzsymbol oben rechts am Knopf (ändert die Größe nicht).
-  final IconData? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -954,39 +952,43 @@ class _RoundButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Material(
-                color: active ? kDanger : theme.colorScheme.surfaceContainerHighest,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: onTap,
-                  child: Padding(padding: const EdgeInsets.all(12), child: Icon(icon, size: 24)),
-                ),
-              ),
-              if (badge != null)
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: IgnorePointer(
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: theme.colorScheme.outlineVariant),
-                      ),
-                      child: Icon(badge, size: 11, color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                  ),
-                ),
-            ],
+          Material(
+            color: active ? kDanger : theme.colorScheme.surfaceContainerHighest,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onTap,
+              child: Padding(padding: const EdgeInsets.all(12), child: Icon(icon, size: 24)),
+            ),
           ),
           const SizedBox(height: 4),
           Text(label, style: theme.textTheme.labelSmall),
         ],
+      ),
+    );
+  }
+}
+
+/// Hinweis unter dem Pegel: Mikro geht aus, wenn Talkie nicht vorne ist.
+class _BackgroundMuteHint extends StatelessWidget {
+  const _BackgroundMuteHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: kAccent.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      // Schmales Handy: lieber etwas kleiner als abgeschnitten
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          'Im Hintergrund stumm',
+          maxLines: 1,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: kAccent, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
