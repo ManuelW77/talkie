@@ -683,7 +683,7 @@ func TestInviteMailInstallHints(t *testing.T) {
 	wt.app.cfg.DownloadURL = "https://example.test/releases/latest"
 	body = wt.app.inviteMail(inv, "Manuel")
 	for _, want := range []string{appStoreURL, "https://example.test/releases/latest", "Talkie-macOS.dmg",
-		"Talkie-Windows.zip", "Talkie-Android.apk", "ABCD2345", "talkie.test:7777", "4. Einladungscode"} {
+		"Talkie-Windows.zip", "Talkie-Android.apk", "ABCD2345", "talkie.test:7777", "4. Einladungscode", "Auf weiterem Gerät nutzen"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("%q fehlt in der Mail:\n%s", want, body)
 		}
