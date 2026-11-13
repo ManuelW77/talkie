@@ -831,6 +831,10 @@ class _ControlBar extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (c.config.settings.muteInBackground) ...[
+                  const SizedBox(height: 6),
+                  const _BackgroundMuteHint(),
+                ],
               ],
             ),
           ),
@@ -960,6 +964,31 @@ class _RoundButton extends StatelessWidget {
           const SizedBox(height: 4),
           Text(label, style: theme.textTheme.labelSmall),
         ],
+      ),
+    );
+  }
+}
+
+/// Hinweis unter dem Pegel: Mikro geht aus, wenn Talkie nicht vorne ist.
+class _BackgroundMuteHint extends StatelessWidget {
+  const _BackgroundMuteHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: kAccent.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      // Schmales Handy: lieber etwas kleiner als abgeschnitten
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          'Im Hintergrund stumm',
+          maxLines: 1,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: kAccent, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }

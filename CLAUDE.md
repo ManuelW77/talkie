@@ -33,7 +33,7 @@ Sitzungen sonst gegenseitig den Branch weg. Beim Committen nur eigene Dateien hi
 3. Am Ende der Arbeit: Feature-Branch pushen, nach `devel` mergen (`git merge --no-ff`) und **`devel` pushen**.
    Die CI baut dann Windows, Linux und macOS zum Testen.
 4. Merge `devel` → `main` und Release-Tags **nur auf ausdrückliche Anweisung von Manuel**.
-   Versionsnummer: `version:` in `app/pubspec.yaml` und `kAppVersion` in `app/lib/version.dart` gleich halten
+   Versionsnummer: `version:` in `app/pubspec.yaml` und `kAppVersion` in `app/lib/version.dart` und `ServerVersion` in `server/version.go` gleich halten
    (Test prüft das), Tag heißt `v<version>`. Der Server meldet den Apps das neueste GitHub-Release.
    Ablauf und Secrets für die Mac-Notarisierung: `docs/RELEASE.md`.
 5. Nie direkt auf `main` committen. Kein Force-Push auf `main` oder `devel`.

@@ -54,6 +54,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     bool? ptt,
     String? pttKey,
     bool? echoCancel,
+    bool? muteInBackground,
   }) => SettingsDto(
     vadThresholdDb: vad ?? _s.vadThresholdDb,
     noiseSuppression: ns ?? _s.noiseSuppression,
@@ -65,6 +66,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     ptt: ptt ?? _s.ptt,
     pttKey: pttKey ?? _s.pttKey,
     echoCancel: echoCancel ?? _s.echoCancel,
+    muteInBackground: muteInBackground ?? _s.muteInBackground,
   );
 
   Widget _pttSection(ThemeData theme) {
@@ -302,6 +304,13 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   value: _s.echoCancel,
                   onChanged: (v) => _update(_copy(echoCancel: v)),
                 ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Talkie im Hintergrund stumm schalten'),
+                subtitle: const Text('Dein Mikro geht aus, solange Talkie nicht vorne ist.'),
+                value: _s.muteInBackground,
+                onChanged: (v) => _update(_copy(muteInBackground: v)),
+              ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Rauschfilter'),

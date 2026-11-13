@@ -111,6 +111,8 @@ pub struct SettingsDto {
     pub ptt_key: String,
     /// Handy: Echo-Unterdrückung des Systems (ohne Kopfhörer wichtig).
     pub echo_cancel: bool,
+    /// Mikrofon stumm, solange die App nicht im Vordergrund ist.
+    pub mute_in_background: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -218,6 +220,7 @@ fn settings_dto(s: &Settings) -> SettingsDto {
         ptt: s.ptt,
         ptt_key: s.ptt_key.clone(),
         echo_cancel: s.echo_cancel,
+        mute_in_background: s.mute_in_background,
     }
 }
 
@@ -375,6 +378,7 @@ pub fn talkie_set_settings(s: SettingsDto) -> Result<()> {
         ptt: s.ptt,
         ptt_key: s.ptt_key,
         echo_cancel: s.echo_cancel,
+        mute_in_background: s.mute_in_background,
     });
     Ok(())
 }

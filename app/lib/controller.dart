@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart' show AppLifecycleListener;
+import 'package:flutter/widgets.dart' show AppLifecycleListener, AppLifecycleState;
 
 import 'platform.dart';
 import 'version.dart';
@@ -64,7 +64,7 @@ class TalkieController extends ChangeNotifier {
   void start() {
     _sub = talkieEvents().listen(_onEvent);
     // Zurück aus den Einstellungen: Mikrofon-Erlaubnis neu prüfen
-    _life = AppLifecycleListener(onResume: () => checkMic());
+    _life = AppLifecycleListener(onResume: () => checkMic(), onStateChange: handleLifecycle);
     // iPhone: nach Anruf/Siri den Ton neu öffnen
     TalkiePlatform.onNative((m) {
       if (m == 'audioResume' && _active) talkieRestartAudio();
@@ -267,7 +267,34 @@ class TalkieController extends ChangeNotifier {
 
   void sendChat(String text) => talkieChat(text: text);
 
-  void toggleMute() => talkieSetMuted(muted: !muted);
+  void toggleMute() {
+    // Wer selbst schaltet, übernimmt: kein automatisches Entstummen mehr
+    _autoMuted = false;
+    talkieSetMuted(muted: !muted);
+  }
+
+  /// Mikro wurde automatisch stumm geschaltet, weil Talkie nicht vorne ist.
+  bool _autoMuted = false;
+
+  /// App kommt in den Hintergrund oder zurück: Mikro je nach Einstellung stumm/an.
+  void handleLifecycle(AppLifecycleState s) {
+    final action = backgroundMuteAction(
+      enabled: config.settings.muteInBackground,
+      foreground: s == AppLifecycleState.resumed,
+      muted: muted,
+      autoMuted: _autoMuted,
+    );
+    switch (action) {
+      case BackgroundMuteAction.mute:
+        _autoMuted = true;
+        talkieSetMuted(muted: true);
+      case BackgroundMuteAction.unmute:
+        _autoMuted = false;
+        talkieSetMuted(muted: false);
+      case BackgroundMuteAction.none:
+        break;
+    }
+  }
 
   void toggleDeaf() => talkieSetDeaf(deaf: !deaf);
 
@@ -289,6 +316,11 @@ class TalkieController extends ChangeNotifier {
   Future<void> saveSettings(SettingsDto s) async {
     await talkieSetSettings(s: s);
     config = talkieConfig();
+    // Einstellung ausgeschaltet, während das Mikro automatisch stumm war: wieder an
+    if (!config.settings.muteInBackground && _autoMuted) {
+      _autoMuted = false;
+      talkieSetMuted(muted: false);
+    }
     if (_active) TalkiePlatform.setVoiceMode(config.settings.echoCancel);
     notifyListeners();
   }
@@ -302,4 +334,19 @@ class TalkieController extends ChangeNotifier {
     setupError = null;
     notifyListeners();
   }
+}
+
+enum BackgroundMuteAction { none, mute, unmute }
+
+/// Entscheidet, ob das Mikro beim Wechsel vorne/hinten automatisch stumm oder wieder an geht.
+/// Wer vorher selbst stumm war, bleibt stumm.
+BackgroundMuteAction backgroundMuteAction({
+  required bool enabled,
+  required bool foreground,
+  required bool muted,
+  required bool autoMuted,
+}) {
+  if (foreground) return autoMuted ? BackgroundMuteAction.unmute : BackgroundMuteAction.none;
+  if (enabled && !muted && !autoMuted) return BackgroundMuteAction.mute;
+  return BackgroundMuteAction.none;
 }
