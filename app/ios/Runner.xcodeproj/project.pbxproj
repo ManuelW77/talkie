@@ -389,7 +389,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Archive: Buildnummer um 1 hochzählen (steht in app/pubspec.yaml als version: x.y.z+N)\n# und in die App schreiben. Andere Builds behalten die Nummer.\nif [ \"$ACTION\" = \"install\" ] && [ \"$CONFIGURATION\" = \"Release\" ]; then\n  PUBSPEC=\"$SRCROOT/../pubspec.yaml\"\n  OLD=$(sed -n 's/^version: *[0-9.]*+\\([0-9]*\\).*/\\1/p' \"$PUBSPEC\")\n  NEW=$(( ${OLD:-0} + 1 ))\n  sed -i '' \"s/^\\(version: *[0-9.]*\\)+[0-9]*/\\1+$NEW/\" \"$PUBSPEC\"\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $NEW\" \"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\n  echo \"Buildnummer: $OLD -> $NEW (pubspec.yaml danach committen)\"\nfi\n";
+			shellScript = "# Archive: Buildnummer um 1 hochzählen (steht in app/pubspec.yaml als version: x.y.z+N)\n# und in die App schreiben. Andere Builds behalten die Nummer.\nif [ \"$ACTION\" = \"install\" ] && [ \"$CONFIGURATION\" = \"Release\" ]; then\n  PUBSPEC=\"$SRCROOT/../pubspec.yaml\"\n  OLD=$(sed -n 's/^version: *[0-9.]*+\\([0-9]*\\).*/\\1/p' \"$PUBSPEC\")\n  NEW=$(( ${OLD:-0} + 1 ))\n  sed -i '' \"s/^\\(version: *[0-9.]*\\)+[0-9]*/\\1+$NEW/\" \"$PUBSPEC\"\n  NAME=$(sed -n 's/^version: *\\([0-9.]*\\)+.*/\\1/p' \"$PUBSPEC\")\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $NEW\" \"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\n  # Version immer aus pubspec.yaml, auch wenn Generated.xcconfig veraltet ist\n  [ -n \"$NAME\" ] && /usr/libexec/PlistBuddy -c \"Set :CFBundleShortVersionString $NAME\" \"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\n  echo \"Version $NAME, Buildnummer: $OLD -> $NEW (pubspec.yaml danach committen)\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -510,7 +510,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = "org.fire-devils.talkie";
 				PRODUCT_NAME = Talkie;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -696,7 +696,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = "org.fire-devils.talkie";
 				PRODUCT_NAME = Talkie;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -722,7 +722,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = "org.fire-devils.talkie";
 				PRODUCT_NAME = Talkie;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
