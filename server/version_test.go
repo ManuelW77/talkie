@@ -24,7 +24,7 @@ func TestServerVersionMatchesPubspec(t *testing.T) {
 func TestFooterOnLoginPage(t *testing.T) {
 	wt := newWebTest(t, nil)
 	_, _, body := wt.browser().get("/login")
-	for _, want := range []string{"Talkie " + ServerVersion, "Manuel Weiser</a> in Leipzig", "https://manuelw.de", "github.com/ManuelW77/talkie"} {
+	for _, want := range []string{"Talkie Server " + ServerVersion, "Manuel Weiser</a> in Leipzig", "https://manuelw.de", "github.com/ManuelW77/talkie"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("Footer fehlt: %q", want)
 		}
