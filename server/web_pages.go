@@ -364,7 +364,7 @@ func (w *webApp) roomsPage(rw http.ResponseWriter, r *http.Request) {
 	for _, rm := range rooms {
 		rows = append(rows, roomRow{rm, count[rm.ID]})
 	}
-	w.render(rw, r, "rooms", "Räume", map[string]any{"Rooms": rows, "Last": len(rows) - 1})
+	w.render(rw, r, "rooms", "Räume", map[string]any{"Rooms": rows, "Last": len(rows) - 1, "Temp": w.hub.TempRoomList()})
 }
 
 const tempNameTaken = "Diesen Namen nutzt gerade ein Raum aus der App. Nimm bitte einen anderen."
