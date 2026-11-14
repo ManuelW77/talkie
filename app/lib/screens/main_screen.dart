@@ -11,6 +11,7 @@ import '../widgets/avatar.dart';
 import '../widgets/level_meter.dart';
 import '../widgets/idle_dialog.dart';
 import 'members_dialog.dart';
+import 'profile_dialog.dart';
 import 'settings_dialog.dart';
 
 /// Unterhalb dieser Breite (Handy hochkant) wird das Layout einspaltig.
@@ -1065,7 +1066,34 @@ class _ControlBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          Avatar(name: me?.name ?? c.config.name, talking: me?.talking ?? false, size: 40, image: c.avatarOf(c.me)),
+          Tooltip(
+            message: 'Dein Profil',
+            child: InkWell(
+              key: const Key('own-avatar'),
+              customBorder: const CircleBorder(),
+              mouseCursor: SystemMouseCursors.click,
+              onTap: () => showDialog<void>(context: context, builder: (_) => ProfileDialog(controller: c)),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Avatar(name: me?.name ?? c.config.name, talking: me?.talking ?? false, size: 40, image: c.avatarOf(c.me)),
+                  Positioned(
+                    right: -3,
+                    bottom: -3,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: theme.colorScheme.surface, width: 1.5),
+                      ),
+                      child: Icon(Icons.edit_rounded, size: 10, color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
