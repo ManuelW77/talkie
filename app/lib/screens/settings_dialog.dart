@@ -21,11 +21,18 @@ class _SettingsDialogState extends State<SettingsDialog> {
   late SettingsDto _s = widget.controller.config.settings;
   List<String> _inputs = const [];
   List<String> _outputs = const [];
+  final _scroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadDevices();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDevices() async {
@@ -70,7 +77,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
   );
 
   Widget _pttSection(ThemeData theme) {
-    final hint = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final hint = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
     final access = TalkiePlatform.isMobile ? 'unsupported' : _pttAccess;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -80,8 +89,16 @@ class _SettingsDialogState extends State<SettingsDialog> {
         SegmentedButton<bool>(
           showSelectedIcon: false,
           segments: const [
-            ButtonSegment(value: false, label: Text('Automatisch'), icon: Icon(Icons.graphic_eq_rounded)),
-            ButtonSegment(value: true, label: Text('Taste halten'), icon: Icon(Icons.touch_app_rounded)),
+            ButtonSegment(
+              value: false,
+              label: Text('Automatisch'),
+              icon: Icon(Icons.graphic_eq_rounded),
+            ),
+            ButtonSegment(
+              value: true,
+              label: Text('Taste halten'),
+              icon: Icon(Icons.touch_app_rounded),
+            ),
           ],
           selected: {_s.ptt},
           onSelectionChanged: (v) => _update(_copy(ptt: v.first)),
@@ -96,20 +113,35 @@ class _SettingsDialogState extends State<SettingsDialog> {
         if (_s.ptt && access != 'unsupported') ...[
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            initialValue: _pttKeys.any((k) => k.id == _s.pttKey) ? _s.pttKey : null,
-            decoration: const InputDecoration(labelText: 'Sprechtaste', prefixIcon: Icon(Icons.keyboard_rounded)),
-            items: [for (final k in _pttKeys) DropdownMenuItem(value: k.id, child: Text(k.label))],
+            initialValue: _pttKeys.any((k) => k.id == _s.pttKey)
+                ? _s.pttKey
+                : null,
+            decoration: const InputDecoration(
+              labelText: 'Sprechtaste',
+              prefixIcon: Icon(Icons.keyboard_rounded),
+            ),
+            items: [
+              for (final k in _pttKeys)
+                DropdownMenuItem(value: k.id, child: Text(k.label)),
+            ],
             onChanged: (v) {
               if (v != null) _update(_copy(pttKey: v));
             },
           ),
           const SizedBox(height: 4),
-          Text('Funktioniert auch, während ein Spiel im Vordergrund ist.', style: hint),
+          Text(
+            'Funktioniert auch, während ein Spiel im Vordergrund ist.',
+            style: hint,
+          ),
           if (access == 'permission') ...[
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: kDanger, size: 20),
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: kDanger,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
@@ -181,7 +213,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   // Alte Server kennen Geräte-Codes nicht und antworten gar nicht
                   FutureBuilder<void>(
                     future: Future<void>.delayed(const Duration(seconds: 6)),
-                    builder: (ctx, snap) => snap.connectionState == ConnectionState.done
+                    builder: (ctx, snap) =>
+                        snap.connectionState == ConnectionState.done
                         ? const Text(
                             'Der Server antwortet nicht. Vermutlich läuft dort noch eine ältere Talkie-Version '
                             'ohne Geräte-Codes – bitte den Server aktualisieren.',
@@ -195,10 +228,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     code,
                     textAlign: TextAlign.center,
                     style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(
-                          letterSpacing: 4,
-                          fontWeight: FontWeight.w700,
-                          color: kAccent,
-                        ),
+                      letterSpacing: 4,
+                      fontWeight: FontWeight.w700,
+                      color: kAccent,
+                    ),
                   ),
                 const SizedBox(height: 16),
                 Text(
@@ -210,7 +243,12 @@ class _SettingsDialogState extends State<SettingsDialog> {
             ),
           ),
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fertig'))],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fertig'),
+          ),
+        ],
       ),
     );
   }
@@ -224,9 +262,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
           'Danach brauchst du einen neuen Einladungscode, um wieder reinzukommen. Das ist nur nötig, wenn du einen anderen Namen oder Server willst.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Abbrechen'),
+          ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kDanger, minimumSize: const Size(0, 40)),
+            style: FilledButton.styleFrom(
+              backgroundColor: kDanger,
+              minimumSize: const Size(0, 40),
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Abmelden'),
           ),
@@ -247,125 +291,158 @@ class _SettingsDialogState extends State<SettingsDialog> {
       title: const Text('Einstellungen'),
       content: SizedBox(
         width: 460,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Auf Handy und Tablet wählt das System Mikrofon und Lautsprecher selbst
-              if (!TalkiePlatform.isMobile) ...[
-                _deviceDropdown(
-                  'Mikrofon',
-                  Icons.mic_rounded,
-                  _s.inputDevice,
-                  _inputs,
-                  (v) => _update(_copy(input: v)),
-                ),
-                const SizedBox(height: 12),
-                _deviceDropdown(
-                  'Kopfhörer / Lautsprecher',
-                  Icons.headphones_rounded,
-                  _s.outputDevice,
-                  _outputs,
-                  (v) => _update(_copy(output: v)),
-                ),
+        // Fester Scrollbalken, damit man sieht, dass es weiter unten weitergeht
+        child: Scrollbar(
+          controller: _scroll,
+          thumbVisibility: true,
+          trackVisibility: true,
+          child: SingleChildScrollView(
+            controller: _scroll,
+            padding: const EdgeInsets.only(right: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Auf Handy und Tablet wählt das System Mikrofon und Lautsprecher selbst
+                if (!TalkiePlatform.isMobile) ...[
+                  _deviceDropdown(
+                    'Mikrofon',
+                    Icons.mic_rounded,
+                    _s.inputDevice,
+                    _inputs,
+                    (v) => _update(_copy(input: v)),
+                  ),
+                  const SizedBox(height: 12),
+                  _deviceDropdown(
+                    'Kopfhörer / Lautsprecher',
+                    Icons.headphones_rounded,
+                    _s.outputDevice,
+                    _outputs,
+                    (v) => _update(_copy(output: v)),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+                _pttSection(theme),
                 const SizedBox(height: 20),
-              ],
-              _pttSection(theme),
-              const SizedBox(height: 20),
-              if (!_s.ptt) ...[
-                Text('Empfindlichkeit', style: theme.textTheme.titleSmall),
-                Text(
-                  'Sprich normal: Der Balken muss über den weißen Strich kommen. '
-                  'Schiebe nach links, wenn du nicht gehört wirst, nach rechts, wenn Tastatur & Co. mitgesendet werden.',
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 10),
-                ValueListenableBuilder<double>(
-                  valueListenable: c.levelNotifier,
-                  builder: (_, v, _) => LevelMeter(level: v, threshold: (_s.vadThresholdDb + 60) / 60, height: 12),
-                ),
-                Slider(
-                  value: _s.vadThresholdDb.clamp(-60.0, -15.0),
-                  min: -60,
-                  max: -15,
-                  divisions: 45,
-                  label: '${_s.vadThresholdDb.round()} dB',
-                  onChanged: (v) => setState(() => _s = _copy(vad: v)),
-                  onChangeEnd: (v) => _update(_copy(vad: v)),
-                ),
-              ],
-              // Handy: Echo-Unterdrückung des Systems (ohne Kopfhörer wichtig)
-              if (TalkiePlatform.isMobile)
+                if (!_s.ptt) ...[
+                  Text('Empfindlichkeit', style: theme.textTheme.titleSmall),
+                  Text(
+                    'Sprich normal: Der Balken muss über den weißen Strich kommen. '
+                    'Schiebe nach links, wenn du nicht gehört wirst, nach rechts, wenn Tastatur & Co. mitgesendet werden.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ValueListenableBuilder<double>(
+                    valueListenable: c.levelNotifier,
+                    builder: (_, v, _) => LevelMeter(
+                      level: v,
+                      threshold: (_s.vadThresholdDb + 60) / 60,
+                      height: 12,
+                    ),
+                  ),
+                  Slider(
+                    value: _s.vadThresholdDb.clamp(-60.0, -15.0),
+                    min: -60,
+                    max: -15,
+                    divisions: 45,
+                    label: '${_s.vadThresholdDb.round()} dB',
+                    onChanged: (v) => setState(() => _s = _copy(vad: v)),
+                    onChangeEnd: (v) => _update(_copy(vad: v)),
+                  ),
+                ],
+                // Handy: Echo-Unterdrückung des Systems (ohne Kopfhörer wichtig)
+                if (TalkiePlatform.isMobile)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Echo-Unterdrückung'),
+                    subtitle: const Text(
+                      'Damit die anderen sich nicht selbst hören, wenn du ohne Kopfhörer sprichst',
+                    ),
+                    value: _s.echoCancel,
+                    onChanged: (v) => _update(_copy(echoCancel: v)),
+                  ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Echo-Unterdrückung'),
-                  subtitle: const Text('Damit die anderen sich nicht selbst hören, wenn du ohne Kopfhörer sprichst'),
-                  value: _s.echoCancel,
-                  onChanged: (v) => _update(_copy(echoCancel: v)),
+                  title: const Text('Talkie im Hintergrund stumm schalten'),
+                  subtitle: const Text(
+                    'Dein Mikro geht aus, solange Talkie nicht vorne ist.',
+                  ),
+                  value: _s.muteInBackground,
+                  onChanged: (v) => _update(_copy(muteInBackground: v)),
                 ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Talkie im Hintergrund stumm schalten'),
-                subtitle: const Text('Dein Mikro geht aus, solange Talkie nicht vorne ist.'),
-                value: _s.muteInBackground,
-                onChanged: (v) => _update(_copy(muteInBackground: v)),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Rauschfilter'),
-                subtitle: const Text('Filtert Lüfter, Tastatur und Hintergrundgeräusche'),
-                value: _s.noiseSuppression,
-                onChanged: (v) => _update(_copy(ns: v)),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Töne'),
-                subtitle: const Text('Kurzer Ton, wenn jemand kommt oder geht und bei neuen Chatnachrichten'),
-                value: _s.sounds,
-                onChanged: (v) => _update(_copy(sounds: v)),
-              ),
-              const SizedBox(height: 8),
-              Text('Mikrofon-Lautstärke', style: theme.textTheme.titleSmall),
-              Slider(
-                value: _s.inputGain.clamp(0.25, 4.0),
-                min: 0.25,
-                max: 4,
-                label: '${(_s.inputGain * 100).round()} %',
-                divisions: 15,
-                onChanged: (v) => setState(() => _s = _copy(gain: v)),
-                onChangeEnd: (v) => _update(_copy(gain: v)),
-              ),
-              Text('Lautstärke der anderen', style: theme.textTheme.titleSmall),
-              Slider(
-                value: _s.outputVolume.clamp(0.0, 2.0),
-                min: 0,
-                max: 2,
-                label: '${(_s.outputVolume * 100).round()} %',
-                divisions: 20,
-                onChanged: (v) => setState(() => _s = _copy(volume: v)),
-                onChangeEnd: (v) => _update(_copy(volume: v)),
-              ),
-              const Divider(height: 32),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: c.status == ConnStatus.connected ? _showDeviceCode : null,
-                  icon: const Icon(Icons.devices_rounded),
-                  label: const Text('Auf weiterem Gerät nutzen'),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Rauschfilter'),
+                  subtitle: const Text(
+                    'Filtert Lüfter, Tastatur und Hintergrundgeräusche',
+                  ),
+                  value: _s.noiseSuppression,
+                  onChanged: (v) => _update(_copy(ns: v)),
                 ),
-              ),
-              Text('Server: ${c.config.server}', style: theme.textTheme.bodySmall),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: _confirmLogout,
-                  icon: const Icon(Icons.logout_rounded, color: kDanger),
-                  label: const Text('Gerät abmelden', style: TextStyle(color: kDanger)),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Töne'),
+                  subtitle: const Text(
+                    'Kurzer Ton, wenn jemand kommt oder geht und bei neuen Chatnachrichten',
+                  ),
+                  value: _s.sounds,
+                  onChanged: (v) => _update(_copy(sounds: v)),
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text('Mikrofon-Lautstärke', style: theme.textTheme.titleSmall),
+                Slider(
+                  value: _s.inputGain.clamp(0.25, 4.0),
+                  min: 0.25,
+                  max: 4,
+                  label: '${(_s.inputGain * 100).round()} %',
+                  divisions: 15,
+                  onChanged: (v) => setState(() => _s = _copy(gain: v)),
+                  onChangeEnd: (v) => _update(_copy(gain: v)),
+                ),
+                Text(
+                  'Lautstärke der anderen',
+                  style: theme.textTheme.titleSmall,
+                ),
+                Slider(
+                  value: _s.outputVolume.clamp(0.0, 2.0),
+                  min: 0,
+                  max: 2,
+                  label: '${(_s.outputVolume * 100).round()} %',
+                  divisions: 20,
+                  onChanged: (v) => setState(() => _s = _copy(volume: v)),
+                  onChangeEnd: (v) => _update(_copy(volume: v)),
+                ),
+                const Divider(height: 32),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: c.status == ConnStatus.connected
+                        ? _showDeviceCode
+                        : null,
+                    icon: const Icon(Icons.devices_rounded),
+                    label: const Text('Auf weiterem Gerät nutzen'),
+                  ),
+                ),
+                Text(
+                  'Server: ${c.config.server}',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _confirmLogout,
+                    icon: const Icon(Icons.logout_rounded, color: kDanger),
+                    label: const Text(
+                      'Gerät abmelden',
+                      style: TextStyle(color: kDanger),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
