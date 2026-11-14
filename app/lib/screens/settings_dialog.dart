@@ -720,9 +720,36 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 const SizedBox(height: 8),
                 _devicesSection(theme),
                 const SizedBox(height: 16),
-                Text(
-                  'Server: ${c.config.server}',
-                  style: theme.textTheme.bodySmall,
+                // Verbundener Server, gut lesbar
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.dns_rounded, color: theme.colorScheme.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Server', style: theme.textTheme.labelMedium),
+                            SelectableText(
+                              c.config.server,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 12),
                 FilledButton.icon(
