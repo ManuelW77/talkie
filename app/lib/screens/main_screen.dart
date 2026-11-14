@@ -125,6 +125,28 @@ class _StatusBanner extends StatelessWidget {
     final status = controller.status;
     if (status == ConnStatus.connected) return const SizedBox.shrink();
 
+    // Selbst getrennt: ruhiger Hinweis statt Fehlermeldung
+    if (status == ConnStatus.idle && controller.userDisconnected) {
+      return Material(
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              const Icon(Icons.link_off_rounded),
+              const SizedBox(width: 12),
+              const Expanded(child: Text('Du bist getrennt.')),
+              FilledButton(
+                onPressed: controller.reconnect,
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 36)),
+                child: const Text('Verbinden'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final failed = status == ConnStatus.failed || status == ConnStatus.idle;
     final offline = s?.errorCode == 'offline';
     final text = switch (status) {
@@ -1033,6 +1055,16 @@ class _ControlBar extends StatelessWidget {
             tooltip: 'Niemanden hören (und selbst stumm)',
           ),
           SizedBox(width: compact ? 6 : 10),
+          if (c.status == ConnStatus.connected) ...[
+            _RoundButton(
+              icon: Icons.call_end_rounded,
+              label: 'Trennen',
+              active: true,
+              onTap: c.disconnect,
+              tooltip: 'Vom Server trennen',
+            ),
+            SizedBox(width: compact ? 6 : 10),
+          ],
           _RoundButton(
             icon: Icons.settings_rounded,
             label: compact ? 'Mehr' : 'Einstellungen',

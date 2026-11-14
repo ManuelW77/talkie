@@ -271,7 +271,18 @@ class TalkieController extends ChangeNotifier {
     }
   }
 
+  /// Selbst vom Server getrennt (Knopf „Trennen“), nicht durch einen Fehler.
+  bool userDisconnected = false;
+
+  /// Vom Server trennen, bis man wieder auf „Verbinden“ tippt.
+  void disconnect() {
+    userDisconnected = true;
+    talkieDisconnect();
+    notifyListeners();
+  }
+
   void reconnect() {
+    userDisconnected = false;
     talkieConnect(server: config.server, name: config.name, invite: '', fingerprint: kServerFingerprint);
   }
 
