@@ -12,6 +12,9 @@ const kTalking = Color(0xFF2EC4B6);
 /// Gefahr/stumm: ins Rosa verschoben, damit es sich klar vom Orange abhebt.
 const kDanger = Color(0xFFFF5D6E);
 
+/// Gefahr als Knopffläche: dunkler, damit weiße Schrift lesbar bleibt (4,6:1).
+const kDangerFill = Color(0xFFD63A52);
+
 // Dunkle Flächen im Blaugrau des Icon-Gehäuses statt Flutters grünstichiger Standardtöne.
 const _bg = Color(0xFF0F1115);
 const _surface = Color(0xFF15181D);

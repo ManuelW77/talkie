@@ -637,7 +637,7 @@ Future<void> _confirmModerate(BuildContext context, TalkieController controller,
       actions: [
         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: kDanger, foregroundColor: Colors.white),
+          style: FilledButton.styleFrom(backgroundColor: kDangerFill, foregroundColor: Colors.white),
           onPressed: () => Navigator.pop(context, true),
           child: Text(ban ? 'Sperren' : 'Rauswerfen'),
         ),
@@ -819,7 +819,7 @@ class _PhoneTabs extends StatelessWidget {
           label: const Text('Räume'),
           icon: Badge(
             isLabelVisible: otherUnread,
-            backgroundColor: kDanger,
+            backgroundColor: kDangerFill,
             smallSize: 8,
             child: const Icon(Icons.groups_rounded),
           ),
@@ -830,7 +830,7 @@ class _PhoneTabs extends StatelessWidget {
           icon: Badge(
             isLabelVisible: c.unreadHere > 0,
             label: Text('${c.unreadHere}'),
-            backgroundColor: kDanger,
+            backgroundColor: kDangerFill,
             child: const Icon(Icons.chat_bubble_rounded),
           ),
         ),
@@ -883,7 +883,7 @@ class _ClearChatMenu extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kDanger, foregroundColor: Colors.white),
+            style: FilledButton.styleFrom(backgroundColor: kDangerFill, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Leeren'),
           ),
@@ -1354,7 +1354,7 @@ class _RoundButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Material(
-              color: active ? kDanger : theme.colorScheme.surfaceContainerHighest,
+              color: active ? kDangerFill : theme.colorScheme.surfaceContainerHighest,
               shape: const CircleBorder(),
               child: InkWell(
                 customBorder: const CircleBorder(),
