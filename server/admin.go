@@ -77,7 +77,7 @@ func writeErr(w http.ResponseWriter, err error) {
 		code = http.StatusNotFound
 	case errors.Is(err, ErrNameTaken):
 		code = http.StatusConflict
-	case errors.Is(err, ErrInviteName), errors.Is(err, ErrInviteNameUses):
+	case errors.Is(err, ErrInviteName):
 		code = http.StatusBadRequest
 	}
 	http.Error(w, err.Error(), code)
@@ -332,7 +332,7 @@ const usage = `Talkie-Server
 
 Verwaltung (während der Server läuft, z. B. per "docker exec talkie talkie-server ..."):
   status                            Fingerabdruck und Anzahl Online
-  invite [anzahl] [tage] [name]     Einladungscode erzeugen (Standard: 1 Person, 7 Tage; Name nur bei 1 Person)
+  invite [anzahl] [tage] [für wen]  Einladungscode erzeugen (Standard: 1 Person, 7 Tage; "für wen" ist eine Notiz)
   invites                           offene Einladungen anzeigen
   invite-del CODE                   Einladung löschen
   users                             alle Nutzer anzeigen
@@ -391,14 +391,14 @@ func runCLI(args []string, dataDir, adminAddr string) error {
 		fmt.Fprintf(tw, "Einladungscode:\t%s\nGilt für:\t%d Person(en)\nGültig bis:\t%s\n",
 			inv.Code, inv.UsesLeft, inv.Expires.Format("02.01.2006 15:04"))
 		if inv.Name != "" {
-			fmt.Fprintf(tw, "Name:\t%s\n", inv.Name)
+			fmt.Fprintf(tw, "Für:\t%s\n", inv.Name)
 		}
 	case "invites":
 		var invs []DBInvite
 		if err := c.do("GET", "/invites", nil, &invs); err != nil {
 			return err
 		}
-		fmt.Fprintln(tw, "CODE\tRESTLICH\tGÜLTIG BIS\tNAME")
+		fmt.Fprintln(tw, "CODE\tRESTLICH\tGÜLTIG BIS\tFÜR")
 		for _, i := range invs {
 			fmt.Fprintf(tw, "%s\t%d\t%s\t%s\n", i.Code, i.UsesLeft, i.Expires.Format("02.01.2006 15:04"), i.Name)
 		}

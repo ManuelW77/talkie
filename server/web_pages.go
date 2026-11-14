@@ -258,11 +258,7 @@ func (w *webApp) createInvite(rw http.ResponseWriter, r *http.Request) {
 	}
 	inv, err := w.store.CreateInvite(uses, time.Duration(days)*24*time.Hour, r.PostFormValue("name"))
 	if errors.Is(err, ErrInviteName) {
-		w.done(rw, r, "/invites", "Der Name muss 2 bis 20 Zeichen lang sein (Buchstaben, Zahlen, Leerzeichen, - _ .).", true)
-		return
-	}
-	if errors.Is(err, ErrInviteNameUses) {
-		w.done(rw, r, "/invites", "Ein Name geht nur bei einer Einladung für 1 Person.", true)
+		w.done(rw, r, "/invites", "Die Notiz darf höchstens 40 Zeichen lang sein.", true)
 		return
 	}
 	if err != nil {
@@ -303,7 +299,7 @@ func (w *webApp) inviteMailHTML(inv *DBInvite, from string) string {
 	d := map[string]any{
 		"From": from, "Code": inv.Code, "Expires": inv.Expires.Local().Format("02.01.2006"),
 		"AppStoreURL": appStoreURL, "DownloadURL": w.cfg.DownloadURL, "ServerAddr": w.cfg.ServerAddr,
-		"StepStart": step, "Name": inv.Name,
+		"StepStart": step,
 	}
 	step++
 	if w.cfg.ServerAddr != "" {
@@ -320,9 +316,6 @@ const appStoreURL = "https://apps.apple.com/de/app/talkie/id6832222100"
 func (w *webApp) inviteMail(inv *DBInvite, from string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Hallo!\n\n%s lädt dich zu Talkie ein, unserem Sprach-Chat zum Zocken.\n\n", from)
-	if inv.Name != "" {
-		fmt.Fprintf(&b, "Dein Name ist schon eingetragen: %s (du kannst ihn ändern).\n\n", inv.Name)
-	}
 	step := 1
 	fmt.Fprintf(&b, "%d. App installieren:\n\n", step)
 	fmt.Fprintf(&b, "   iPhone und iPad: Talkie im App Store laden\n   %s\n\n", appStoreURL)
