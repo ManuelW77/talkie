@@ -46,6 +46,9 @@ C → S  {"t":"device_del","id":4}     eigenes anderes Gerät entfernen (nicht d
 C → S  {"t":"device_rename","id":4,"name":"Mein Mac"}  eigenes Gerät umbenennen (auch das aktuelle; leer = ohne Namen)
 C → S  {"t":"device_code_del"}       offenen Geräte-Code löschen
 C → S  {"t":"clear_chat","room":3}  Chat leeren (room fehlt = alle Räume), nur mit verknüpftem Admin-Konto
+C → S  {"t":"set_avatar","data":"<base64 JPEG/PNG>"}  eigenes Profilbild setzen; data leer = Bild entfernen (siehe „Profilbilder“)
+C → S  {"t":"get_avatar","id":7}     Profilbild eines Nutzers abfragen
+C → S  {"t":"members"}               Mitgliederliste abfragen
 C → S  {"t":"still_here"}            „Ich bin noch da“: setzt nur die Inaktivitäts-Uhr zurück (siehe unten)
 
 S → C  {"t":"user_joined","user":User}
@@ -62,15 +65,41 @@ S → C  {"t":"devices","devices":[Device],"code":"ABCD-EFGH","expires":17310000
        Device = {"id":4,"label":"iPhone/iPad","created":1731000000,"last_seen":1731000000,"this":true}
 S → C  {"t":"idle_warning","secs":300}   gleich wegen Inaktivität getrennt, noch so viele Sekunden
 S → C  {"t":"chat_cleared","room":3}   Chat wurde geleert (room fehlt = alle Räume)
+S → C  {"t":"avatar","id":7,"avatar":1731000000000,"data":"<base64 JPEG>"}  Antwort auf get_avatar
+S → C  {"t":"members","members":[Member]}  Antwort auf members
 S → C  {"t":"error","code":"forbidden","reason":"..."}  Meldung für den Nutzer
 ```
 
 ```
-User = {"id":7,"name":"Max","room":3,"muted":false,"deaf":false}
+User = {"id":7,"name":"Max","room":3,"muted":false,"deaf":false,"avatar":1731000000000}
+       avatar = Version des Profilbilds (Unix-Millisekunden), 0 oder fehlt = kein Bild
+Member = {"id":7,"name":"Max","avatar":1731000000000,"online":true,"last_seen":1731000000}
 Room = {"id":3,"name":"Lobby"}
        temporäre Räume zusätzlich {"temp":true} und bei Passwort {"locked":true}
 Chat = {"room":3,"from":7,"name":"Max","text":"Hi","ts":1731000000}
 ```
+
+### Profilbilder und Mitgliederliste
+
+Jeder Nutzer kann ein Profilbild setzen, das alle anderen sehen. `WireUser.avatar` ist die Version des
+Bildes (Unix-Millisekunden, immer größer als die vorige); 0 oder fehlend heißt „kein Bild“. Clients laden
+ein Bild mit `get_avatar` nur nach, wenn sich die Version gegenüber ihrem Zwischenspeicher geändert hat.
+
+- `set_avatar`: `data` ist ein base64-kodiertes JPEG oder PNG, **genau 128×128 Pixel**, dekodiert höchstens
+  24 KiB (die App skaliert vorher). Der Server prüft zuerst nur den Bildkopf (`image.DecodeConfig`),
+  kodiert das Bild neu als JPEG (Qualität 80, entfernt Metadaten) und speichert es. Danach geht ein
+  `user_update` mit neuer Version an alle. `data` leer entfernt das Bild (`user_update` mit `avatar` 0).
+  Ungültiges Bild (kein JPEG/PNG, falsche Größe, zu groß, kein base64) → `error` mit Code `bad_avatar`;
+  die Verbindung bleibt offen. Höchstens 1 `set_avatar` pro 10 s, sonst `rate_limited`.
+- `get_avatar`: Antwort `avatar` mit `id`, `avatar` (Version) und `data` (base64 JPEG). Ohne Bild oder bei
+  unbekannter `id` fehlen `avatar` und `data`.
+- `members`: alle registrierten, nicht gesperrten Nutzer, nach Name sortiert (Groß/Klein egal).
+  `online` = gerade verbunden, `last_seen` = Unix-Sekunden der letzten Aktivität eines Geräts
+  (Anmeldung oder Trennung), 0 = nie.
+- `get_avatar` und `members` zusammen: höchstens 30 Anfragen pro 10 s, sonst `rate_limited`.
+- Die Verwaltungsseite und die Admin-CLI (`avatar-del`) können Bilder entfernen; verbundene Clients
+  bekommen dann ein `user_update` mit `avatar` 0. Ältere Server kennen diese Nachrichten nicht und
+  antworten nicht.
 
 ### Temporäre Räume
 

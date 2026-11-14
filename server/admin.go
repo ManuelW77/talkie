@@ -50,6 +50,7 @@ func (a *adminAPI) handler() http.Handler {
 	mux.HandleFunc("GET /users", a.listUsers)
 	mux.HandleFunc("POST /users/{name}/{action}", a.userAction)
 	mux.HandleFunc("DELETE /users/{name}", a.deleteUser)
+	mux.HandleFunc("DELETE /users/{name}/avatar", a.deleteAvatar)
 	mux.HandleFunc("GET /rooms", a.listRooms)
 	mux.HandleFunc("POST /rooms", a.addRoom)
 	mux.HandleFunc("DELETE /rooms/{name}", a.deleteRoom)
@@ -339,6 +340,7 @@ Verwaltung (während der Server läuft, z. B. per "docker exec talkie talkie-ser
   kick NAME                         Nutzer rauswerfen (darf wiederkommen)
   ban NAME / unban NAME             Nutzer sperren / entsperren
   rename NAME NEUERNAME             Nutzer umbenennen
+  avatar-del NAME-ODER-ID           Profilbild eines Nutzers entfernen
   user-del NAME                     Nutzer löschen (braucht neue Einladung)
   rooms                             Räume anzeigen
   room-add NAME / room-del NAME     Raum anlegen / löschen
@@ -442,6 +444,14 @@ func runCLI(args []string, dataDir, adminAddr string) error {
 			return err
 		}
 		ok("Umbenannt.")
+	case "avatar-del":
+		if err := need(1); err != nil {
+			return err
+		}
+		if err := c.do("DELETE", "/users/"+esc(args[1])+"/avatar", nil, nil); err != nil {
+			return err
+		}
+		ok("Profilbild entfernt: " + args[1])
 	case "user-del":
 		if err := need(1); err != nil {
 			return err

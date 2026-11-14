@@ -350,6 +350,7 @@ func (w *webApp) handler() http.Handler {
 	mux.HandleFunc("GET /{$}", w.auth(0, w.dashboard))
 	mux.HandleFunc("GET /users", w.auth(0, w.usersPage))
 	mux.HandleFunc("GET /users/{id}", w.auth(0, w.userPage))
+	mux.HandleFunc("GET /users/{id}/avatar", w.auth(0, w.userAvatar))
 	mux.HandleFunc("POST /users/{id}/{action}", w.auth(0, w.userAction))
 	mux.HandleFunc("GET /invites", w.auth(PermInvite, w.invitesPage))
 	mux.HandleFunc("POST /invites", w.auth(PermInvite, w.createInvite))

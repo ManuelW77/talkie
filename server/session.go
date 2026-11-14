@@ -50,6 +50,7 @@ type Session struct {
 	room       int64
 	muted      bool
 	deaf       bool
+	avatar     int64 // Version des Profilbilds (0 = keins)
 	// ignored: Nutzer, deren Sprache dieser Client nicht hören will (nur für ihn)
 	ignored map[int64]bool
 
@@ -62,7 +63,7 @@ type Session struct {
 func (s *Session) touch() { s.lastActive.Store(s.hub.now().UnixMilli()) }
 
 func (s *Session) wireLocked() WireUser {
-	return WireUser{ID: s.userID, Name: s.name, Room: s.room, Muted: s.muted, Deaf: s.deaf}
+	return WireUser{ID: s.userID, Name: s.name, Room: s.room, Muted: s.muted, Deaf: s.deaf, Avatar: s.avatar}
 }
 
 func (s *Session) send(e *Envelope) {
@@ -142,6 +143,8 @@ func (s *Session) voiceReader(ctx context.Context) {
 func (s *Session) controlLoop() {
 	chatLimit := NewTokenBucket(5, 1)
 	ctrlLimit := NewTokenBucket(20, 5)
+	avatarSetLimit := NewTokenBucket(1, 0.1) // 1 Bild pro 10 s
+	avatarGetLimit := NewTokenBucket(30, 3)  // 30 Abfragen pro 10 s
 	for {
 		_ = s.stream.SetReadDeadline(time.Time{})
 		e, err := ReadFrame(s.stream)
@@ -199,6 +202,22 @@ func (s *Session) controlLoop() {
 			s.hub.Moderate(s, e.ID, e.T == "ban")
 		case "clear_chat":
 			s.hub.ClearChatFrom(s, e.Room)
+		case "set_avatar":
+			if !avatarSetLimit.Allow() {
+				s.send(&Envelope{T: "error", Code: "rate_limited", Reason: "Nicht so schnell! Warte kurz, bevor du das Bild nochmal änderst."})
+				continue
+			}
+			s.hub.SetOwnAvatar(s, e.Data)
+		case "get_avatar", "members":
+			if !avatarGetLimit.Allow() {
+				s.send(&Envelope{T: "error", Code: "rate_limited", Reason: "Nicht so schnell!"})
+				continue
+			}
+			if e.T == "members" {
+				s.hub.SendMembers(s)
+			} else {
+				s.hub.SendAvatar(s, e.ID)
+			}
 		case "still_here":
 			// nichts weiter: touch() oben hat die Aktivität schon zurückgesetzt
 		}
@@ -308,7 +327,7 @@ func (h *Hub) HandleConn(conn *quic.Conn) {
 	release()
 	s := &Session{
 		hub: h, conn: conn, stream: stream, ip: ip,
-		userID: user.ID, name: user.Name, pubkey: user.PubKey, device: h.deviceLabel(user.PubKey),
+		userID: user.ID, name: user.Name, avatar: h.store.AvatarVersion(user.ID), pubkey: user.PubKey, device: h.deviceLabel(user.PubKey),
 		out:  make(chan []byte, outQueueSize),
 		done: make(chan struct{}),
 	}
@@ -337,6 +356,7 @@ func (h *Hub) HandleConn(conn *quic.Conn) {
 	h.Remove(s)
 	s.close(0, "tschüss")
 	_ = h.store.TouchUser(user.ID)
+	h.store.TouchDevice(s.pubkey) // für „zuletzt online“ in der Mitgliederliste
 	log.Printf("%s (%d) getrennt", user.Name, user.ID)
 }
 

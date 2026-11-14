@@ -103,6 +103,10 @@ func OpenStore(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("schema geräte: %w", err)
 	}
+	if err := s.initAvatar(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("schema profilbilder: %w", err)
+	}
 	if err := s.initWeb(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("schema web: %w", err)
