@@ -405,7 +405,7 @@ class _RoomTile extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.volume_up_rounded,
-                      size: 18,
+                      size: 20,
                       color: current ? kAccent : theme.colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 8),
@@ -413,7 +413,7 @@ class _RoomTile extends StatelessWidget {
                       child: Text(
                         room.name,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: current ? FontWeight.w700 : null),
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: current ? FontWeight.w700 : null),
                       ),
                     ),
                     if (room.temp)
@@ -446,16 +446,16 @@ class _RoomTile extends StatelessWidget {
                 ),
                 for (final u in users)
                   Padding(
-                    padding: const EdgeInsets.only(left: 10, top: 8),
+                    padding: const EdgeInsets.only(left: 8, top: 10),
                     child: Row(
                       children: [
-                        Avatar(name: u.name, talking: u.talking, size: 26, image: controller.avatarOf(u.id)),
-                        const SizedBox(width: 10),
+                        Avatar(name: u.name, talking: u.talking, size: 34, image: controller.avatarOf(u.id)),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             u.id == controller.me ? '${u.name} (du)' : u.name,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: theme.textTheme.bodyLarge?.copyWith(
                               color: u.localMuted ? theme.colorScheme.onSurfaceVariant : (u.talking ? kTalking : null),
                             ),
                           ),
@@ -463,12 +463,12 @@ class _RoomTile extends StatelessWidget {
                         if (u.deaf)
                           Icon(
                             Icons.headset_off_rounded,
-                            size: 16,
+                            size: 18,
                             color: kDanger,
                             semanticLabel: '${u.name} hört nichts',
                           )
                         else if (u.muted)
-                          Icon(Icons.mic_off_rounded, size: 16, color: kDanger, semanticLabel: '${u.name} ist stumm'),
+                          Icon(Icons.mic_off_rounded, size: 18, color: kDanger, semanticLabel: '${u.name} ist stumm'),
                         if (u.id != controller.me)
                           _UserMuteButton(controller: controller, user: u)
                         else
