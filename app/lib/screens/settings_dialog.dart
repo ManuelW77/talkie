@@ -519,10 +519,20 @@ class _SettingsDialogState extends State<SettingsDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final c = widget.controller;
+    // Handy: kleinere Ränder, damit die Texte mehr Platz haben
+    final narrow = MediaQuery.sizeOf(context).width < 600;
     return AlertDialog(
       title: const Text('Einstellungen'),
+      insetPadding: narrow
+          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 24)
+          : const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      titlePadding: narrow ? const EdgeInsets.fromLTRB(18, 20, 18, 0) : null,
+      contentPadding: narrow
+          ? const EdgeInsets.fromLTRB(18, 16, 8, 0)
+          : const EdgeInsets.fromLTRB(24, 20, 24, 0),
       content: SizedBox(
-        width: 600, // breit genug für die Erklärtexte; auf dem Handy begrenzt der Bildschirm
+        width:
+            600, // breit genug für die Erklärtexte; auf dem Handy begrenzt der Bildschirm
         // Fester Scrollbalken, damit man sieht, dass es weiter unten weitergeht
         child: Scrollbar(
           controller: _scroll,
@@ -530,7 +540,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           trackVisibility: true,
           child: SingleChildScrollView(
             controller: _scroll,
-            padding: const EdgeInsets.only(right: 16),
+            padding: EdgeInsets.only(right: narrow ? 14 : 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
