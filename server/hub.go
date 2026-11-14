@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"log"
 	"sort"
 	"sync"
@@ -24,7 +26,8 @@ type Hub struct {
 	rooms      []DBRoom // Räume aus der Datenbank
 	temp       []*tempRoom
 	nextTempID int64
-	pwLimiter  *IPLimiter // Passwort-Fehlversuche pro Nutzer
+	pwLimiter  *IPLimiter       // Passwort-Fehlversuche pro Nutzer
+	now        func() time.Time // Uhr (in Tests austauschbar)
 }
 
 func NewHub(store *Store, certHash []byte, maxUsers int) (*Hub, error) {
@@ -42,6 +45,7 @@ func NewHub(store *Store, certHash []byte, maxUsers int) (*Hub, error) {
 		rooms:      rooms,
 		nextTempID: tempRoomFirstID - 1,
 		pwLimiter:  NewIPLimiter(passwordTries, passwordWindow),
+		now:        time.Now,
 	}, nil
 }
 
@@ -482,3 +486,53 @@ func (h *Hub) ReloadRooms() error {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// --- Inaktivität ---
+
+const (
+	idleCheckEvery = 15 * time.Second
+	idleWarnBefore = 5 * time.Minute
+)
+
+// RunIdleWatch prüft regelmäßig, wer zu lange nichts getan hat, bis ctx endet.
+func (h *Hub) RunIdleWatch(ctx context.Context) {
+	t := time.NewTicker(idleCheckEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			h.checkIdle()
+		}
+	}
+}
+
+// checkIdle warnt Nutzer 5 Minuten vor Ablauf einmal und trennt sie danach.
+// Die Einstellung wird bei jedem Aufruf neu gelesen (Änderungen wirken sofort).
+func (h *Hub) checkIdle() {
+	minutes := h.store.IdleMinutes()
+	if minutes <= 0 {
+		return
+	}
+	limit := time.Duration(minutes) * time.Minute
+	now := h.now()
+	h.mu.RLock()
+	sessions := make([]*Session, 0, len(h.sessions))
+	for _, s := range h.sessions {
+		sessions = append(sessions, s)
+	}
+	h.mu.RUnlock()
+	for _, s := range sessions {
+		last := s.lastActive.Load()
+		idle := now.Sub(time.UnixMilli(last))
+		switch {
+		case idle >= limit:
+			s.kick(fmt.Sprintf("Du warst %d Minuten nicht aktiv und wurdest getrennt.", minutes))
+		case limit-idle <= idleWarnBefore && s.warnedFor.Load() != last:
+			s.warnedFor.Store(last)
+			secs := int((limit - idle).Seconds())
+			s.send(&Envelope{T: "idle_warning", Secs: secs})
+		}
+	}
+}

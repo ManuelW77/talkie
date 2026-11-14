@@ -42,6 +42,7 @@ C → S  {"t":"kick","id":7}          rauswerfen   } nur mit verknüpftem Webkon
 C → S  {"t":"ban","id":7}           sperren      } bearbeiten“ darf (Admins immer); Admins sind geschützt
 C → S  {"t":"device_code"}           Code für ein weiteres Gerät desselben Nutzers (15 min, einmalig)
 C → S  {"t":"clear_chat","room":3}  Chat leeren (room fehlt = alle Räume), nur mit verknüpftem Admin-Konto
+C → S  {"t":"still_here"}            „Ich bin noch da“: setzt nur die Inaktivitäts-Uhr zurück (siehe unten)
 
 S → C  {"t":"user_joined","user":User}
 S → C  {"t":"user_update","user":User}
@@ -52,6 +53,7 @@ S → C  {"t":"chat","msg":Chat}
 S → C  {"t":"kicked","reason":"..."}
 S → C  {"t":"info","reason":"Ben wurde rausgeworfen."}   Erfolgsmeldung
 S → C  {"t":"device_code","code":"ABCD-EFGH"}
+S → C  {"t":"idle_warning","secs":300}   gleich wegen Inaktivität getrennt, noch so viele Sekunden
 S → C  {"t":"chat_cleared","room":3}   Chat wurde geleert (room fehlt = alle Räume)
 S → C  {"t":"error","code":"forbidden","reason":"..."}  Meldung für den Nutzer
 ```
@@ -85,6 +87,16 @@ Ein Nutzer kann bis zu 5 Geräte haben, jedes mit eigenem Schlüssel. Ein neues 
 mit einem Geräte-Code statt einer Einladung: `register` mit `invite` = Geräte-Code, `name` leer, optional
 `device` (z. B. „iPhone/iPad“, nur zur Anzeige). Der Server antwortet mit dem vorhandenen Nutzer.
 Verbunden ist pro Nutzer immer nur ein Gerät; eine neue Anmeldung trennt die ältere (`kicked`).
+
+### Inaktivität
+
+Wer länger als die eingestellte Zeit nichts tut, wird getrennt (Verwaltungsseite, Standard 60 Minuten,
+0 = aus, erlaubt 10–1440), auch wenn andere im Raum sind. Als Aktion zählt jede Steuernachricht des
+Clients (die vom Rate-Limit durchgelassen wird, also auch `still_here`) und echte Sprache: Opus-Pakete
+mit höchstens 2 Byte Nutzlast (DTX/Komfortrauschen) zählen nicht. 5 Minuten vor Ablauf schickt der Server
+einmal `idle_warning` mit den restlichen Sekunden (nach neuer Aktivität kann erneut gewarnt werden).
+Bei Ablauf kommt `kicked` mit dem Grund „Du warst N Minuten nicht aktiv und wurdest getrennt.“.
+Clients, die `idle_warning` nicht kennen, ignorieren es und werden ohne Vorwarnung getrennt.
 
 ## Sprache (QUIC-Datagramme)
 

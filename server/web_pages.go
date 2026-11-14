@@ -364,7 +364,28 @@ func (w *webApp) roomsPage(rw http.ResponseWriter, r *http.Request) {
 	for _, rm := range rooms {
 		rows = append(rows, roomRow{rm, count[rm.ID]})
 	}
-	w.render(rw, r, "rooms", "Räume", map[string]any{"Rooms": rows, "Last": len(rows) - 1, "Temp": w.hub.TempRoomList()})
+	w.render(rw, r, "rooms", "Räume", map[string]any{"Rooms": rows, "Last": len(rows) - 1, "Temp": w.hub.TempRoomList(),
+		"IdleMinutes": w.store.IdleMinutes(), "IdleMin": MinIdleMinutes, "IdleMax": MaxIdleMinutes})
+}
+
+// idleSave speichert die Zeit bis zur Trennung wegen Inaktivität (nur Admins).
+func (w *webApp) idleSave(rw http.ResponseWriter, r *http.Request) {
+	n, err := strconv.Atoi(strings.TrimSpace(r.PostFormValue("minutes")))
+	if err != nil || !validIdleMinutes(n) {
+		w.done(rw, r, "/rooms", fmt.Sprintf("Bitte eine Zahl von %d bis %d eingeben, oder 0 zum Ausschalten.", MinIdleMinutes, MaxIdleMinutes), true)
+		return
+	}
+	if err := w.store.SetIdleMinutes(n); err != nil {
+		w.fail(rw, r, "/rooms", err)
+		return
+	}
+	if n == 0 {
+		w.audit(r, "Trennen bei Inaktivität ausgeschaltet")
+		w.done(rw, r, "/rooms", "Gespeichert: Niemand wird wegen Inaktivität getrennt.", false)
+		return
+	}
+	w.audit(r, fmt.Sprintf("Trennen bei Inaktivität auf %d Minuten gestellt", n))
+	w.done(rw, r, "/rooms", fmt.Sprintf("Gespeichert: Wer %d Minuten nichts macht, wird getrennt.", n), false)
 }
 
 const tempNameTaken = "Diesen Namen nutzt gerade ein Raum aus der App. Nimm bitte einen anderen."

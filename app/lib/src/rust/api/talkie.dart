@@ -71,6 +71,9 @@ void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
       muted: muted,
     );
 
+/// „Ich bin noch da“ an den Server schicken (hält die Verbindung am Leben).
+void talkieStillHere() => RustLib.instance.api.crateApiTalkieTalkieStillHere();
+
 /// Code für ein weiteres Gerät anfordern; kommt als Ereignis DeviceCode zurück.
 void talkieRequestDeviceCode() =>
     RustLib.instance.api.crateApiTalkieTalkieRequestDeviceCode();
@@ -189,6 +192,9 @@ enum EventKind {
 
   /// Geräte-Code (steht in `notice`).
   deviceCode,
+
+  /// Gleich wegen Inaktivität getrennt (`idle_secs` Sekunden bleiben).
+  idleWarning,
 }
 
 class PttKeyDto {
@@ -396,6 +402,7 @@ class UiEvent {
   final List<ChatDto> history;
   final double level;
   final String notice;
+  final PlatformInt64 idleSecs;
 
   const UiEvent({
     required this.kind,
@@ -405,6 +412,7 @@ class UiEvent {
     required this.history,
     required this.level,
     required this.notice,
+    required this.idleSecs,
   });
 
   @override
@@ -415,7 +423,8 @@ class UiEvent {
       historyRoom.hashCode ^
       history.hashCode ^
       level.hashCode ^
-      notice.hashCode;
+      notice.hashCode ^
+      idleSecs.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -428,7 +437,8 @@ class UiEvent {
           historyRoom == other.historyRoom &&
           history == other.history &&
           level == other.level &&
-          notice == other.notice;
+          notice == other.notice &&
+          idleSecs == other.idleSecs;
 }
 
 class UserDto {

@@ -135,6 +135,8 @@ func serve(dataDir, addr, adminAddr string, maxUsers int) error {
 		_ = ln.Close()
 	}()
 
+	go hub.RunIdleWatch(ctx)
+
 	for {
 		conn, err := ln.Accept(ctx)
 		if err != nil {
