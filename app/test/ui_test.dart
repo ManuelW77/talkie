@@ -7,6 +7,7 @@ import 'package:talkie/avatar_image.dart';
 import 'package:talkie/controller.dart';
 import 'package:talkie/screens/main_screen.dart';
 import 'package:talkie/screens/members_dialog.dart';
+import 'package:talkie/screens/profile_dialog.dart';
 import 'package:talkie/screens/setup_screen.dart';
 import 'package:talkie/src/rust/api/talkie.dart';
 import 'package:talkie/theme.dart';
@@ -485,6 +486,23 @@ void main() {
     expect(find.byType(Image), findsNWidgets(2));
     expect(find.text('M'), findsOneWidget);
     await expectLater(find.byType(Scaffold), matchesGoldenFile('goldens/avatar_image.png'));
+  });
+
+  testWidgets('Tipp auf das eigene Bild unten links öffnet "Dein Profil"', (tester) async {
+    tester.view.physicalSize = const Size(1000, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(ProfileDialog), findsNothing);
+    await tester.tap(find.byKey(const Key('own-avatar')));
+    await tester.pumpAndSettle();
+    expect(find.text('Dein Profil'), findsOneWidget);
+    expect(find.text('Bild wählen'), findsOneWidget);
+    await tester.tap(find.text('Fertig'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfileDialog), findsNothing);
   });
 
   testWidgets('Mitgliederliste: online zuerst, dann zuletzt da, mit Bild', (tester) async {
