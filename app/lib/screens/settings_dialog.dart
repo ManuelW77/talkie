@@ -8,6 +8,22 @@ import '../src/rust/api/talkie.dart';
 import '../theme.dart';
 import '../widgets/level_meter.dart';
 
+/// Öffnet die Einstellungen: auf dem Handy als Vollbildseite, sonst als Dialog.
+Future<void> showSettings(BuildContext context, TalkieController c) {
+  if (MediaQuery.sizeOf(context).width < 600) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => SettingsDialog(controller: c),
+      ),
+    );
+  }
+  return showDialog<void>(
+    context: context,
+    builder: (_) => SettingsDialog(controller: c),
+  );
+}
+
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key, required this.controller});
 
@@ -515,269 +531,274 @@ class _SettingsDialogState extends State<SettingsDialog> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  /// Der scrollbare Inhalt – gleich für Dialog (breit) und Vollbildseite (Handy).
+  Widget _body(bool narrow) {
     final theme = Theme.of(context);
     final c = widget.controller;
-    // Handy: kleinere Ränder, damit die Texte mehr Platz haben
-    final narrow = MediaQuery.sizeOf(context).width < 600;
-    return AlertDialog(
-      title: const Text('Einstellungen'),
-      insetPadding: narrow
-          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 24)
-          : const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-      titlePadding: narrow ? const EdgeInsets.fromLTRB(18, 20, 18, 0) : null,
-      contentPadding: narrow
-          ? const EdgeInsets.fromLTRB(18, 16, 8, 0)
-          : const EdgeInsets.fromLTRB(24, 20, 24, 0),
-      content: SizedBox(
-        width:
-            600, // breit genug für die Erklärtexte; auf dem Handy begrenzt der Bildschirm
-        // Fester Scrollbalken, damit man sieht, dass es weiter unten weitergeht
-        child: Scrollbar(
-          controller: _scroll,
-          thumbVisibility: true,
-          trackVisibility: true,
-          child: SingleChildScrollView(
-            controller: _scroll,
-            padding: EdgeInsets.only(right: narrow ? 14 : 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Auf Handy und Tablet wählt das System Mikrofon und Lautsprecher selbst
-                if (!TalkiePlatform.isMobile) ...[
-                  _deviceDropdown(
-                    'Mikrofon',
-                    Icons.mic_rounded,
-                    _s.inputDevice,
-                    _inputs,
-                    (v) => _update(_copy(input: v)),
-                  ),
-                  const SizedBox(height: 12),
-                  _deviceDropdown(
-                    'Kopfhörer / Lautsprecher',
-                    Icons.headphones_rounded,
-                    _s.outputDevice,
-                    _outputs,
-                    (v) => _update(_copy(output: v)),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-                _pttSection(theme),
-                const SizedBox(height: 12),
-                // Gehört zum Sprechen: leicht orange hervorgehoben
-                Material(
-                  color: Colors.orange.withValues(alpha: 0.14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(
-                      color: Colors.orange.withValues(alpha: 0.35),
-                    ),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SwitchListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                        ),
-                        title: const Text(
-                          'Talkie im Hintergrund stumm schalten',
-                        ),
-                        subtitle: const Text(
-                          'Dein Mikro geht aus, solange Talkie nicht vorne ist.',
-                          textAlign: TextAlign.justify,
-                        ),
-                        value: _s.muteInBackground,
-                        onChanged: (v) => _update(_copy(muteInBackground: v)),
-                      ),
-                      if (_s.muteInBackground)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.mic_off_rounded,
-                                color: kDanger,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Du wirst nicht gehört, wenn die App im Hintergrund ist.',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: kDanger,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 32),
-                if (!_s.ptt) ...[
-                  Text('Empfindlichkeit', style: theme.textTheme.titleSmall),
-                  Text(
-                    'Sprich normal: Der Balken muss über den weißen Strich kommen. '
-                    'Schiebe nach links, wenn du nicht gehört wirst, nach rechts, wenn Tastatur & Co. mitgesendet werden.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.justify,
-                  ),
-                  const SizedBox(height: 10),
-                  ValueListenableBuilder<double>(
-                    valueListenable: c.levelNotifier,
-                    builder: (_, v, _) => LevelMeter(
-                      level: v,
-                      threshold: (_s.vadThresholdDb + 60) / 60,
-                      height: 12,
-                    ),
-                  ),
-                  Slider(
-                    value: _s.vadThresholdDb.clamp(-60.0, -15.0),
-                    min: -60,
-                    max: -15,
-                    divisions: 45,
-                    label: '${_s.vadThresholdDb.round()} dB',
-                    onChanged: (v) => setState(() => _s = _copy(vad: v)),
-                    onChangeEnd: (v) => _update(_copy(vad: v)),
-                  ),
-                ],
-                // Handy: Echo-Unterdrückung des Systems (ohne Kopfhörer wichtig)
-                if (TalkiePlatform.isMobile)
+    return Scrollbar(
+      controller: _scroll,
+      thumbVisibility: true,
+      trackVisibility: true,
+      child: SingleChildScrollView(
+        controller: _scroll,
+        padding: EdgeInsets.only(right: narrow ? 14 : 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Auf Handy und Tablet wählt das System Mikrofon und Lautsprecher selbst
+            if (!TalkiePlatform.isMobile) ...[
+              _deviceDropdown(
+                'Mikrofon',
+                Icons.mic_rounded,
+                _s.inputDevice,
+                _inputs,
+                (v) => _update(_copy(input: v)),
+              ),
+              const SizedBox(height: 12),
+              _deviceDropdown(
+                'Kopfhörer / Lautsprecher',
+                Icons.headphones_rounded,
+                _s.outputDevice,
+                _outputs,
+                (v) => _update(_copy(output: v)),
+              ),
+              const SizedBox(height: 20),
+            ],
+            _pttSection(theme),
+            const SizedBox(height: 12),
+            // Gehört zum Sprechen: leicht orange hervorgehoben
+            Material(
+              color: Colors.orange.withValues(alpha: 0.14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.orange.withValues(alpha: 0.35)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Echo-Unterdrückung'),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    title: const Text('Talkie im Hintergrund stumm schalten'),
                     subtitle: const Text(
-                      'Damit die anderen sich nicht selbst hören, wenn du ohne Kopfhörer sprichst',
+                      'Dein Mikro geht aus, solange Talkie nicht vorne ist.',
                       textAlign: TextAlign.justify,
                     ),
-                    value: _s.echoCancel,
-                    onChanged: (v) => _update(_copy(echoCancel: v)),
+                    value: _s.muteInBackground,
+                    onChanged: (v) => _update(_copy(muteInBackground: v)),
                   ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Rauschfilter'),
-                  subtitle: const Text(
-                    'Filtert Lüfter, Tastatur und Hintergrundgeräusche',
-                    textAlign: TextAlign.justify,
-                  ),
-                  value: _s.noiseSuppression,
-                  onChanged: (v) => _update(_copy(ns: v)),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Töne'),
-                  subtitle: const Text(
-                    'Kurzer Ton, wenn jemand kommt oder geht und bei neuen Chatnachrichten',
-                    textAlign: TextAlign.justify,
-                  ),
-                  value: _s.sounds,
-                  onChanged: (v) => _update(_copy(sounds: v)),
-                ),
-                const SizedBox(height: 8),
-                Text('Mikrofon-Lautstärke', style: theme.textTheme.titleSmall),
-                Slider(
-                  value: _s.inputGain.clamp(0.25, 4.0),
-                  min: 0.25,
-                  max: 4,
-                  label: '${(_s.inputGain * 100).round()} %',
-                  divisions: 15,
-                  onChanged: (v) => setState(() => _s = _copy(gain: v)),
-                  onChangeEnd: (v) => _update(_copy(gain: v)),
-                ),
-                Text(
-                  'Lautstärke der anderen',
-                  style: theme.textTheme.titleSmall,
-                ),
-                Slider(
-                  value: _s.outputVolume.clamp(0.0, 2.0),
-                  min: 0,
-                  max: 2,
-                  label: '${(_s.outputVolume * 100).round()} %',
-                  divisions: 20,
-                  onChanged: (v) => setState(() => _s = _copy(volume: v)),
-                  onChangeEnd: (v) => _update(_copy(volume: v)),
-                ),
-                const Divider(height: 32),
-                Text('Weiteres Gerät', style: theme.textTheme.titleSmall),
-                const SizedBox(height: 4),
-                Text(
-                  c.status == ConnStatus.connected
-                      ? 'Du willst Talkie auch auf dem Handy, Tablet oder einem '
-                            'zweiten Rechner nutzen? Hol dir hier einen Code und gib '
-                            'ihn auf dem anderen Gerät ein. Dort bist du dann auch du.'
-                      : 'Du willst Talkie auch auf einem anderen Gerät nutzen? '
-                            'Das geht, sobald Talkie verbunden ist.',
-                  style: theme.textTheme.bodyMedium,
-                  textAlign: TextAlign.justify,
-                ),
-                const SizedBox(height: 12),
-                FilledButton.tonalIcon(
-                  onPressed: c.status == ConnStatus.connected
-                      ? _showDeviceCode
-                      : null,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                  ),
-                  icon: const Icon(Icons.devices_rounded),
-                  label: const Text('Code für weiteres Gerät holen'),
-                ),
-                const SizedBox(height: 8),
-                _devicesSection(theme),
-                const SizedBox(height: 16),
-                // Verbundener Server, gut lesbar
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.dns_rounded, color: theme.colorScheme.primary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Server', style: theme.textTheme.labelMedium),
-                            SelectableText(
-                              c.config.server,
-                              style: theme.textTheme.titleMedium?.copyWith(
+                  if (_s.muteInBackground)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.mic_off_rounded,
+                            color: kDanger,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Du wirst nicht gehört, wenn die App im Hintergrund ist.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: kDanger,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: _confirmLogout,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: kDanger,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(48),
-                  ),
-                  icon: const Icon(Icons.logout_rounded),
-                  label: const Text('Vom Server abmelden'),
-                ),
-              ],
+                    ),
+                ],
+              ),
             ),
+            const Divider(height: 32),
+            if (!_s.ptt) ...[
+              Text('Empfindlichkeit', style: theme.textTheme.titleSmall),
+              Text(
+                'Sprich normal: Der Balken muss über den weißen Strich kommen. '
+                'Schiebe nach links, wenn du nicht gehört wirst, nach rechts, wenn Tastatur & Co. mitgesendet werden.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.justify,
+              ),
+              const SizedBox(height: 10),
+              ValueListenableBuilder<double>(
+                valueListenable: c.levelNotifier,
+                builder: (_, v, _) => LevelMeter(
+                  level: v,
+                  threshold: (_s.vadThresholdDb + 60) / 60,
+                  height: 12,
+                ),
+              ),
+              Slider(
+                value: _s.vadThresholdDb.clamp(-60.0, -15.0),
+                min: -60,
+                max: -15,
+                divisions: 45,
+                label: '${_s.vadThresholdDb.round()} dB',
+                onChanged: (v) => setState(() => _s = _copy(vad: v)),
+                onChangeEnd: (v) => _update(_copy(vad: v)),
+              ),
+            ],
+            // Handy: Echo-Unterdrückung des Systems (ohne Kopfhörer wichtig)
+            if (TalkiePlatform.isMobile)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Echo-Unterdrückung'),
+                subtitle: const Text(
+                  'Damit die anderen sich nicht selbst hören, wenn du ohne Kopfhörer sprichst',
+                  textAlign: TextAlign.justify,
+                ),
+                value: _s.echoCancel,
+                onChanged: (v) => _update(_copy(echoCancel: v)),
+              ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Rauschfilter'),
+              subtitle: const Text(
+                'Filtert Lüfter, Tastatur und Hintergrundgeräusche',
+                textAlign: TextAlign.justify,
+              ),
+              value: _s.noiseSuppression,
+              onChanged: (v) => _update(_copy(ns: v)),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Töne'),
+              subtitle: const Text(
+                'Kurzer Ton, wenn jemand kommt oder geht und bei neuen Chatnachrichten',
+                textAlign: TextAlign.justify,
+              ),
+              value: _s.sounds,
+              onChanged: (v) => _update(_copy(sounds: v)),
+            ),
+            const SizedBox(height: 8),
+            Text('Mikrofon-Lautstärke', style: theme.textTheme.titleSmall),
+            Slider(
+              value: _s.inputGain.clamp(0.25, 4.0),
+              min: 0.25,
+              max: 4,
+              label: '${(_s.inputGain * 100).round()} %',
+              divisions: 15,
+              onChanged: (v) => setState(() => _s = _copy(gain: v)),
+              onChangeEnd: (v) => _update(_copy(gain: v)),
+            ),
+            Text('Lautstärke der anderen', style: theme.textTheme.titleSmall),
+            Slider(
+              value: _s.outputVolume.clamp(0.0, 2.0),
+              min: 0,
+              max: 2,
+              label: '${(_s.outputVolume * 100).round()} %',
+              divisions: 20,
+              onChanged: (v) => setState(() => _s = _copy(volume: v)),
+              onChangeEnd: (v) => _update(_copy(volume: v)),
+            ),
+            const Divider(height: 32),
+            Text('Weiteres Gerät', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              c.status == ConnStatus.connected
+                  ? 'Du willst Talkie auch auf dem Handy, Tablet oder einem '
+                        'zweiten Rechner nutzen? Hol dir hier einen Code und gib '
+                        'ihn auf dem anderen Gerät ein. Dort bist du dann auch du.'
+                  : 'Du willst Talkie auch auf einem anderen Gerät nutzen? '
+                        'Das geht, sobald Talkie verbunden ist.',
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.justify,
+            ),
+            const SizedBox(height: 12),
+            FilledButton.tonalIcon(
+              onPressed: c.status == ConnStatus.connected
+                  ? _showDeviceCode
+                  : null,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+              icon: const Icon(Icons.devices_rounded),
+              label: const Text('Code für weiteres Gerät holen'),
+            ),
+            const SizedBox(height: 8),
+            _devicesSection(theme),
+            const SizedBox(height: 16),
+            // Verbundener Server, gut lesbar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.dns_rounded, color: theme.colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Server', style: theme.textTheme.labelMedium),
+                        SelectableText(
+                          c.config.server,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _confirmLogout,
+              style: FilledButton.styleFrom(
+                backgroundColor: kDanger,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(48),
+              ),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Vom Server abmelden'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Handy: Vollbildseite, sonst Dialog
+    final narrow = MediaQuery.sizeOf(context).width < 600;
+    if (narrow) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Einstellungen'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fertig'),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 8, 0),
+            child: _body(true),
           ),
         ),
+      );
+    }
+    return AlertDialog(
+      title: const Text('Einstellungen'),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      content: SizedBox(
+        width: 600, // breit genug für die Erklärtexte
+        child: _body(false),
       ),
       actions: [
         FilledButton(
