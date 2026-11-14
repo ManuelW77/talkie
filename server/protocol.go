@@ -68,9 +68,22 @@ type Envelope struct {
 	// idle_warning: so viele Sekunden bis zur Trennung wegen Inaktivität
 	Secs int `json:"secs,omitempty"`
 
+	// devices: eigene Geräte; zusammen mit code (offener Geräte-Code) und expires (Unix-Sekunden)
+	Devices []WireDevice `json:"devices,omitempty"`
+	Expires int64        `json:"expires,omitempty"`
+
 	// error / kicked
 	Code   string `json:"code,omitempty"`
 	Reason string `json:"reason,omitempty"`
+}
+
+// WireDevice ist ein Gerät des Nutzers in der Geräteliste der App.
+type WireDevice struct {
+	ID       int64  `json:"id"`
+	Label    string `json:"label"`
+	Created  int64  `json:"created"`
+	LastSeen int64  `json:"last_seen"`
+	This     bool   `json:"this"`
 }
 
 type WireUser struct {

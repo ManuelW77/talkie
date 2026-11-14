@@ -184,7 +184,15 @@ func (s *Session) controlLoop() {
 			}
 			s.hub.SetState(s, muted, deaf)
 		case "device_code":
-			s.hub.SendDeviceCode(s)
+			s.hub.SendDeviceCode(s, e.Name)
+		case "devices":
+			s.hub.SendDevices(s)
+		case "device_rename":
+			s.hub.RenameOwnDevice(s, e.ID, e.Name)
+		case "device_del":
+			s.hub.DeleteOwnDevice(s, e.ID)
+		case "device_code_del":
+			s.hub.DeleteOwnDeviceCode(s)
 		case "ignore":
 			s.hub.SetIgnored(s, e.IDs)
 		case "kick", "ban":
@@ -404,7 +412,7 @@ func (h *Hub) handshake(stream *quic.Stream) (*DBUser, error) {
 		case errors.Is(err, ErrNameMissing):
 			return nil, &hsError{"name_invalid", "Bitte gib deinen Namen ein.", false}
 		case errors.Is(err, ErrTooManyDevices):
-			return nil, &hsError{"too_many_devices", "Du hast schon 5 Geräte. Lass erst eins auf der Verwaltungsseite entfernen.", false}
+			return nil, &hsError{"too_many_devices", "Du hast schon 5 Geräte. Entferne erst eins auf einem deiner anderen Geräte (Einstellungen → „Deine Geräte“).", false}
 		case err == nil && u.Banned:
 			return nil, &hsError{"banned", "Du bist auf diesem Server gesperrt.", false}
 		case errors.Is(err, ErrInviteInvalid):

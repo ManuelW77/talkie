@@ -16,6 +16,17 @@ const String kServerFingerprint = String.fromEnvironment('TALKIE_FINGERPRINT');
 /// Fehler, bei denen man zurück zur Einrichtung muss.
 const _setupErrors = {'need_invite', 'auth_failed', 'invite_invalid', 'name_taken', 'name_invalid', 'bad_server'};
 
+/// Geräteliste des Kontos samt offenem Geräte-Code (code leer = keiner).
+class DevicesInfo {
+  const DevicesInfo(this.devices, this.code, this.codeName, this.expires);
+  final List<DeviceDto> devices;
+  final String code;
+  final String codeName;
+
+  /// Ablauf des Codes in Unix-Sekunden.
+  final int expires;
+}
+
 class TalkieController extends ChangeNotifier {
   TalkieController(this.config) {
     showSetup = !config.registered || config.server.isEmpty;
@@ -50,11 +61,20 @@ class TalkieController extends ChangeNotifier {
   /// Zuletzt angeforderter Geräte-Code (null = noch keiner da).
   final ValueNotifier<String?> deviceCode = ValueNotifier(null);
 
-  /// Code für ein weiteres Gerät anfordern; landet in [deviceCode].
-  void requestDeviceCode() {
+  /// Code für ein weiteres Gerät anfordern; landet in [deviceCode]. [name] = Name des neuen Geräts.
+  void requestDeviceCode([String name = '']) {
     deviceCode.value = null;
-    talkieRequestDeviceCode();
+    talkieRequestDeviceCode(name: name);
   }
+
+  /// Eigene Geräte und offener Geräte-Code (null = noch keine Antwort, z. B. älterer Server).
+  final ValueNotifier<DevicesInfo?> devices = ValueNotifier(null);
+
+  void requestDevices() => talkieRequestDevices();
+  void deleteDevice(int id) => talkieDeleteDevice(id: id);
+  void renameDevice(int id, String name) =>
+      talkieRenameDevice(id: id, name: name);
+  void deleteDeviceCode() => talkieDeleteDeviceCode();
 
   /// Sekunden bis zur Trennung wegen Inaktivität, solange der Server gewarnt hat (sonst null).
   /// Die Oberfläche zeigt dann „Bist du noch da?“.
@@ -211,6 +231,13 @@ class TalkieController extends ChangeNotifier {
         if (e.notice.isNotEmpty) _notices.add(e.notice);
       case EventKind.deviceCode:
         deviceCode.value = e.notice;
+      case EventKind.devices:
+        devices.value = DevicesInfo(
+          e.devices,
+          e.deviceCode,
+          e.deviceCodeName,
+          e.deviceCodeExpires.toInt(),
+        );
       case EventKind.idleWarning:
         idleSecs.value = e.idleSecs;
     }

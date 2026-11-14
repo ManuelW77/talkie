@@ -44,6 +44,20 @@ pub struct WireChat {
     pub ts: i64,
 }
 
+/// Ein Gerät des Nutzers (Antwort `devices`).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct WireDevice {
+    pub id: i64,
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub created: i64,
+    #[serde(default)]
+    pub last_seen: i64,
+    #[serde(default)]
+    pub this: bool,
+}
+
 /// Obermenge aller Steuernachrichten, Feld `t` ist der Typ.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Envelope {
@@ -114,6 +128,12 @@ pub struct Envelope {
     /// idle_warning: so viele Sekunden bis zur Trennung wegen Inaktivität
     #[serde(default, skip_serializing_if = "is_zero_i64")]
     pub secs: i64,
+
+    /// devices: eigene Geräte; `code` ist dann der offene Geräte-Code, `expires` sein Ablauf (Unix-Sekunden)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub devices: Vec<WireDevice>,
+    #[serde(default, skip_serializing_if = "is_zero_i64")]
+    pub expires: i64,
 
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub code: String,
@@ -201,6 +221,24 @@ mod tests {
         let mut e = Envelope::new("join");
         e.room = 3;
         assert_eq!(serde_json::to_string(&e).unwrap(), r#"{"t":"join","room":3}"#);
+    }
+
+    #[test]
+    fn parses_devices_and_serializes_commands() {
+        let j = r#"{"t":"devices","devices":[{"id":4,"label":"iPhone/iPad","created":10,"last_seen":20,"this":true},{"id":5,"label":"","created":11,"last_seen":0}],"code":"ABCD-EFGH","expires":1731000000,"name":"Mein iPhone"}"#;
+        let e: Envelope = serde_json::from_str(j).unwrap();
+        assert_eq!(e.devices.len(), 2);
+        assert!(e.devices[0].this && !e.devices[1].this);
+        assert_eq!(e.devices[1].last_seen, 0);
+        assert_eq!((e.code.as_str(), e.expires, e.name.as_str()), ("ABCD-EFGH", 1731000000, "Mein iPhone"));
+        // ohne offenen Code
+        let e: Envelope = serde_json::from_str(r#"{"t":"devices","devices":[]}"#).unwrap();
+        assert!(e.code.is_empty() && e.expires == 0);
+        let mut r = Envelope::new("device_rename");
+        r.id = 4;
+        r.name = "Mein Mac".into();
+        assert_eq!(serde_json::to_string(&r).unwrap(), r#"{"t":"device_rename","name":"Mein Mac","id":4}"#);
+        assert_eq!(serde_json::to_string(&Envelope::new("device_code_del")).unwrap(), r#"{"t":"device_code_del"}"#);
     }
 
     #[test]

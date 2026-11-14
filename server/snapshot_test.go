@@ -29,7 +29,7 @@ func TestSnapshot(t *testing.T) {
 		}
 	}
 	// Jonas hat ein zweites Gerät
-	if c, err := wt.store.CreateDeviceCode(users[0].ID, time.Hour); err == nil {
+	if c, err := wt.store.CreateDeviceCode(users[0].ID, time.Hour, ""); err == nil {
 		wt.store.RegisterDevice(c.Code, "", []byte("kJonas2"), "iPhone/iPad")
 	}
 	// Drei sind online, Lea spricht gerade, Mia ist stumm (Sitzungen ohne echte Verbindung)

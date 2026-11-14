@@ -145,7 +145,11 @@ func (s *Store) TouchDevice(pk []byte) {
 
 // CreateDeviceCode erzeugt einen einmaligen Code, mit dem ein weiteres Gerät dem Nutzer
 // beitritt. Ältere offene Codes des Nutzers verfallen dabei.
-func (s *Store) CreateDeviceCode(userID int64, valid time.Duration) (*DBInvite, error) {
+func (s *Store) CreateDeviceCode(userID int64, valid time.Duration, label string) (*DBInvite, error) {
+	label, ok := cleanInviteNote(label)
+	if !ok {
+		return nil, ErrInviteName
+	}
 	var n int
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM devices WHERE user_id = ?", userID).Scan(&n); err != nil {
 		return nil, err
@@ -162,24 +166,46 @@ func (s *Store) CreateDeviceCode(userID int64, valid time.Duration) (*DBInvite, 
 	}
 	now := time.Now()
 	exp := now.Add(valid)
-	if _, err := s.db.Exec("INSERT INTO invites(code, created, expires, uses_left, user_id) VALUES(?,?,?,1,?)",
-		code, now.Unix(), exp.Unix(), userID); err != nil {
+	if _, err := s.db.Exec("INSERT INTO invites(code, created, expires, uses_left, user_id, name) VALUES(?,?,?,1,?,?)",
+		code, now.Unix(), exp.Unix(), userID, label); err != nil {
 		return nil, err
 	}
-	return &DBInvite{Code: code, UsesLeft: 1, Expires: exp}, nil
+	return &DBInvite{Code: code, UsesLeft: 1, Expires: exp, Name: label}, nil
 }
 
 // DeviceCode liefert den offenen Geräte-Code eines Nutzers (nil = keiner).
 func (s *Store) DeviceCode(userID int64) *DBInvite {
 	var inv DBInvite
 	var exp int64
-	err := s.db.QueryRow("SELECT code, uses_left, expires FROM invites WHERE user_id = ? AND expires > ? AND uses_left > 0",
-		userID, time.Now().Unix()).Scan(&inv.Code, &inv.UsesLeft, &exp)
+	err := s.db.QueryRow("SELECT code, uses_left, expires, name FROM invites WHERE user_id = ? AND expires > ? AND uses_left > 0",
+		userID, time.Now().Unix()).Scan(&inv.Code, &inv.UsesLeft, &exp, &inv.Name)
 	if err != nil {
 		return nil
 	}
 	inv.Expires = time.Unix(exp, 0)
 	return &inv
+}
+
+// DeleteDeviceCode löscht die offenen Geräte-Codes des Nutzers (nur seine eigenen).
+func (s *Store) DeleteDeviceCode(userID int64) error {
+	_, err := s.db.Exec("DELETE FROM invites WHERE user_id = ?", userID)
+	return err
+}
+
+// RenameDevice gibt einem Gerät des Nutzers einen eigenen Namen (leer = ohne Namen).
+func (s *Store) RenameDevice(userID, deviceID int64, label string) error {
+	label, ok := cleanInviteNote(label)
+	if !ok {
+		return ErrInviteName
+	}
+	r, err := s.db.Exec("UPDATE devices SET label = ? WHERE id = ? AND user_id = ?", label, deviceID, userID)
+	if err != nil {
+		return err
+	}
+	if c, _ := r.RowsAffected(); c != 1 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // addDevice: Geräte-Code einlösen (in der Register-Transaktion).

@@ -195,10 +195,14 @@ func (s *Store) RegisterDevice(invite, name string, pk []byte, label string) (*D
 		return nil, ErrInviteInvalid
 	}
 	var owner sql.NullInt64
-	if err := tx.QueryRow("SELECT user_id FROM invites WHERE code = ?", invite).Scan(&owner); err != nil {
+	var devName string
+	if err := tx.QueryRow("SELECT user_id, name FROM invites WHERE code = ?", invite).Scan(&owner, &devName); err != nil {
 		return nil, err
 	}
 	if owner.Valid {
+		if devName != "" { // beim Code vergebener Name statt der automatischen Bezeichnung
+			label = devName
+		}
 		u, err := addDevice(tx, owner.Int64, pk, label)
 		if err != nil {
 			return nil, err

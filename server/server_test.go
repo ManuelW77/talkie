@@ -554,7 +554,7 @@ func TestMultipleDevices(t *testing.T) {
 	}
 	// Höchstens MaxDevices
 	for i := 0; i < MaxDevices-1; i++ {
-		c, err := srv.store.CreateDeviceCode(w.You.ID, time.Hour)
+		c, err := srv.store.CreateDeviceCode(w.You.ID, time.Hour, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -562,7 +562,7 @@ func TestMultipleDevices(t *testing.T) {
 			t.Fatalf("gerät %d: %+v", i, e)
 		}
 	}
-	if _, err := srv.store.CreateDeviceCode(w.You.ID, time.Hour); !errors.Is(err, ErrTooManyDevices) {
+	if _, err := srv.store.CreateDeviceCode(w.You.ID, time.Hour, ""); !errors.Is(err, ErrTooManyDevices) {
 		t.Fatalf("mehr als %d geräte: %v", MaxDevices, err)
 	}
 	// Geräte-Codes tauchen nicht in der Einladungsliste auf
@@ -576,7 +576,7 @@ func TestMultipleDevices(t *testing.T) {
 	u, _ := srv.store.UserByID(w.You.ID)
 	devs, _ = srv.store.Devices(w.You.ID)
 	_ = srv.store.DeleteDevice(w.You.ID, devs[len(devs)-1].ID)
-	c, _ := srv.store.CreateDeviceCode(w.You.ID, time.Hour)
+	c, _ := srv.store.CreateDeviceCode(w.You.ID, time.Hour, "")
 	srv.store.SetBanned(u.Name, true)
 	if _, e := login(t, srv.addr, newKey(t), "", c.Code); e.Code != "banned" {
 		t.Fatalf("gesperrt: %+v", e)
@@ -606,7 +606,7 @@ func TestDevicesMigration(t *testing.T) {
 		t.Fatalf("migration: %v %+v", err, u)
 	}
 	// Erstgerät entfernen (es gibt ein zweites) → darf nach Neustart nicht zurückkommen
-	c, _ := s.CreateDeviceCode(u.ID, time.Hour)
+	c, _ := s.CreateDeviceCode(u.ID, time.Hour, "")
 	pk2 := make([]byte, 32)
 	pk2[0] = 8
 	if _, err := s.RegisterDevice(c.Code, "", pk2, "iOS"); err != nil {

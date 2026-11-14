@@ -5,7 +5,7 @@
 //! Prüft: Registrierung, erneute Anmeldung ohne Code, Chat, Sprache (Opus über
 //! QUIC-Datagramme inkl. Datenrate), Raumwechsel und Zertifikats-Pinning.
 
-use rust_lib_talkie::core::engine::{CoreEvent, Engine, Status};
+use rust_lib_talkie::core::engine::{CoreEvent, DevicesInfo, Engine, Status};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -18,6 +18,17 @@ fn engine(dir: &std::path::Path) -> (Engine, mpsc::Receiver<CoreEvent>) {
         let _ = tx.lock().unwrap().send(ev);
     }));
     (e, rx)
+}
+
+/// Wartet auf die nächste Geräteliste vom Server.
+fn wait_devices(rx: &std::sync::mpsc::Receiver<CoreEvent>) -> Option<DevicesInfo> {
+    let t = Instant::now();
+    while t.elapsed() < Duration::from_secs(3) {
+        if let Ok(CoreEvent::Devices(i)) = rx.recv_timeout(Duration::from_millis(100)) {
+            return Some(i);
+        }
+    }
+    None
 }
 
 fn wait_status(e: &Engine, want: Status, secs: u64) -> bool {
@@ -171,7 +182,7 @@ fn main() {
     };
     a3.connect(&server, "", "", "").expect("connect");
     check(wait_status(&a3, Status::Connected, 10), "Anna wieder verbunden");
-    a3.request_device_code();
+    a3.request_device_code("Mein iPhone");
     let t = Instant::now();
     let mut code = String::new();
     while t.elapsed() < Duration::from_secs(3) && code.is_empty() {
@@ -180,12 +191,32 @@ fn main() {
         }
     }
     check(code.len() == 9, &format!("Geräte-Code bekommen ({code})"));
-    let (phone, _) = engine(&base.join("phone"));
+    let info = wait_devices(&ra3);
+    check(
+        info.as_ref().is_some_and(|i| i.code == code && i.code_name == "Mein iPhone" && i.devices.len() == 1),
+        "Geräteliste zeigt offenen Code mit Namen",
+    );
+    let (phone, rp) = engine(&base.join("phone"));
     phone.connect(&server, "", &code, "").expect("connect");
     check(wait_status(&phone, Status::Connected, 10), "zweites Gerät mit Geräte-Code verbunden");
     check(phone.config().name == sa_name, "zweites Gerät heißt wie Anna");
     check(phone.snapshot().me == sa.me, "zweites Gerät ist derselbe Nutzer");
     check(wait_status(&a3, Status::Failed, 5) && a3.snapshot().error_code == "kicked", "erstes Gerät wird getrennt");
+    phone.request_devices();
+    let info = wait_devices(&rp).unwrap_or_default();
+    let this = info.devices.iter().find(|d| d.this);
+    let other = info.devices.iter().find(|d| !d.this).map(|d| d.id).unwrap_or(0);
+    check(
+        info.devices.len() == 2 && info.code.is_empty() && this.is_some_and(|d| d.label == "Mein iPhone"),
+        "zwei Geräte, Name aus dem Code übernommen, Code verbraucht",
+    );
+    phone.rename_device(other, "Mein Mac");
+    let info = wait_devices(&rp).unwrap_or_default();
+    check(info.devices.iter().any(|d| d.id == other && d.label == "Mein Mac"), "anderes Gerät umbenannt");
+    phone.delete_device(this.map(|d| d.id).unwrap_or(0));
+    phone.delete_device(other);
+    let info = wait_devices(&rp).unwrap_or_default();
+    check(info.devices.len() == 1 && info.devices[0].this, "aktuelles Gerät bleibt, anderes entfernt");
     drop(phone);
     drop(a3);
 
