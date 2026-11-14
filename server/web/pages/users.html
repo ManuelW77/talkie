@@ -11,7 +11,7 @@
     <td>{{if .Banned}}<span class="tag bad">gesperrt</span>{{else if .Online}}<span class="tag ok">online</span>{{else}}offline{{end}}</td>
     <td>{{dt .LastSeen}}</td>
     <td>{{date .Created}}</td>
-    <td class="right">{{if or $.Can.users_edit $.Can.users_delete}}<a href="/users/{{.ID}}">Bearbeiten</a>{{end}}</td>
+    <td class="right">{{if or $.Can.users_edit $.Can.users_delete}}<a href="/users/{{.ID}}">Details</a>{{end}}</td>
   </tr>
   {{end}}
   </tbody>
