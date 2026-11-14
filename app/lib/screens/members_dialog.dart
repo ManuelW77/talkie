@@ -11,7 +11,10 @@ import '../widgets/avatar.dart';
 /// Öffnet die Liste aller Mitglieder (fragt den Server beim Öffnen neu ab).
 Future<void> showMembersDialog(BuildContext context, TalkieController c) {
   c.requestMembers();
-  return showDialog<void>(context: context, builder: (_) => MembersDialog(controller: c));
+  return showDialog<void>(
+    context: context,
+    builder: (_) => MembersDialog(controller: c),
+  );
 }
 
 /// Online zuerst (alphabetisch), danach nach letztem Besuch absteigend, wer noch nie da war, ganz unten.
@@ -38,33 +41,75 @@ class MembersDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return AlertDialog(
-      title: const Text('Alle Mitglieder'),
+      title: ListenableBuilder(
+        listenable: controller.members,
+        builder: (context, _) => _Header(list: controller.members.value),
+      ),
       content: SizedBox(
         width: 420,
-        height: 440,
-        child: ListenableBuilder(
-          // Neue Profilbilder kommen über den Controller, die Liste über [members]
-          listenable: Listenable.merge([controller, controller.members]),
-          builder: (context, _) {
-            final list = controller.members.value;
-            if (list == null) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (list.isEmpty) {
-              return const Center(child: Text('Noch niemand da.'));
-            }
-            final sorted = sortMembers(list);
-            return ListView.builder(
-              itemCount: sorted.length,
-              itemBuilder: (context, i) => _MemberTile(
-                member: sorted[i],
-                me: sorted[i].id.toInt() == controller.me,
-                image: controller.avatarOf(sorted[i].id.toInt()),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 520),
+          child: ListenableBuilder(
+            // Neue Profilbilder kommen über den Controller, die Liste über [members]
+            listenable: Listenable.merge([controller, controller.members]),
+            builder: (context, _) {
+              final list = controller.members.value;
+              if (list == null) {
+                return const SizedBox(
+                  height: 160,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (list.isEmpty) {
+                return SizedBox(
+                  height: 160,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.people_outline,
+                          size: 40,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Noch niemand da.',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              final sorted = sortMembers(list);
+              final online = sorted.where((m) => m.online).toList();
+              final offline = sorted.where((m) => !m.online).toList();
+              Widget tile(MemberDto m) => _MemberTile(
+                member: m,
+                me: m.id.toInt() == controller.me,
+                image: controller.avatarOf(m.id.toInt()),
                 now: now,
-              ),
-            );
-          },
+              );
+              return ListView(
+                shrinkWrap: true,
+                children: [
+                  if (online.isNotEmpty) ...[
+                    const _SectionTitle('Online'),
+                    for (final m in online) tile(m),
+                  ],
+                  if (offline.isNotEmpty) ...[
+                    const _SectionTitle('Gerade nicht da'),
+                    for (final m in offline) tile(m),
+                  ],
+                ],
+              );
+            },
+          ),
         ),
       ),
       actions: [
@@ -78,8 +123,101 @@ class MembersDialog extends StatelessWidget {
   }
 }
 
+class _Header extends StatelessWidget {
+  const _Header({required this.list});
+
+  final List<MemberDto>? list;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = list;
+    final online = l?.where((m) => m.online).length ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.groups_rounded, color: kAccent),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text('Alle Mitglieder', overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+        if (l != null && l.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              _CountChip('$online online', kTalking),
+              _CountChip(
+                '${l.length} insgesamt',
+                Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CountChip extends StatelessWidget {
+  const _CountChip(this.text, this.color);
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          letterSpacing: 0.3,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
 class _MemberTile extends StatelessWidget {
-  const _MemberTile({required this.member, required this.me, required this.image, this.now});
+  const _MemberTile({
+    required this.member,
+    required this.me,
+    required this.image,
+    this.now,
+  });
 
   final MemberDto member;
   final bool me;
@@ -90,26 +228,100 @@ class _MemberTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Avatar(name: member.name, size: 40, image: image),
-      title: Text(me ? '${member.name} (du)' : member.name, overflow: TextOverflow.ellipsis),
-      subtitle: member.online
-          ? Row(
+    final bg = theme.colorScheme.surfaceContainerHighest;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: me ? kAccent.withValues(alpha: 0.5) : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
               children: [
-                Container(
-                  width: 9,
-                  height: 9,
-                  decoration: const BoxDecoration(color: kTalking, shape: BoxShape.circle),
+                Opacity(
+                  opacity: member.online ? 1 : 0.6,
+                  child: Avatar(name: member.name, size: 44, image: image),
                 ),
-                const SizedBox(width: 6),
-                const Text('Online', style: TextStyle(color: kTalking)),
+                if (member.online)
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: kTalking,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: bg, width: 2.5),
+                      ),
+                    ),
+                  ),
               ],
-            )
-          : Text(
-              'zuletzt da: ${lastSeenText(member.lastSeen.toInt(), now: now)}',
-              style: TextStyle(color: muted),
             ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          member.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      if (me) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: kAccent.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'Du',
+                            style: TextStyle(
+                              color: kAccent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  member.online
+                      ? const Text(
+                          'Online',
+                          style: TextStyle(color: kTalking, fontSize: 13),
+                        )
+                      : Text(
+                          'zuletzt da: ${lastSeenText(member.lastSeen.toInt(), now: now)}',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: muted, fontSize: 13),
+                        ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

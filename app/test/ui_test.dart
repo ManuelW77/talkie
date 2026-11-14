@@ -506,7 +506,7 @@ void main() {
   });
 
   testWidgets('Mitgliederliste: online zuerst, dann zuletzt da, mit Bild', (tester) async {
-    tester.view.physicalSize = const Size(480, 640);
+    tester.view.physicalSize = const Size(480, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final c = _mainController();
@@ -539,13 +539,14 @@ void main() {
     });
     await tester.pumpAndSettle();
     expect(find.text('Alle Mitglieder'), findsOneWidget);
-    expect(find.text('Online'), findsNWidgets(2));
+    expect(find.text('Online'), findsNWidgets(3));
+    expect(find.text('Gerade nicht da'), findsOneWidget);
     expect(find.text('zuletzt da: vor 5 Minuten'), findsOneWidget);
     expect(find.text('zuletzt da: vor 3 Stunden'), findsOneWidget);
     expect(find.text('zuletzt da: vor 4 Tagen'), findsOneWidget);
     expect(find.text('zuletzt da: noch nie'), findsOneWidget);
     // Reihenfolge: Online (Lena, Max), danach Jonas (5 min), Ben (3 h), Emil (4 Tage), Mia (nie)
-    final order = ['Lena', 'Max (du)', 'Jonas', 'Ben', 'Emil', 'Mia'];
+    final order = ['Lena', 'Max', 'Jonas', 'Ben', 'Emil', 'Mia'];
     final ys = [for (final n in order) tester.getTopLeft(find.text(n)).dy];
     expect(ys, [...ys]..sort());
     await expectLater(find.byType(AlertDialog), matchesGoldenFile('goldens/members.png'));
