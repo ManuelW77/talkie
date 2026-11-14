@@ -40,13 +40,16 @@ type DBInvite struct {
 	Code     string    `json:"code"`
 	UsesLeft int       `json:"uses_left"`
 	Expires  time.Time `json:"expires"`
+	Name     string    `json:"name,omitempty"` // optional: Name, den der Eingeladene vorgeschlagen bekommt
 }
 
 var (
-	ErrNotFound      = errors.New("nicht gefunden")
-	ErrNameTaken     = errors.New("name vergeben")
-	ErrInviteInvalid = errors.New("einladung ungültig")
-	ErrNameMissing   = errors.New("name fehlt")
+	ErrNotFound       = errors.New("nicht gefunden")
+	ErrNameTaken      = errors.New("name vergeben")
+	ErrInviteInvalid  = errors.New("einladung ungültig")
+	ErrNameMissing    = errors.New("name fehlt")
+	ErrInviteName     = errors.New("einladungsname ungültig")
+	ErrInviteNameUses = errors.New("name nur bei einer einladung für eine person")
 )
 
 const schema = `
@@ -205,6 +208,12 @@ func (s *Store) RegisterDevice(invite, name string, pk []byte, label string) (*D
 		return u, tx.Commit()
 	}
 	if name == "" {
+		// Rückfall für alte Apps: Name aus der Einladung
+		if err := tx.QueryRow("SELECT name FROM invites WHERE code = ?", invite).Scan(&name); err != nil {
+			return nil, err
+		}
+	}
+	if name == "" {
 		return nil, ErrNameMissing
 	}
 	var exists int
@@ -308,25 +317,55 @@ func newInviteCode() (string, error) {
 	return string(out), nil
 }
 
-func (s *Store) CreateInvite(uses int, valid time.Duration) (*DBInvite, error) {
+func (s *Store) CreateInvite(uses int, valid time.Duration, name string) (*DBInvite, error) {
+	if strings.TrimSpace(name) != "" {
+		if uses != 1 {
+			return nil, ErrInviteNameUses
+		}
+		var ok bool
+		if name, ok = cleanName(name); !ok {
+			return nil, ErrInviteName
+		}
+	} else {
+		name = ""
+	}
 	code, err := newInviteCode()
 	if err != nil {
 		return nil, err
 	}
 	now := time.Now()
 	exp := now.Add(valid)
-	if _, err := s.db.Exec("INSERT INTO invites(code, created, expires, uses_left) VALUES(?,?,?,?)",
-		code, now.Unix(), exp.Unix(), uses); err != nil {
+	if _, err := s.db.Exec("INSERT INTO invites(code, created, expires, uses_left, name) VALUES(?,?,?,?,?)",
+		code, now.Unix(), exp.Unix(), uses, name); err != nil {
 		return nil, err
 	}
-	return &DBInvite{Code: code, UsesLeft: uses, Expires: exp}, nil
+	return &DBInvite{Code: code, UsesLeft: uses, Expires: exp, Name: name}, nil
+}
+
+// InviteName liefert den Namen einer gültigen Einladung (leer, wenn keiner hinterlegt ist
+// oder es ein Geräte-Code ist).
+func (s *Store) InviteName(code string) (string, error) {
+	var name string
+	var owner sql.NullInt64
+	err := s.db.QueryRow("SELECT name, user_id FROM invites WHERE code = ? AND uses_left > 0 AND expires > ?",
+		NormalizeInvite(code), time.Now().Unix()).Scan(&name, &owner)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrInviteInvalid
+	}
+	if err != nil {
+		return "", err
+	}
+	if owner.Valid {
+		return "", nil
+	}
+	return name, nil
 }
 
 func (s *Store) Invites() ([]DBInvite, error) {
 	if _, err := s.db.Exec("DELETE FROM invites WHERE expires <= ?", time.Now().Unix()); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query("SELECT code, uses_left, expires FROM invites WHERE user_id IS NULL ORDER BY expires")
+	rows, err := s.db.Query("SELECT code, uses_left, expires, name FROM invites WHERE user_id IS NULL ORDER BY expires")
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +374,7 @@ func (s *Store) Invites() ([]DBInvite, error) {
 	for rows.Next() {
 		var inv DBInvite
 		var exp int64
-		if err := rows.Scan(&inv.Code, &inv.UsesLeft, &exp); err != nil {
+		if err := rows.Scan(&inv.Code, &inv.UsesLeft, &exp, &inv.Name); err != nil {
 			return nil, err
 		}
 		inv.Expires = time.Unix(exp, 0)

@@ -415,6 +415,31 @@ impl Engine {
         self.inner.stop_audio();
     }
 
+    /// Fragt den zur Einladung hinterlegten Namen ab (leer = keiner).
+    /// Prüfung des Fingerabdrucks wie beim Verbinden; es wird nichts gespeichert.
+    pub async fn invite_name(&self, server: &str, invite: &str, fingerprint: &str) -> Result<String> {
+        let pin = if fingerprint.trim().is_empty() {
+            None
+        } else {
+            Some(net::parse_fingerprint(fingerprint).ok_or_else(|| anyhow::anyhow!("ungültiger Fingerabdruck"))?)
+        };
+        // Wie beim Verbinden: schon gemerkter Fingerabdruck desselben Servers gilt weiter
+        let pin = pin.or_else(|| {
+            let c = self.inner.config.lock();
+            (net::split_host_port(&c.server) == net::split_host_port(server.trim()))
+                .then(|| net::parse_fingerprint(&c.pinned_fingerprint))
+                .flatten()
+        });
+        let key = self.inner.key.lock().clone();
+        let (server, invite) = (server.trim().to_string(), invite.trim().to_string());
+        let h = self.rt.spawn(async move { net::invite_name(&server, &key, pin, &invite).await });
+        match h.await {
+            Ok(Ok(n)) => Ok(n),
+            Ok(Err(e)) => Err(anyhow::anyhow!("{e}")),
+            Err(e) => Err(anyhow::anyhow!("{e}")),
+        }
+    }
+
     /// Verbindet (und registriert, falls das Gerät noch nicht registriert ist).
     /// `fingerprint` (optional) pinnt das Server-Zertifikat fest.
     pub fn connect(&self, server: &str, name: &str, invite: &str, fingerprint: &str) -> Result<()> {

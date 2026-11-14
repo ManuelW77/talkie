@@ -77,6 +77,8 @@ func writeErr(w http.ResponseWriter, err error) {
 		code = http.StatusNotFound
 	case errors.Is(err, ErrNameTaken):
 		code = http.StatusConflict
+	case errors.Is(err, ErrInviteName), errors.Is(err, ErrInviteNameUses):
+		code = http.StatusBadRequest
 	}
 	http.Error(w, err.Error(), code)
 }
@@ -97,7 +99,7 @@ func (a *adminAPI) createInvite(w http.ResponseWriter, r *http.Request) {
 	if days < 1 || days > 365 {
 		days = 7
 	}
-	inv, err := a.store.CreateInvite(uses, time.Duration(days)*24*time.Hour)
+	inv, err := a.store.CreateInvite(uses, time.Duration(days)*24*time.Hour, r.URL.Query().Get("name"))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -330,7 +332,7 @@ const usage = `Talkie-Server
 
 Verwaltung (während der Server läuft, z. B. per "docker exec talkie talkie-server ..."):
   status                            Fingerabdruck und Anzahl Online
-  invite [anzahl] [tage]            Einladungscode erzeugen (Standard: 1 Person, 7 Tage)
+  invite [anzahl] [tage] [name]     Einladungscode erzeugen (Standard: 1 Person, 7 Tage; Name nur bei 1 Person)
   invites                           offene Einladungen anzeigen
   invite-del CODE                   Einladung löschen
   users                             alle Nutzer anzeigen
@@ -379,20 +381,26 @@ func runCLI(args []string, dataDir, adminAddr string) error {
 		if len(args) > 2 {
 			q.Set("days", args[2])
 		}
+		if len(args) > 3 {
+			q.Set("name", strings.Join(args[3:], " "))
+		}
 		var inv DBInvite
 		if err := c.do("POST", "/invites", q, &inv); err != nil {
 			return err
 		}
 		fmt.Fprintf(tw, "Einladungscode:\t%s\nGilt für:\t%d Person(en)\nGültig bis:\t%s\n",
 			inv.Code, inv.UsesLeft, inv.Expires.Format("02.01.2006 15:04"))
+		if inv.Name != "" {
+			fmt.Fprintf(tw, "Name:\t%s\n", inv.Name)
+		}
 	case "invites":
 		var invs []DBInvite
 		if err := c.do("GET", "/invites", nil, &invs); err != nil {
 			return err
 		}
-		fmt.Fprintln(tw, "CODE\tRESTLICH\tGÜLTIG BIS")
+		fmt.Fprintln(tw, "CODE\tRESTLICH\tGÜLTIG BIS\tNAME")
 		for _, i := range invs {
-			fmt.Fprintf(tw, "%s\t%d\t%s\n", i.Code, i.UsesLeft, i.Expires.Format("02.01.2006 15:04"))
+			fmt.Fprintf(tw, "%s\t%d\t%s\t%s\n", i.Code, i.UsesLeft, i.Expires.Format("02.01.2006 15:04"), i.Name)
 		}
 	case "invite-del":
 		if err := need(1); err != nil {

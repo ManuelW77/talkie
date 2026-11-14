@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../src/rust/api/talkie.dart' show ConnStatus;
@@ -25,8 +27,45 @@ class _SetupScreenState extends State<SetupScreen> {
   /// Gleicher Name auf einem weiteren Gerät: nur Geräte-Code, kein Name.
   bool _existing = false;
 
+  // Vorgegebener Name aus der Einladung
+  static const _inviteChars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  Timer? _lookupTimer;
+  String _lookedUp = ''; // Code, für den schon gefragt wurde
+  String _autoName = ''; // zuletzt automatisch eingetragener Name
+  bool _nameFromInvite = false;
+
+  String _cleanCode() => _invite.text.replaceAll(RegExp(r'[\s-]'), '').toUpperCase();
+
+  void _inviteChanged(String _) {
+    _lookupTimer?.cancel();
+    final code = _cleanCode();
+    if (_existing || code.length != 8 || code.split('').any((ch) => !_inviteChars.contains(ch))) return;
+    if (code == _lookedUp || _server.text.trim().isEmpty) return;
+    _lookupTimer = Timer(const Duration(milliseconds: 500), () => _lookupName(code));
+  }
+
+  Future<void> _lookupName(String code) async {
+    _lookedUp = code;
+    String name;
+    try {
+      name = (await widget.controller.inviteNameLookup(_server.text.trim(), code)).trim();
+    } catch (_) {
+      return; // die Anmeldung meldet Fehler sowieso
+    }
+    if (!mounted || _existing || _cleanCode() != code || name.isEmpty) return;
+    final cur = _name.text.trim();
+    if (cur.isEmpty || cur == _autoName) {
+      setState(() {
+        _name.text = name;
+        _autoName = name;
+        _nameFromInvite = true;
+      });
+    }
+  }
+
   @override
   void dispose() {
+    _lookupTimer?.cancel();
     _name.dispose();
     _invite.dispose();
     _server.dispose();
@@ -81,7 +120,18 @@ class _SetupScreenState extends State<SetupScreen> {
                         prefixIcon: Icon(Icons.person_rounded),
                         counterText: '',
                       ),
+                      onChanged: (v) {
+                        if (_nameFromInvite && v.trim() != _autoName) setState(() => _nameFromInvite = false);
+                      },
                       validator: (v) => (v == null || v.trim().length < 2) ? 'Mindestens 2 Zeichen' : null,
+                    ),
+                  if (!_existing && _nameFromInvite)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6, left: 4),
+                      child: Text(
+                        'Dein Name ist schon eingetragen. Du kannst ihn ändern.',
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
                     ),
                   if (!_existing) const SizedBox(height: 14),
                   TextFormField(
@@ -90,6 +140,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     textCapitalization: TextCapitalization.characters,
                     textInputAction: TextInputAction.go,
                     onFieldSubmitted: (_) => _submit(),
+                    onChanged: _inviteChanged,
                     style: const TextStyle(letterSpacing: 2, fontWeight: FontWeight.w600),
                     decoration: InputDecoration(
                       labelText: _existing ? 'Geräte-Code' : 'Einladungscode',

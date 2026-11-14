@@ -34,7 +34,7 @@ func findRoom(rooms []DBRoom, name string) *DBRoom {
 
 func TestTempRoomCreateAndDelete(t *testing.T) {
 	srv := startTestServer(t)
-	inv, _ := srv.store.CreateInvite(3, time.Hour)
+	inv, _ := srv.store.CreateInvite(3, time.Hour, "")
 	a, wa := login(t, srv.addr, newKey(t), "Anna", inv.Code)
 	b, _ := login(t, srv.addr, newKey(t), "Ben", inv.Code)
 	dbRooms := len(wa.Rooms)
@@ -96,7 +96,7 @@ func TestTempRoomCreateAndDelete(t *testing.T) {
 
 func TestTempRoomDeletedOnDisconnectAndOpenRoom(t *testing.T) {
 	srv := startTestServer(t)
-	inv, _ := srv.store.CreateInvite(2, time.Hour)
+	inv, _ := srv.store.CreateInvite(2, time.Hour, "")
 	a, _ := login(t, srv.addr, newKey(t), "Anna", inv.Code)
 	writeEnv(t, a.stream, &Envelope{T: "create_room", Name: "Offen"})
 	a.expect("rooms")
@@ -112,7 +112,7 @@ func TestTempRoomDeletedOnDisconnectAndOpenRoom(t *testing.T) {
 
 func TestTempRoomAdminBypassAndKick(t *testing.T) {
 	srv := startTestServer(t)
-	inv, _ := srv.store.CreateInvite(3, time.Hour)
+	inv, _ := srv.store.CreateInvite(3, time.Hour, "")
 	kChef := newKey(t)
 	c0, wc := login(t, srv.addr, kChef, "Chef", inv.Code)
 	a, _ := login(t, srv.addr, newKey(t), "Anna", inv.Code)
@@ -138,7 +138,7 @@ func TestTempRoomAdminBypassAndKick(t *testing.T) {
 
 func TestTempRoomLimitsAndNames(t *testing.T) {
 	srv := startTestServer(t)
-	inv, _ := srv.store.CreateInvite(3, time.Hour)
+	inv, _ := srv.store.CreateInvite(3, time.Hour, "")
 	a, wa := login(t, srv.addr, newKey(t), "Anna", inv.Code)
 	b, _ := login(t, srv.addr, newKey(t), "Ben", inv.Code)
 
@@ -181,7 +181,7 @@ func TestTempRoomLimitsAndNames(t *testing.T) {
 
 func TestTempRoomPasswordRateLimit(t *testing.T) {
 	srv := startTestServer(t)
-	inv, _ := srv.store.CreateInvite(2, time.Hour)
+	inv, _ := srv.store.CreateInvite(2, time.Hour, "")
 	a, _ := login(t, srv.addr, newKey(t), "Anna", inv.Code)
 	b, _ := login(t, srv.addr, newKey(t), "Ben", inv.Code)
 	writeEnv(t, a.stream, &Envelope{T: "create_room", Name: "Zu", Password: "richtig"})
@@ -202,7 +202,7 @@ func TestTempRoomPasswordRateLimit(t *testing.T) {
 
 func TestReloadRoomsKeepsTemp(t *testing.T) {
 	srv := startTestServer(t)
-	inv, _ := srv.store.CreateInvite(2, time.Hour)
+	inv, _ := srv.store.CreateInvite(2, time.Hour, "")
 	a, _ := login(t, srv.addr, newKey(t), "Anna", inv.Code)
 	writeEnv(t, a.stream, &Envelope{T: "create_room", Name: "Bleibt"})
 	a.expect("rooms")

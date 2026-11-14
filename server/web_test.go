@@ -344,7 +344,7 @@ func TestWebPermissions(t *testing.T) {
 		t.Fatalf("Einladungsmail: %s", m)
 	}
 	// Talkie-Nutzer löschen ohne Recht
-	inv, _ := wt.store.CreateInvite(1, time.Hour)
+	inv, _ := wt.store.CreateInvite(1, time.Hour, "")
 	u, _ := wt.store.Register(inv.Code, "Max", []byte("schluessel-max"))
 	if st, _, _ := b.post("/users/"+itoa(u.ID)+"/delete", url.Values{"csrf": {tok}}); st != http.StatusForbidden {
 		t.Fatalf("Nutzer löschen ohne Recht: %d", st)
@@ -407,7 +407,7 @@ func TestWebAdminManages(t *testing.T) {
 		t.Fatal("Raum nicht gelöscht")
 	}
 	// Talkie-Nutzer umbenennen, sperren, löschen
-	inv, _ := wt.store.CreateInvite(1, time.Hour)
+	inv, _ := wt.store.CreateInvite(1, time.Hour, "")
 	u, _ := wt.store.Register(inv.Code, "Max", []byte("schluessel-max"))
 	b.post("/users/"+itoa(u.ID)+"/rename", url.Values{"csrf": {tok}, "name": {"Maxi"}})
 	b.post("/users/"+itoa(u.ID)+"/ban", url.Values{"csrf": {tok}})
@@ -621,7 +621,7 @@ func TestWebDevices(t *testing.T) {
 	wt := newWebTest(t, nil)
 	wt.account("chef@x.de", RoleAdmin, 0)
 	wt.account("helfer@x.de", RoleUser, PermUsersEdit)
-	inv, _ := wt.store.CreateInvite(1, time.Hour)
+	inv, _ := wt.store.CreateInvite(1, time.Hour, "")
 	pk1 := make([]byte, 32)
 	pk1[0] = 1
 	u, err := wt.store.Register(inv.Code, "Mia", pk1)
