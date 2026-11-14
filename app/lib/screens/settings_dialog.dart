@@ -226,37 +226,39 @@ class _SettingsDialogState extends State<SettingsDialog> {
   /// Erst fragt ein Feld nach dem Namen des Geräts, dann kommt der Code.
   Future<void> _showDeviceCode() async {
     final c = widget.controller;
-    final nameCtrl = TextEditingController();
     var asked = false;
     await showDialog<void>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('Auf weiterem Gerät nutzen'),
-          content: SizedBox(
-            width: 380,
-            child: asked ? _deviceCodeBody(ctx, c) : _deviceNameForm(nameCtrl),
-          ),
-          actions: [
-            if (!asked)
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Abbrechen'),
-              ),
-            FilledButton(
-              onPressed: asked
-                  ? () => Navigator.pop(ctx)
-                  : () {
-                      c.requestDeviceCode(nameCtrl.text.trim());
-                      setLocal(() => asked = true);
-                    },
-              child: Text(asked ? 'Fertig' : 'Code holen'),
+      builder: (ctx) => _WithTextController(
+        builder: (nameCtrl) => StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: const Text('Auf weiterem Gerät nutzen'),
+            content: SizedBox(
+              width: 380,
+              child: asked
+                  ? _deviceCodeBody(ctx, c)
+                  : _deviceNameForm(nameCtrl),
             ),
-          ],
+            actions: [
+              if (!asked)
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Abbrechen'),
+                ),
+              FilledButton(
+                onPressed: asked
+                    ? () => Navigator.pop(ctx)
+                    : () {
+                        c.requestDeviceCode(nameCtrl.text.trim());
+                        setLocal(() => asked = true);
+                      },
+                child: Text(asked ? 'Fertig' : 'Code holen'),
+              ),
+            ],
+          ),
         ),
       ),
     );
-    nameCtrl.dispose();
     c.requestDevices();
   }
 
@@ -373,31 +375,34 @@ class _SettingsDialogState extends State<SettingsDialog> {
   }
 
   Future<void> _renameDevice(DeviceDto d) async {
-    final ctrl = TextEditingController(text: d.label);
     final name = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Gerät umbenennen'),
-        content: TextField(
-          controller: ctrl,
-          maxLength: 40,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Name (z. B. Mein Mac)'),
-          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+      builder: (ctx) => _WithTextController(
+        text: d.label,
+        builder: (ctrl) => AlertDialog(
+          title: const Text('Gerät umbenennen'),
+          content: TextField(
+            controller: ctrl,
+            maxLength: 40,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Name (z. B. Mein Mac)',
+            ),
+            onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('Speichern'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Abbrechen'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Speichern'),
-          ),
-        ],
       ),
     );
-    ctrl.dispose();
     if (name != null) widget.controller.renameDevice(d.id, name);
   }
 
@@ -809,4 +814,30 @@ class _SettingsDialogState extends State<SettingsDialog> {
       ],
     );
   }
+}
+
+/// Hält einen TextEditingController so lange, wie der Dialog sichtbar ist.
+/// Direkt nach `showDialog` freigeben ist zu früh: Während der Ausblend-Animation
+/// nutzt das Textfeld ihn noch (sonst Fehler „_dependents.isEmpty“).
+class _WithTextController extends StatefulWidget {
+  const _WithTextController({required this.builder, this.text = ''});
+
+  final Widget Function(TextEditingController ctrl) builder;
+  final String text;
+
+  @override
+  State<_WithTextController> createState() => _WithTextControllerState();
+}
+
+class _WithTextControllerState extends State<_WithTextController> {
+  late final _ctrl = TextEditingController(text: widget.text);
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_ctrl);
 }
