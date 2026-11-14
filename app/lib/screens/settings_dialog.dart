@@ -86,22 +86,32 @@ class _SettingsDialogState extends State<SettingsDialog> {
       children: [
         Text('Sprechen', style: theme.textTheme.titleSmall),
         const SizedBox(height: 8),
-        SegmentedButton<bool>(
-          showSelectedIcon: false,
-          segments: const [
-            ButtonSegment(
-              value: false,
-              label: Text('Automatisch'),
-              icon: Icon(Icons.graphic_eq_rounded),
-            ),
-            ButtonSegment(
-              value: true,
-              label: Text('Taste halten'),
-              icon: Icon(Icons.touch_app_rounded),
-            ),
-          ],
-          selected: {_s.ptt},
-          onSelectionChanged: (v) => _update(_copy(ptt: v.first)),
+        // Auf schmalen Handys ohne Symbole, damit „Automatisch“ nicht mitten im Wort umbricht
+        LayoutBuilder(
+          builder: (context, box) {
+            final icons = box.maxWidth >= 400;
+            Widget label(String t) => FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(t, maxLines: 1, softWrap: false),
+            );
+            return SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: false,
+                  label: label('Automatisch'),
+                  icon: icons ? const Icon(Icons.graphic_eq_rounded) : null,
+                ),
+                ButtonSegment(
+                  value: true,
+                  label: label('Taste halten'),
+                  icon: icons ? const Icon(Icons.touch_app_rounded) : null,
+                ),
+              ],
+              selected: {_s.ptt},
+              onSelectionChanged: (v) => _update(_copy(ptt: v.first)),
+            );
+          },
         ),
         const SizedBox(height: 6),
         Text(
@@ -109,6 +119,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               ? 'Du wirst nur gehört, solange du die Taste oder unten den Knopf „Halten“ gedrückt hältst.'
               : 'Talkie sendet von selbst, sobald du sprichst.',
           style: hint,
+          textAlign: TextAlign.justify,
         ),
         if (_s.ptt && access != 'unsupported') ...[
           const SizedBox(height: 12),
@@ -132,6 +143,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           Text(
             'Funktioniert auch, während ein Spiel im Vordergrund ist.',
             style: hint,
+            textAlign: TextAlign.justify,
           ),
           if (access == 'permission') ...[
             const SizedBox(height: 8),
@@ -145,6 +157,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
+                    textAlign: TextAlign.justify,
                     'macOS muss Talkie die „Eingabeüberwachung“ erlauben, sonst reagiert Talkie nicht auf die Taste.',
                   ),
                 ),
@@ -207,6 +220,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 const Text(
                   'Öffne Talkie auf dem anderen Gerät, tippe auf „Ich nutze Talkie schon auf einem anderen Gerät“ '
                   'und gib diesen Code ein:',
+                  textAlign: TextAlign.justify,
                 ),
                 const SizedBox(height: 16),
                 if (code == null)
@@ -332,6 +346,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
+                    textAlign: TextAlign.justify,
                   ),
                   const SizedBox(height: 10),
                   ValueListenableBuilder<double>(
@@ -359,6 +374,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     title: const Text('Echo-Unterdrückung'),
                     subtitle: const Text(
                       'Damit die anderen sich nicht selbst hören, wenn du ohne Kopfhörer sprichst',
+                      textAlign: TextAlign.justify,
                     ),
                     value: _s.echoCancel,
                     onChanged: (v) => _update(_copy(echoCancel: v)),
@@ -368,6 +384,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   title: const Text('Talkie im Hintergrund stumm schalten'),
                   subtitle: const Text(
                     'Dein Mikro geht aus, solange Talkie nicht vorne ist.',
+                    textAlign: TextAlign.justify,
                   ),
                   value: _s.muteInBackground,
                   onChanged: (v) => _update(_copy(muteInBackground: v)),
@@ -377,6 +394,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   title: const Text('Rauschfilter'),
                   subtitle: const Text(
                     'Filtert Lüfter, Tastatur und Hintergrundgeräusche',
+                    textAlign: TextAlign.justify,
                   ),
                   value: _s.noiseSuppression,
                   onChanged: (v) => _update(_copy(ns: v)),
@@ -386,6 +404,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   title: const Text('Töne'),
                   subtitle: const Text(
                     'Kurzer Ton, wenn jemand kommt oder geht und bei neuen Chatnachrichten',
+                    textAlign: TextAlign.justify,
                   ),
                   value: _s.sounds,
                   onChanged: (v) => _update(_copy(sounds: v)),
@@ -425,6 +444,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       : 'Du willst Talkie auch auf einem anderen Gerät nutzen? '
                             'Das geht, sobald Talkie verbunden ist.',
                   style: theme.textTheme.bodyMedium,
+                  textAlign: TextAlign.justify,
                 ),
                 const SizedBox(height: 12),
                 FilledButton.tonalIcon(
