@@ -76,6 +76,57 @@ class TalkieController extends ChangeNotifier {
       talkieRenameDevice(id: id, name: name);
   void deleteDeviceCode() => talkieDeleteDeviceCode();
 
+  // --- Profilbilder ---
+
+  /// Bilder im Speicher: Nutzer-ID → (Version, JPEG). Leere Bytes = Server hat kein Bild geliefert.
+  final Map<int, ({int version, Uint8List bytes})> _avatars = {};
+
+  /// Gerade angefragte Bilder (ID → Version), damit nichts doppelt geladen wird.
+  final Map<int, int> _avatarPending = {};
+  final _avatarErrors = StreamController<String>.broadcast();
+
+  /// Fehlermeldungen zum eigenen Profilbild (für die Einstellungen).
+  Stream<String> get avatarErrors => _avatarErrors.stream;
+
+  /// Profilbild einer Person (null = keins, dann zeigt Talkie den Anfangsbuchstaben).
+  Uint8List? avatarOf(int id) {
+    final b = _avatars[id]?.bytes;
+    return b == null || b.isEmpty ? null : b;
+  }
+
+  /// Eigene Bild-Version (0 = kein Bild).
+  int get myAvatarVersion => meUser?.avatar ?? 0;
+
+  /// Lädt ein Bild nur, wenn es neu oder in einer neueren Version da ist; bei 0 wird es vergessen.
+  void _syncAvatar(int id, int version) {
+    if (version <= 0) {
+      _avatars.remove(id);
+      _avatarPending.remove(id);
+      return;
+    }
+    final have = _avatars[id]?.version ?? 0;
+    if (have >= version || _avatarPending[id] != null && _avatarPending[id]! >= version) return;
+    _avatarPending[id] = version;
+    try {
+      talkieGetAvatar(id: id);
+    } catch (_) {
+      _avatarPending.remove(id);
+    }
+  }
+
+  /// Nur für Tests: Bild direkt in den Speicher legen.
+  @visibleForTesting
+  void debugSetAvatar(int id, int version, Uint8List bytes) => _avatars[id] = (version: version, bytes: bytes);
+
+  /// Eigenes Bild setzen (JPEG 128×128); leer = Bild entfernen.
+  void setAvatar(Uint8List jpeg) => talkieSetAvatar(jpeg: jpeg);
+
+  /// Alle registrierten Nutzer; null = noch keine Antwort (z. B. älterer Server).
+  final ValueNotifier<List<MemberDto>?> members = ValueNotifier(null);
+
+  /// Mitgliederliste neu holen.
+  void requestMembers() => talkieRequestMembers();
+
   /// Sekunden bis zur Trennung wegen Inaktivität, solange der Server gewarnt hat (sonst null).
   /// Die Oberfläche zeigt dann „Bist du noch da?“.
   final ValueNotifier<int?> idleSecs = ValueNotifier(null);
@@ -109,6 +160,8 @@ class TalkieController extends ChangeNotifier {
     _sub?.cancel();
     _life?.dispose();
     _notices.close();
+    _avatarErrors.close();
+    members.dispose();
     levelNotifier.dispose();
     idleSecs.dispose();
     super.dispose();
@@ -203,6 +256,11 @@ class TalkieController extends ChangeNotifier {
         }
         if (s.status != ConnStatus.connected) idleSecs.value = null; // Verbindung weg: Frage schließen
         _updateBackground(s.status);
+        if (s.status == ConnStatus.connected) {
+          for (final u in s.users) {
+            _syncAvatar(u.id, u.avatar);
+          }
+        }
         notifyListeners();
       case EventKind.chat:
         final m = e.chat!;
@@ -240,6 +298,24 @@ class TalkieController extends ChangeNotifier {
         );
       case EventKind.idleWarning:
         idleSecs.value = e.idleSecs;
+      case EventKind.avatar:
+        final id = e.avatarId.toInt();
+        final wanted = _avatarPending.remove(id) ?? 0;
+        final version = e.avatarVersion.toInt() > wanted ? e.avatarVersion.toInt() : wanted;
+        if (e.avatarBytes.isEmpty) {
+          _avatars[id] = (version: version, bytes: Uint8List(0));
+        } else {
+          _avatars[id] = (version: version, bytes: Uint8List.fromList(e.avatarBytes));
+        }
+        notifyListeners();
+      case EventKind.members:
+        final list = List.of(e.members);
+        for (final m in list) {
+          _syncAvatar(m.id.toInt(), m.avatar.toInt());
+        }
+        members.value = list;
+      case EventKind.avatarRejected:
+        _avatarErrors.add(e.notice);
     }
   }
 
@@ -387,6 +463,9 @@ class TalkieController extends ChangeNotifier {
     await talkieLogout();
     config = talkieConfig();
     chats.clear();
+    _avatars.clear();
+    _avatarPending.clear();
+    members.value = null;
     state = null;
     showSetup = true;
     setupError = null;

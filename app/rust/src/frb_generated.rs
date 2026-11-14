@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 918284350;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1582672532;
 
 // Section: executor
 
@@ -378,6 +378,38 @@ fn wire__crate__api__talkie__talkie_events_impl(
                     })(),
                 )
             }
+        },
+    )
+}
+fn wire__crate__api__talkie__talkie_get_avatar_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "talkie_get_avatar",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_id = <i64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                (move || {
+                    let output_ok = crate::api::talkie::talkie_get_avatar(api_id)?;
+                    std::result::Result::Ok(output_ok)
+                })(),
+            )
         },
     )
 }
@@ -768,6 +800,37 @@ fn wire__crate__api__talkie__talkie_request_devices_impl(
         },
     )
 }
+fn wire__crate__api__talkie__talkie_request_members_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "talkie_request_members",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                (move || {
+                    let output_ok = crate::api::talkie::talkie_request_members()?;
+                    std::result::Result::Ok(output_ok)
+                })(),
+            )
+        },
+    )
+}
 fn wire__crate__api__talkie__talkie_restart_audio_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -799,6 +862,38 @@ fn wire__crate__api__talkie__talkie_restart_audio_impl(
                     })(),
                 )
             }
+        },
+    )
+}
+fn wire__crate__api__talkie__talkie_set_avatar_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "talkie_set_avatar",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_jpeg = <Vec<u8>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                (move || {
+                    let output_ok = crate::api::talkie::talkie_set_avatar(api_jpeg)?;
+                    std::result::Result::Ok(output_ok)
+                })(),
+            )
         },
     )
 }
@@ -1147,6 +1242,9 @@ impl SseDecode for crate::api::talkie::EventKind {
             5 => crate::api::talkie::EventKind::DeviceCode,
             6 => crate::api::talkie::EventKind::Devices,
             7 => crate::api::talkie::EventKind::IdleWarning,
+            8 => crate::api::talkie::EventKind::Avatar,
+            9 => crate::api::talkie::EventKind::Members,
+            10 => crate::api::talkie::EventKind::AvatarRejected,
             _ => unreachable!("Invalid variant for EventKind: {}", inner),
         };
     }
@@ -1209,6 +1307,18 @@ impl SseDecode for Vec<crate::api::talkie::DeviceDto> {
     }
 }
 
+impl SseDecode for Vec<crate::api::talkie::MemberDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::talkie::MemberDto>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1254,6 +1364,24 @@ impl SseDecode for Vec<crate::api::talkie::UserDto> {
             ans_.push(<crate::api::talkie::UserDto>::sse_decode(deserializer));
         }
         return ans_;
+    }
+}
+
+impl SseDecode for crate::api::talkie::MemberDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <i64>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_avatar = <i64>::sse_decode(deserializer);
+        let mut var_online = <bool>::sse_decode(deserializer);
+        let mut var_lastSeen = <i64>::sse_decode(deserializer);
+        return crate::api::talkie::MemberDto {
+            id: var_id,
+            name: var_name,
+            avatar: var_avatar,
+            online: var_online,
+            last_seen: var_lastSeen,
+        };
     }
 }
 
@@ -1406,6 +1534,10 @@ impl SseDecode for crate::api::talkie::UiEvent {
         let mut var_deviceCode = <String>::sse_decode(deserializer);
         let mut var_deviceCodeName = <String>::sse_decode(deserializer);
         let mut var_deviceCodeExpires = <i64>::sse_decode(deserializer);
+        let mut var_avatarId = <i64>::sse_decode(deserializer);
+        let mut var_avatarVersion = <i64>::sse_decode(deserializer);
+        let mut var_avatarBytes = <Vec<u8>>::sse_decode(deserializer);
+        let mut var_members = <Vec<crate::api::talkie::MemberDto>>::sse_decode(deserializer);
         return crate::api::talkie::UiEvent {
             kind: var_kind,
             state: var_state,
@@ -1419,6 +1551,10 @@ impl SseDecode for crate::api::talkie::UiEvent {
             device_code: var_deviceCode,
             device_code_name: var_deviceCodeName,
             device_code_expires: var_deviceCodeExpires,
+            avatar_id: var_avatarId,
+            avatar_version: var_avatarVersion,
+            avatar_bytes: var_avatarBytes,
+            members: var_members,
         };
     }
 }
@@ -1436,6 +1572,7 @@ impl SseDecode for crate::api::talkie::UserDto {
         let mut var_room = <i64>::sse_decode(deserializer);
         let mut var_muted = <bool>::sse_decode(deserializer);
         let mut var_deaf = <bool>::sse_decode(deserializer);
+        let mut var_avatar = <i64>::sse_decode(deserializer);
         let mut var_talking = <bool>::sse_decode(deserializer);
         let mut var_localMuted = <bool>::sse_decode(deserializer);
         let mut var_volume = <f32>::sse_decode(deserializer);
@@ -1445,6 +1582,7 @@ impl SseDecode for crate::api::talkie::UserDto {
             room: var_room,
             muted: var_muted,
             deaf: var_deaf,
+            avatar: var_avatar,
             talking: var_talking,
             local_muted: var_localMuted,
             volume: var_volume,
@@ -1463,24 +1601,24 @@ fn pde_ffi_dispatcher_primary_impl(
     match func_id {
         1 => wire__crate__api__talkie__init_app_impl(port, ptr, rust_vec_len, data_len),
         10 => wire__crate__api__talkie__talkie_events_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__talkie__talkie_init_impl(port, ptr, rust_vec_len, data_len),
-        12 => {
+        12 => wire__crate__api__talkie__talkie_init_impl(port, ptr, rust_vec_len, data_len),
+        13 => {
             wire__crate__api__talkie__talkie_input_devices_impl(port, ptr, rust_vec_len, data_len)
         }
-        14 => wire__crate__api__talkie__talkie_logout_impl(port, ptr, rust_vec_len, data_len),
-        16 => {
+        15 => wire__crate__api__talkie__talkie_logout_impl(port, ptr, rust_vec_len, data_len),
+        17 => {
             wire__crate__api__talkie__talkie_output_devices_impl(port, ptr, rust_vec_len, data_len)
         }
-        19 => wire__crate__api__talkie__talkie_ptt_request_access_impl(
+        20 => wire__crate__api__talkie__talkie_ptt_request_access_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        23 => {
+        25 => {
             wire__crate__api__talkie__talkie_restart_audio_impl(port, ptr, rust_vec_len, data_len)
         }
-        27 => wire__crate__api__talkie__talkie_set_settings_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__talkie__talkie_set_settings_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1501,21 +1639,24 @@ fn pde_ffi_dispatcher_sync_impl(
         7 => wire__crate__api__talkie__talkie_delete_device_impl(ptr, rust_vec_len, data_len),
         8 => wire__crate__api__talkie__talkie_delete_device_code_impl(ptr, rust_vec_len, data_len),
         9 => wire__crate__api__talkie__talkie_disconnect_impl(ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__talkie__talkie_join_impl(ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__talkie__talkie_moderate_impl(ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__talkie__talkie_ptt_access_impl(ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__talkie__talkie_ptt_keys_impl(ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__talkie__talkie_rename_device_impl(ptr, rust_vec_len, data_len),
-        21 => {
+        11 => wire__crate__api__talkie__talkie_get_avatar_impl(ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__talkie__talkie_join_impl(ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__talkie__talkie_moderate_impl(ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__talkie__talkie_ptt_access_impl(ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__talkie__talkie_ptt_keys_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__talkie__talkie_rename_device_impl(ptr, rust_vec_len, data_len),
+        22 => {
             wire__crate__api__talkie__talkie_request_device_code_impl(ptr, rust_vec_len, data_len)
         }
-        22 => wire__crate__api__talkie__talkie_request_devices_impl(ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__talkie__talkie_set_deaf_impl(ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__talkie__talkie_set_muted_impl(ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__talkie__talkie_set_ptt_pressed_impl(ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__talkie__talkie_set_user_muted_impl(ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__talkie__talkie_set_user_volume_impl(ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__talkie__talkie_still_here_impl(ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__talkie__talkie_request_devices_impl(ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__talkie__talkie_request_members_impl(ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__talkie__talkie_set_avatar_impl(ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__talkie__talkie_set_deaf_impl(ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__talkie__talkie_set_muted_impl(ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__talkie__talkie_set_ptt_pressed_impl(ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__talkie__talkie_set_user_muted_impl(ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__talkie__talkie_set_user_volume_impl(ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__talkie__talkie_still_here_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1620,6 +1761,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::talkie::EventKind {
             Self::DeviceCode => 5.into_dart(),
             Self::Devices => 6.into_dart(),
             Self::IdleWarning => 7.into_dart(),
+            Self::Avatar => 8.into_dart(),
+            Self::Members => 9.into_dart(),
+            Self::AvatarRejected => 10.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -1629,6 +1773,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::talkie::EventKind>
     for crate::api::talkie::EventKind
 {
     fn into_into_dart(self) -> crate::api::talkie::EventKind {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::talkie::MemberDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.avatar.into_into_dart().into_dart(),
+            self.online.into_into_dart().into_dart(),
+            self.last_seen.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::talkie::MemberDto {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::talkie::MemberDto>
+    for crate::api::talkie::MemberDto
+{
+    fn into_into_dart(self) -> crate::api::talkie::MemberDto {
         self
     }
 }
@@ -1746,6 +1911,10 @@ impl flutter_rust_bridge::IntoDart for crate::api::talkie::UiEvent {
             self.device_code.into_into_dart().into_dart(),
             self.device_code_name.into_into_dart().into_dart(),
             self.device_code_expires.into_into_dart().into_dart(),
+            self.avatar_id.into_into_dart().into_dart(),
+            self.avatar_version.into_into_dart().into_dart(),
+            self.avatar_bytes.into_into_dart().into_dart(),
+            self.members.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1767,6 +1936,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::talkie::UserDto {
             self.room.into_into_dart().into_dart(),
             self.muted.into_into_dart().into_dart(),
             self.deaf.into_into_dart().into_dart(),
+            self.avatar.into_into_dart().into_dart(),
             self.talking.into_into_dart().into_dart(),
             self.local_muted.into_into_dart().into_dart(),
             self.volume.into_into_dart().into_dart(),
@@ -1877,6 +2047,9 @@ impl SseEncode for crate::api::talkie::EventKind {
                 crate::api::talkie::EventKind::DeviceCode => 5,
                 crate::api::talkie::EventKind::Devices => 6,
                 crate::api::talkie::EventKind::IdleWarning => 7,
+                crate::api::talkie::EventKind::Avatar => 8,
+                crate::api::talkie::EventKind::Members => 9,
+                crate::api::talkie::EventKind::AvatarRejected => 10,
                 _ => {
                     unimplemented!("");
                 }
@@ -1937,6 +2110,16 @@ impl SseEncode for Vec<crate::api::talkie::DeviceDto> {
     }
 }
 
+impl SseEncode for Vec<crate::api::talkie::MemberDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::talkie::MemberDto>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1974,6 +2157,17 @@ impl SseEncode for Vec<crate::api::talkie::UserDto> {
         for item in self {
             <crate::api::talkie::UserDto>::sse_encode(item, serializer);
         }
+    }
+}
+
+impl SseEncode for crate::api::talkie::MemberDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i64>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <i64>::sse_encode(self.avatar, serializer);
+        <bool>::sse_encode(self.online, serializer);
+        <i64>::sse_encode(self.last_seen, serializer);
     }
 }
 
@@ -2084,6 +2278,10 @@ impl SseEncode for crate::api::talkie::UiEvent {
         <String>::sse_encode(self.device_code, serializer);
         <String>::sse_encode(self.device_code_name, serializer);
         <i64>::sse_encode(self.device_code_expires, serializer);
+        <i64>::sse_encode(self.avatar_id, serializer);
+        <i64>::sse_encode(self.avatar_version, serializer);
+        <Vec<u8>>::sse_encode(self.avatar_bytes, serializer);
+        <Vec<crate::api::talkie::MemberDto>>::sse_encode(self.members, serializer);
     }
 }
 
@@ -2100,6 +2298,7 @@ impl SseEncode for crate::api::talkie::UserDto {
         <i64>::sse_encode(self.room, serializer);
         <bool>::sse_encode(self.muted, serializer);
         <bool>::sse_encode(self.deaf, serializer);
+        <i64>::sse_encode(self.avatar, serializer);
         <bool>::sse_encode(self.talking, serializer);
         <bool>::sse_encode(self.local_muted, serializer);
         <f32>::sse_encode(self.volume, serializer);

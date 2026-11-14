@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/level_meter.dart';
 import '../widgets/idle_dialog.dart';
+import 'members_dialog.dart';
 import 'settings_dialog.dart';
 
 /// Unterhalb dieser Breite (Handy hochkant) wird das Layout einspaltig.
@@ -261,10 +262,23 @@ class _RoomsPanel extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
-            child: Text('RÄUME',
-                style: theme.textTheme.labelMedium
-                    ?.copyWith(letterSpacing: 1.5, color: theme.colorScheme.onSurfaceVariant)),
+            padding: const EdgeInsets.fromLTRB(8, 0, 0, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text('RÄUME',
+                      style: theme.textTheme.labelMedium
+                          ?.copyWith(letterSpacing: 1.5, color: theme.colorScheme.onSurfaceVariant)),
+                ),
+                if (controller.status == ConnStatus.connected)
+                  IconButton(
+                    tooltip: 'Alle Mitglieder',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.people_alt_rounded, size: 22),
+                    onPressed: () => showMembersDialog(context, controller),
+                  ),
+              ],
+            ),
           ),
           for (final r in rooms) _RoomTile(controller: controller, room: r),
           Padding(
@@ -360,7 +374,7 @@ class _RoomTile extends StatelessWidget {
                     padding: const EdgeInsets.only(left: 10, top: 8),
                     child: Row(
                       children: [
-                        Avatar(name: u.name, talking: u.talking, size: 26),
+                        Avatar(name: u.name, talking: u.talking, size: 26, image: controller.avatarOf(u.id)),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -614,7 +628,7 @@ class _UserDialogState extends State<_UserDialog> {
         return AlertDialog(
           title: Row(
             children: [
-              Avatar(name: u.name, talking: u.talking && !u.localMuted, size: 32),
+              Avatar(name: u.name, talking: u.talking && !u.localMuted, size: 32, image: widget.controller.avatarOf(u.id)),
               const SizedBox(width: 12),
               Expanded(child: Text(u.name, overflow: TextOverflow.ellipsis)),
             ],
@@ -905,7 +919,7 @@ class _ChatPanelState extends State<_ChatPanel> {
                     final m = msgs[msgs.length - 1 - i];
                     final prev = i + 1 < msgs.length ? msgs[msgs.length - 2 - i] : null;
                     final grouped = prev != null && prev.from == m.from && (m.ts - prev.ts) < 120;
-                    return _ChatLine(msg: m, grouped: grouped);
+                    return _ChatLine(msg: m, grouped: grouped, image: widget.controller.avatarOf(m.from.toInt()));
                   },
                 ),
           ),
@@ -976,7 +990,7 @@ class _RoomPeople extends StatelessWidget {
             for (final u in shown)
               Padding(
                 padding: const EdgeInsets.only(left: 4),
-                child: Avatar(name: u.name, talking: u.talking && !u.localMuted, size: 28),
+                child: Avatar(name: u.name, talking: u.talking && !u.localMuted, size: 28, image: controller.avatarOf(u.id)),
               ),
             if (users.length > shown.length)
               Padding(
@@ -991,10 +1005,11 @@ class _RoomPeople extends StatelessWidget {
 }
 
 class _ChatLine extends StatelessWidget {
-  const _ChatLine({required this.msg, required this.grouped});
+  const _ChatLine({required this.msg, required this.grouped, this.image});
 
   final ChatDto msg;
   final bool grouped;
+  final Uint8List? image;
 
   @override
   Widget build(BuildContext context) {
@@ -1008,7 +1023,7 @@ class _ChatLine extends StatelessWidget {
         children: [
           SizedBox(
             width: 40,
-            child: grouped ? null : Avatar(name: msg.name, size: 32),
+            child: grouped ? null : Avatar(name: msg.name, size: 32, image: image),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -1050,7 +1065,7 @@ class _ControlBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          Avatar(name: me?.name ?? c.config.name, talking: me?.talking ?? false, size: 40),
+          Avatar(name: me?.name ?? c.config.name, talking: me?.talking ?? false, size: 40, image: c.avatarOf(c.me)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
