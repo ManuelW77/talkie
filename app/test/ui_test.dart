@@ -157,7 +157,7 @@ void main() {
     expect(find.text('Jonas'), findsOneWidget);
     expect(find.text('Lobby-Code: 4711'), findsOneWidget);
     expect(find.text('2'), findsOneWidget); // ungelesen in Zocken 1
-    expect(find.byIcon(Icons.mic_off_rounded), findsOneWidget); // Lena stumm
+    expect(find.byIcon(Icons.mic_off_rounded), findsNWidgets(2)); // Lena stumm, Emil taub und damit auch stumm
     expect(find.byIcon(Icons.headset_off_rounded), findsOneWidget); // Emil taub
     await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/main.png'));
   });
