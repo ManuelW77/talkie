@@ -460,15 +460,18 @@ class _RoomTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (u.deaf)
+                        // Wer nichts hört, ist auch stumm: dann beide Zeichen zeigen
+                        if (u.muted || u.deaf)
+                          Icon(Icons.mic_off_rounded, size: 18, color: kDanger, semanticLabel: '${u.name} ist stumm'),
+                        if (u.deaf) ...[
+                          const SizedBox(width: 4),
                           Icon(
                             Icons.headset_off_rounded,
                             size: 18,
                             color: kDanger,
                             semanticLabel: '${u.name} hört nichts',
-                          )
-                        else if (u.muted)
-                          Icon(Icons.mic_off_rounded, size: 18, color: kDanger, semanticLabel: '${u.name} ist stumm'),
+                          ),
+                        ],
                         if (u.id != controller.me)
                           _UserMuteButton(controller: controller, user: u)
                         else

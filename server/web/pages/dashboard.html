@@ -15,7 +15,7 @@
   {{range .D.Online}}
   <tr><td><span class="dot on"></span>{{.Name}}</td><td>{{.Room}}</td>
     <td>{{if .Device}}{{.Device}}{{else}}<span class="muted">–</span>{{end}}</td>
-    <td>{{if .Deaf}}🔇 taub{{else if .Muted}}🔕 stumm{{else if .Talking}}🗣️ spricht gerade{{else}}🎤 Mikro an{{end}}</td></tr>
+    <td>{{if .Deaf}}🔕 stumm, 🔇 taub{{else if .Muted}}🔕 stumm{{else if .Talking}}🗣️ spricht gerade{{else}}🎤 Mikro an{{end}}</td></tr>
   {{end}}
   </tbody>
 </table>
