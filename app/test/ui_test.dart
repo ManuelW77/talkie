@@ -394,6 +394,37 @@ void main() {
     await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_ptt.png'));
   });
 
+  testWidgets('Selbst getrennt: ruhiger Hinweis mit Verbinden, kein Trennen-Knopf', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _controller()
+      ..userDisconnected = true
+      ..state = const StateDto(
+        status: ConnStatus.idle,
+        message: '',
+        errorCode: '',
+        me: 0,
+        room: 0,
+        rooms: [],
+        users: [],
+        muted: false,
+        deaf: false,
+        moderator: false,
+        admin: false,
+        chatHours: 0,
+        latestVersion: '',
+        latestUrl: '',
+      );
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Du bist getrennt.'), findsOneWidget);
+    expect(find.text('Verbinden'), findsOneWidget);
+    expect(find.text('Nochmal verbinden'), findsNothing);
+    expect(find.text('Trennen'), findsNothing);
+    await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_disconnected.png'));
+  });
+
   testWidgets('Einrichtung: weiteres Gerät nur mit Geräte-Code', (tester) async {
     tester.view.physicalSize = const Size(390, 760);
     tester.view.devicePixelRatio = 1;
