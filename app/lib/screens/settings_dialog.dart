@@ -522,7 +522,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     return AlertDialog(
       title: const Text('Einstellungen'),
       content: SizedBox(
-        width: 460,
+        width: 600, // breit genug für die Erklärtexte; auf dem Handy begrenzt der Bildschirm
         // Fester Scrollbalken, damit man sieht, dass es weiter unten weitergeht
         child: Scrollbar(
           controller: _scroll,
