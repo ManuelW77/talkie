@@ -100,6 +100,13 @@ var tplFuncs = template.FuncMap{
 	},
 	"date": func(t time.Time) string { return t.Local().Format("02.01.2006") },
 	"unix": func(ts int64) string { return time.Unix(ts, 0).Local().Format("02.01. 15:04") },
+	// initial: erster Buchstabe groß, für den Platzhalter ohne Profilbild
+	"initial": func(name string) string {
+		for _, r := range name {
+			return strings.ToUpper(string(r))
+		}
+		return "?"
+	},
 }
 
 func (w *webApp) loadTemplates() error {
