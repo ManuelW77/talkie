@@ -698,7 +698,20 @@ class _PhoneTabs extends StatelessWidget {
     final otherUnread = c.unread.values.any((n) => n > 0);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      child: SegmentedButton<bool>(
+      child: Row(
+        children: [
+          Expanded(child: _tabs(c, otherUnread)),
+          if (c.status == ConnStatus.connected) ...[
+            const SizedBox(width: 8),
+            _DisconnectButton(controller: c, compact: true),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _tabs(TalkieController c, bool otherUnread) {
+    return SegmentedButton<bool>(
         showSelectedIcon: false,
         segments: [
           ButtonSegment(
@@ -724,6 +737,31 @@ class _PhoneTabs extends StatelessWidget {
         ],
         selected: {c.phoneChat},
         onSelectionChanged: (s) => c.showPhoneChat(s.first),
+    );
+  }
+}
+
+/// Oben rechts: vom Server trennen (danach „Verbinden“ im Hinweisbalken).
+class _DisconnectButton extends StatelessWidget {
+  const _DisconnectButton({required this.controller, this.compact = false});
+
+  final TalkieController controller;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Vom Server trennen',
+      child: OutlinedButton.icon(
+        onPressed: controller.disconnect,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: kDanger,
+          side: BorderSide(color: kDanger.withValues(alpha: 0.6)),
+          minimumSize: Size(0, compact ? 40 : 36),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+        ),
+        icon: const Icon(Icons.call_end_rounded, size: 20),
+        label: const Text('Trennen'),
       ),
     );
   }
@@ -839,6 +877,11 @@ class _ChatPanelState extends State<_ChatPanel> {
               ),
               if (widget.onShowRooms != null) _RoomPeople(controller: widget.controller, onTap: widget.onShowRooms!),
               if (widget.controller.admin) _ClearChatMenu(controller: widget.controller, roomName: _roomName()),
+              // Handy hat den Knopf schon neben „Räume / Chat“
+              if (!widget.compact && connected) ...[
+                const SizedBox(width: 8),
+                _DisconnectButton(controller: widget.controller),
+              ],
             ],
           ),
         ),
@@ -1055,16 +1098,6 @@ class _ControlBar extends StatelessWidget {
             tooltip: 'Niemanden hören (und selbst stumm)',
           ),
           SizedBox(width: compact ? 6 : 10),
-          if (c.status == ConnStatus.connected) ...[
-            _RoundButton(
-              icon: Icons.call_end_rounded,
-              label: 'Trennen',
-              active: true,
-              onTap: c.disconnect,
-              tooltip: 'Vom Server trennen',
-            ),
-            SizedBox(width: compact ? 6 : 10),
-          ],
           _RoundButton(
             icon: Icons.settings_rounded,
             label: compact ? 'Mehr' : 'Einstellungen',
