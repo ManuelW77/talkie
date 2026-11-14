@@ -68,6 +68,9 @@ pub struct WireDevice {
     pub id: i64,
     #[serde(default)]
     pub label: String,
+    /// Gerätetyp (Mac, Windows, …); ältere Server schicken ihn nicht
+    #[serde(default)]
+    pub kind: String,
     #[serde(default)]
     pub created: i64,
     #[serde(default)]

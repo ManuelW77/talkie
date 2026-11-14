@@ -310,6 +310,9 @@ func (h *Hub) OnlineDetails() []OnlineInfo {
 
 func (h *Hub) deviceLabel(pk []byte) string {
 	if d, err := h.store.DeviceByPubKey(pk); err == nil {
+		if d.Kind != "" {
+			return d.Kind
+		}
 		return d.Label
 	}
 	return ""
@@ -407,7 +410,7 @@ func (h *Hub) SendDevices(s *Session) {
 	}
 	out := make([]WireDevice, 0, len(devs))
 	for _, d := range devs {
-		w := WireDevice{ID: d.ID, Label: d.Label, Created: d.Created.Unix(), This: d.ID == thisID}
+		w := WireDevice{ID: d.ID, Label: d.Label, Kind: d.Kind, Created: d.Created.Unix(), This: d.ID == thisID}
 		if !d.LastSeen.IsZero() {
 			w.LastSeen = d.LastSeen.Unix()
 		}
