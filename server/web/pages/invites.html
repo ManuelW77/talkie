@@ -4,7 +4,7 @@
 <div class="card highlight">
   <p>Neuer Einladungscode:</p>
   <p class="bigcode"><code id="newcode">{{.}}</code> <button type="button" data-copy="newcode">Kopieren</button></p>
-  <p class="muted">Gib den Code weiter. In der App: Name ausdenken, Code eingeben, fertig.</p>
+  <p class="muted">{{if $.D.NewName}}Für {{$.D.NewName}}: {{end}}Gib den Code weiter. In der App: Name ausdenken, Code eingeben, fertig.</p>
 </div>
 {{end}}
 
@@ -18,6 +18,10 @@
     <label>Gültig (Tage)
       <input type="number" name="days" value="7" min="1" max="365">
     </label>
+    <label class="full">Für wen? (optional)
+      <input type="text" name="name" maxlength="40" autocomplete="off" placeholder="Max (Klasse 5b)">
+      <span class="muted">Nur für dich zur Übersicht, die App sieht das nicht.</span>
+    </label>
     {{if .MailOn}}
     <label class="full">Per Mail schicken an (optional)
       <input type="email" name="email" placeholder="eltern@example.org">
@@ -30,12 +34,13 @@
 <h2>Offene Einladungen</h2>
 {{if .D.Invites}}
 <table>
-  <thead><tr><th>Code</th><th>Noch für</th><th>Gültig bis</th><th></th></tr></thead>
+  <thead><tr><th>Code</th><th>Noch für</th><th>Für</th><th>Gültig bis</th><th></th></tr></thead>
   <tbody>
   {{range .D.Invites}}
   <tr>
     <td><code>{{.Code}}</code></td>
     <td>{{.UsesLeft}} Person(en)</td>
+    <td>{{if .Name}}{{.Name}}{{else}}–{{end}}</td>
     <td>{{dt .Expires}}</td>
     <td class="right"><form method="post" action="/invites/{{.Code}}/delete">
       <input type="hidden" name="csrf" value="{{$.CSRF}}">

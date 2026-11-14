@@ -21,7 +21,7 @@ func TestSnapshot(t *testing.T) {
 	devices := map[string]string{"Jonas": "Windows", "Lea": "iPhone/iPad", "Mia": "Android", "Finn": "Mac"}
 	var users []*DBUser
 	for i, n := range []string{"Jonas", "Lea", "Mia", "Finn"} {
-		inv, _ := wt.store.CreateInvite(1, time.Hour)
+		inv, _ := wt.store.CreateInvite(1, time.Hour, "")
 		u, _ := wt.store.RegisterDevice(inv.Code, n, []byte("k"+n), devices[n])
 		users = append(users, u)
 		if i == 3 {
@@ -46,7 +46,7 @@ func TestSnapshot(t *testing.T) {
 		}
 		wt.hub.sessions[u.ID] = s
 	}
-	wt.store.CreateInvite(3, 72*time.Hour)
+	wt.store.CreateInvite(3, 72*time.Hour, "")
 	rooms, _ := wt.store.Rooms()
 	wt.store.AddMessage(DBMessage{Room: rooms[0].ID, From: 1, Name: "Jonas", Text: "Wer ist dabei? 🎮", TS: time.Now().Unix()}, 200)
 	wt.store.AddMessage(DBMessage{Room: rooms[0].ID, From: 2, Name: "Lea", Text: "Ich, gleich!", TS: time.Now().Unix()}, 200)

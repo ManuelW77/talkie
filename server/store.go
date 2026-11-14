@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	_ "modernc.org/sqlite"
 )
@@ -40,6 +42,7 @@ type DBInvite struct {
 	Code     string    `json:"code"`
 	UsesLeft int       `json:"uses_left"`
 	Expires  time.Time `json:"expires"`
+	Name     string    `json:"name,omitempty"` // Notiz, für wen die Einladung ist (nur für die Verwaltung)
 }
 
 var (
@@ -47,6 +50,7 @@ var (
 	ErrNameTaken     = errors.New("name vergeben")
 	ErrInviteInvalid = errors.New("einladung ungültig")
 	ErrNameMissing   = errors.New("name fehlt")
+	ErrInviteName    = errors.New("einladungsnotiz ungültig")
 )
 
 const schema = `
@@ -308,25 +312,44 @@ func newInviteCode() (string, error) {
 	return string(out), nil
 }
 
-func (s *Store) CreateInvite(uses int, valid time.Duration) (*DBInvite, error) {
+func (s *Store) CreateInvite(uses int, valid time.Duration, note string) (*DBInvite, error) {
+	name, ok := cleanInviteNote(note)
+	if !ok {
+		return nil, ErrInviteName
+	}
 	code, err := newInviteCode()
 	if err != nil {
 		return nil, err
 	}
 	now := time.Now()
 	exp := now.Add(valid)
-	if _, err := s.db.Exec("INSERT INTO invites(code, created, expires, uses_left) VALUES(?,?,?,?)",
-		code, now.Unix(), exp.Unix(), uses); err != nil {
+	if _, err := s.db.Exec("INSERT INTO invites(code, created, expires, uses_left, name) VALUES(?,?,?,?,?)",
+		code, now.Unix(), exp.Unix(), uses, name); err != nil {
 		return nil, err
 	}
-	return &DBInvite{Code: code, UsesLeft: uses, Expires: exp}, nil
+	return &DBInvite{Code: code, UsesLeft: uses, Expires: exp, Name: name}, nil
+}
+
+// cleanInviteNote fasst Leerraum zusammen und prüft die Notiz zur Einladung:
+// höchstens 40 Zeichen, keine Steuerzeichen. Leer ist erlaubt.
+func cleanInviteNote(n string) (string, bool) {
+	n = strings.Join(strings.Fields(n), " ")
+	if utf8.RuneCountInString(n) > 40 {
+		return "", false
+	}
+	for _, r := range n {
+		if unicode.IsControl(r) {
+			return "", false
+		}
+	}
+	return n, true
 }
 
 func (s *Store) Invites() ([]DBInvite, error) {
 	if _, err := s.db.Exec("DELETE FROM invites WHERE expires <= ?", time.Now().Unix()); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query("SELECT code, uses_left, expires FROM invites WHERE user_id IS NULL ORDER BY expires")
+	rows, err := s.db.Query("SELECT code, uses_left, expires, name FROM invites WHERE user_id IS NULL ORDER BY expires")
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +358,7 @@ func (s *Store) Invites() ([]DBInvite, error) {
 	for rows.Next() {
 		var inv DBInvite
 		var exp int64
-		if err := rows.Scan(&inv.Code, &inv.UsesLeft, &exp); err != nil {
+		if err := rows.Scan(&inv.Code, &inv.UsesLeft, &exp, &inv.Name); err != nil {
 			return nil, err
 		}
 		inv.Expires = time.Unix(exp, 0)

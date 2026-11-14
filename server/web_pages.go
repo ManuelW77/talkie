@@ -223,7 +223,15 @@ func (w *webApp) invitesPage(rw http.ResponseWriter, r *http.Request) {
 		w.fail(rw, r, "/", err)
 		return
 	}
-	w.render(rw, r, "invites", "Einladungen", map[string]any{"Invites": invs, "New": r.URL.Query().Get("new")})
+	w.render(rw, r, "invites", "Einladungen", map[string]any{"Invites": invs, "New": r.URL.Query().Get("new"), "NewName": r.URL.Query().Get("name")})
+}
+
+// nameq hängt den Einladungsnamen als Query-Parameter an (für den Hinweiskasten).
+func nameq(name string) string {
+	if name == "" {
+		return ""
+	}
+	return "&name=" + urlq(name)
 }
 
 func formInt(r *http.Request, key string, def, min, max int) int {
@@ -248,7 +256,11 @@ func (w *webApp) createInvite(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	inv, err := w.store.CreateInvite(uses, time.Duration(days)*24*time.Hour)
+	inv, err := w.store.CreateInvite(uses, time.Duration(days)*24*time.Hour, r.PostFormValue("name"))
+	if errors.Is(err, ErrInviteName) {
+		w.done(rw, r, "/invites", "Die Notiz darf höchstens 40 Zeichen lang sein.", true)
+		return
+	}
 	if err != nil {
 		w.fail(rw, r, "/invites", err)
 		return
@@ -257,13 +269,13 @@ func (w *webApp) createInvite(rw http.ResponseWriter, r *http.Request) {
 	msg := "Einladung erstellt: " + inv.Code
 	if email != "" {
 		if err := w.cfg.Mailer.Send(email, "Einladung zu Talkie", w.inviteMail(inv, me(r).Name), w.inviteMailHTML(inv, me(r).Name)); err != nil {
-			w.done(rw, r, "/invites?new="+urlq(inv.Code), msg+" – die Mail konnte aber nicht verschickt werden.", true)
+			w.done(rw, r, "/invites?new="+urlq(inv.Code)+nameq(inv.Name), msg+" – die Mail konnte aber nicht verschickt werden.", true)
 			return
 		}
 		w.audit(r, "Einladung "+inv.Code+" per Mail an "+email+" geschickt")
 		msg += " und an " + email + " geschickt."
 	}
-	w.done(rw, r, "/invites?new="+urlq(inv.Code), msg, false)
+	w.done(rw, r, "/invites?new="+urlq(inv.Code)+nameq(inv.Name), msg, false)
 }
 
 //go:embed web/mail/invite.html web/mail/login.html
