@@ -72,6 +72,12 @@ type Envelope struct {
 	Devices []WireDevice `json:"devices,omitempty"`
 	Expires int64        `json:"expires,omitempty"`
 
+	// set_avatar: Bild als base64 (JPEG/PNG, 128×128; leer = entfernen). avatar: Antwort auf get_avatar
+	// (zusammen mit id und data), members: Antwort auf members
+	Data    string   `json:"data,omitempty"`
+	Avatar  int64    `json:"avatar,omitempty"`
+	Members []Member `json:"members,omitempty"`
+
 	// error / kicked
 	Code   string `json:"code,omitempty"`
 	Reason string `json:"reason,omitempty"`
@@ -92,6 +98,8 @@ type WireUser struct {
 	Room  int64  `json:"room"`
 	Muted bool   `json:"muted"`
 	Deaf  bool   `json:"deaf"`
+	// Avatar: Version des Profilbilds (0 = keins)
+	Avatar int64 `json:"avatar,omitempty"`
 }
 
 var ErrFrameTooLarge = errors.New("nachricht zu groß")

@@ -10,6 +10,7 @@ use crate::core::ptt;
 use crate::core::net::{self, ConnectError};
 use crate::core::protocol::*;
 use anyhow::Result;
+use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use bytes::Bytes;
 use ed25519_dalek::SigningKey;
 use parking_lot::Mutex;
@@ -36,6 +37,8 @@ pub struct UserView {
     pub room: i64,
     pub muted: bool,
     pub deaf: bool,
+    /// Version des Profilbilds (0 = keins).
+    pub avatar: i64,
     pub talking: bool,
     /// Nur für mich stumm geschaltet.
     pub local_muted: bool,
@@ -74,6 +77,14 @@ pub struct DevicesInfo {
     pub expires: i64,
 }
 
+/// Antwort auf `get_avatar`: Bild eines Nutzers (leer = keins).
+#[derive(Debug, Clone)]
+pub struct AvatarInfo {
+    pub id: i64,
+    pub version: i64,
+    pub bytes: Vec<u8>,
+}
+
 #[derive(Debug, Clone)]
 pub enum CoreEvent {
     State(Snapshot),
@@ -87,6 +98,12 @@ pub enum CoreEvent {
     Devices(DevicesInfo),
     /// Server: Gleich wegen Inaktivität getrennt, noch so viele Sekunden.
     IdleWarning(i64),
+    /// Profilbild eines Nutzers.
+    Avatar(AvatarInfo),
+    /// Mitgliederliste.
+    Members(Vec<WireMember>),
+    /// Server hat das eigene Profilbild abgelehnt.
+    AvatarRejected(String),
 }
 
 pub type Emitter = Arc<dyn Fn(CoreEvent) + Send + Sync>;
@@ -174,6 +191,7 @@ impl Inner {
                 room: u.room,
                 muted: u.muted,
                 deaf: u.deaf,
+                avatar: u.avatar,
                 talking: if u.id == n.me { self_talking } else { n.talking.binary_search(&u.id).is_ok() },
                 local_muted: ignored.contains(&u.id),
                 volume: gains.get(&u.id).copied().unwrap_or(1.0),
@@ -611,6 +629,25 @@ impl Engine {
     /// Offenen Geräte-Code löschen.
     pub fn delete_device_code(&self) {
         self.inner.send_cmd(Envelope::new("device_code_del"));
+    }
+
+    /// Eigenes Profilbild setzen (JPEG, 128×128); leer = Bild entfernen.
+    pub fn set_avatar(&self, jpeg: &[u8]) {
+        let mut e = Envelope::new("set_avatar");
+        e.data = B64.encode(jpeg);
+        self.inner.send_cmd(e);
+    }
+
+    /// Profilbild eines Nutzers anfordern (kommt als CoreEvent::Avatar).
+    pub fn request_avatar(&self, id: i64) {
+        let mut e = Envelope::new("get_avatar");
+        e.id = id;
+        self.inner.send_cmd(e);
+    }
+
+    /// Mitgliederliste anfordern (kommt als CoreEvent::Members).
+    pub fn request_members(&self) {
+        self.inner.send_cmd(Envelope::new("members"));
     }
 
     /// „Ich bin noch da“: setzt die Inaktivitäts-Uhr des Servers zurück.
@@ -1057,7 +1094,14 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
         "kicked" => {
             return Some(SessionEnd::Kicked(if e.reason.is_empty() { "Du wurdest getrennt.".into() } else { e.reason }))
         }
+        "error" if e.code == "bad_avatar" => inner.emit(CoreEvent::AvatarRejected(e.reason)),
         "error" | "info" => inner.emit(CoreEvent::Notice(e.reason)),
+        "avatar" => inner.emit(CoreEvent::Avatar(AvatarInfo {
+            id: e.id,
+            version: e.avatar,
+            bytes: if e.data.is_empty() { Vec::new() } else { B64.decode(e.data.as_bytes()).unwrap_or_default() },
+        })),
+        "members" => inner.emit(CoreEvent::Members(e.members)),
         "device_code" => inner.emit(CoreEvent::DeviceCode(e.code)),
         "devices" => inner.emit(CoreEvent::Devices(DevicesInfo {
             devices: e.devices,

@@ -29,6 +29,8 @@ pub struct UserDto {
     pub room: i64,
     pub muted: bool,
     pub deaf: bool,
+    /// Version des Profilbilds (0 = keins).
+    pub avatar: i64,
     pub talking: bool,
     /// Nur für mich stumm geschaltet.
     pub local_muted: bool,
@@ -90,6 +92,12 @@ pub enum EventKind {
     Devices,
     /// Gleich wegen Inaktivität getrennt (`idle_secs` Sekunden bleiben).
     IdleWarning,
+    /// Profilbild eines Nutzers (`avatar_id`, `avatar_version`, `avatar_bytes`; leer = keins).
+    Avatar,
+    /// Mitgliederliste (Feld `members`).
+    Members,
+    /// Der Server hat das eigene Profilbild abgelehnt.
+    AvatarRejected,
 }
 
 /// Ein Ereignis an die Oberfläche; welche Felder gefüllt sind, hängt von `kind` ab.
@@ -108,6 +116,21 @@ pub struct UiEvent {
     pub device_code: String,
     pub device_code_name: String,
     pub device_code_expires: i64,
+    pub avatar_id: i64,
+    pub avatar_version: i64,
+    pub avatar_bytes: Vec<u8>,
+    pub members: Vec<MemberDto>,
+}
+
+/// Ein registrierter Nutzer des Servers (Mitgliederliste).
+#[derive(Debug, Clone)]
+pub struct MemberDto {
+    pub id: i64,
+    pub name: String,
+    pub avatar: i64,
+    pub online: bool,
+    /// Unix-Sekunden, 0 = nie.
+    pub last_seen: i64,
 }
 
 /// Ein mit dem Konto verknüpftes Gerät.
@@ -180,6 +203,7 @@ fn state_dto(s: Snapshot) -> StateDto {
                 room: u.room,
                 muted: u.muted,
                 deaf: u.deaf,
+                avatar: u.avatar,
                 talking: u.talking,
                 local_muted: u.local_muted,
                 volume: u.volume,
@@ -209,6 +233,10 @@ fn ui_event(e: CoreEvent) -> UiEvent {
         device_code: String::new(),
         device_code_name: String::new(),
         device_code_expires: 0,
+        avatar_id: 0,
+        avatar_version: 0,
+        avatar_bytes: Vec::new(),
+        members: Vec::new(),
     };
     match e {
         CoreEvent::State(s) => {
@@ -243,6 +271,23 @@ fn ui_event(e: CoreEvent) -> UiEvent {
             ev.device_code = d.code;
             ev.device_code_name = d.code_name;
             ev.device_code_expires = d.expires;
+        }
+        CoreEvent::Avatar(a) => {
+            ev.kind = EventKind::Avatar;
+            ev.avatar_id = a.id;
+            ev.avatar_version = a.version;
+            ev.avatar_bytes = a.bytes;
+        }
+        CoreEvent::Members(m) => {
+            ev.kind = EventKind::Members;
+            ev.members = m
+                .into_iter()
+                .map(|x| MemberDto { id: x.id, name: x.name, avatar: x.avatar, online: x.online, last_seen: x.last_seen })
+                .collect();
+        }
+        CoreEvent::AvatarRejected(r) => {
+            ev.kind = EventKind::AvatarRejected;
+            ev.notice = r;
         }
         CoreEvent::IdleWarning(secs) => {
             ev.kind = EventKind::IdleWarning;
@@ -372,6 +417,27 @@ pub fn talkie_request_device_code(name: String) -> Result<()> {
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_request_devices() -> Result<()> {
     engine()?.request_devices();
+    Ok(())
+}
+
+/// Eigenes Profilbild setzen (JPEG, 128×128, höchstens 24 KiB); leer = Bild entfernen.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_set_avatar(jpeg: Vec<u8>) -> Result<()> {
+    engine()?.set_avatar(&jpeg);
+    Ok(())
+}
+
+/// Profilbild eines Nutzers anfordern; kommt als Ereignis Avatar zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_get_avatar(id: i64) -> Result<()> {
+    engine()?.request_avatar(id);
+    Ok(())
+}
+
+/// Mitgliederliste anfordern; kommt als Ereignis Members zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_request_members() -> Result<()> {
+    engine()?.request_members();
     Ok(())
 }
 
