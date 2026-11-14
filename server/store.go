@@ -183,6 +183,11 @@ func (s *Store) Register(invite, name string, pk []byte) (*DBUser, error) {
 }
 
 func (s *Store) RegisterDevice(invite, name string, pk []byte, label string) (*DBUser, error) {
+	return s.RegisterDeviceKind(invite, name, pk, label, label)
+}
+
+// RegisterDeviceKind wie RegisterDevice, mit getrenntem Gerätetyp (kind) und Namen (label).
+func (s *Store) RegisterDeviceKind(invite, name string, pk []byte, kind, label string) (*DBUser, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
@@ -207,7 +212,7 @@ func (s *Store) RegisterDevice(invite, name string, pk []byte, label string) (*D
 		if devName != "" { // beim Code vergebener Name statt der automatischen Bezeichnung
 			label = devName
 		}
-		u, err := addDevice(tx, owner.Int64, pk, label)
+		u, err := addDevice(tx, owner.Int64, pk, kind, label)
 		if err != nil {
 			return nil, err
 		}
@@ -232,8 +237,8 @@ func (s *Store) RegisterDevice(invite, name string, pk []byte, label string) (*D
 		return nil, err
 	}
 	uid, _ := r.LastInsertId()
-	if _, err := tx.Exec("INSERT INTO devices(user_id, pubkey, label, created, last_seen) VALUES(?,?,?,?,?)",
-		uid, pk, label, now, now); err != nil {
+	if _, err := tx.Exec("INSERT INTO devices(user_id, pubkey, label, kind, created, last_seen) VALUES(?,?,?,?,?,?)",
+		uid, pk, label, kind, now, now); err != nil {
 		return nil, err
 	}
 	if _, err := tx.Exec("DELETE FROM invites WHERE uses_left <= 0"); err != nil {

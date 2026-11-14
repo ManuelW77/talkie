@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS devices (
 	user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	pubkey    BLOB NOT NULL UNIQUE,
 	label     TEXT NOT NULL DEFAULT '',
+	kind      TEXT NOT NULL DEFAULT '',
 	created   INTEGER NOT NULL,
 	last_seen INTEGER NOT NULL DEFAULT 0
 );
@@ -29,7 +30,8 @@ var ErrTooManyDevices = errors.New("zu viele geräte")
 type DBDevice struct {
 	ID       int64
 	UserID   int64
-	Label    string
+	Label    string // eigener Name (leer = keiner)
+	Kind     string // Gerätetyp (Mac, Windows, …), nur zur Anzeige
 	Created  time.Time
 	LastSeen time.Time
 }
@@ -58,6 +60,19 @@ func (s *Store) initDevices() error {
 			return err
 		}
 	}
+	// Gerätetyp getrennt vom Namen speichern. Bei alten Datenbanken den Typ aus der bisherigen
+	// automatischen Bezeichnung übernehmen (der Name konnte ihn überschreiben).
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('devices') WHERE name = 'kind'").Scan(&has); err != nil {
+		return err
+	}
+	if has == 0 {
+		if _, err := s.db.Exec("ALTER TABLE devices ADD COLUMN kind TEXT NOT NULL DEFAULT ''"); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec("UPDATE devices SET kind = label WHERE label IN ('Mac','Windows','Linux','Android','iPhone/iPad','iOS','Gerät')"); err != nil {
+			return err
+		}
+	}
 	// Nur Nutzer ohne jedes Gerät übernehmen (alte Datenbank). Sonst käme ein entferntes
 	// Erstgerät beim nächsten Start über users.pubkey wieder herein.
 	_, err := s.db.Exec(`INSERT OR IGNORE INTO devices(user_id, pubkey, label, created, last_seen)
@@ -69,7 +84,7 @@ func (s *Store) initDevices() error {
 func scanDevice(row interface{ Scan(...any) error }) (*DBDevice, error) {
 	var d DBDevice
 	var created, seen int64
-	if err := row.Scan(&d.ID, &d.UserID, &d.Label, &created, &seen); err != nil {
+	if err := row.Scan(&d.ID, &d.UserID, &d.Label, &d.Kind, &created, &seen); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -84,7 +99,7 @@ func scanDevice(row interface{ Scan(...any) error }) (*DBDevice, error) {
 
 // Devices liefert die Geräte eines Nutzers, zuletzt benutzte zuerst.
 func (s *Store) Devices(userID int64) ([]DBDevice, error) {
-	rows, err := s.db.Query("SELECT id, user_id, label, created, last_seen FROM devices WHERE user_id = ? ORDER BY last_seen DESC, id", userID)
+	rows, err := s.db.Query("SELECT id, user_id, label, kind, created, last_seen FROM devices WHERE user_id = ? ORDER BY last_seen DESC, id", userID)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +117,7 @@ func (s *Store) Devices(userID int64) ([]DBDevice, error) {
 
 // DeviceByPubKey liefert das Gerät zu einem Schlüssel.
 func (s *Store) DeviceByPubKey(pk []byte) (*DBDevice, error) {
-	return scanDevice(s.db.QueryRow("SELECT id, user_id, label, created, last_seen FROM devices WHERE pubkey = ?", pk))
+	return scanDevice(s.db.QueryRow("SELECT id, user_id, label, kind, created, last_seen FROM devices WHERE pubkey = ?", pk))
 }
 
 // DeleteDevice entfernt ein Gerät des Nutzers. Das letzte Gerät bleibt (dafür den Nutzer löschen).
@@ -192,6 +207,12 @@ func (s *Store) DeleteDeviceCode(userID int64) error {
 	return err
 }
 
+// SetDeviceKind aktualisiert den Gerätetyp (kommt bei der Anmeldung von der App). Der Name bleibt.
+func (s *Store) SetDeviceKind(pk []byte, kind string) error {
+	_, err := s.db.Exec("UPDATE devices SET kind = ? WHERE pubkey = ? AND kind <> ?", kind, pk, kind)
+	return err
+}
+
 // RenameDevice gibt einem Gerät des Nutzers einen eigenen Namen (leer = ohne Namen).
 func (s *Store) RenameDevice(userID, deviceID int64, label string) error {
 	label, ok := cleanInviteNote(label)
@@ -209,7 +230,7 @@ func (s *Store) RenameDevice(userID, deviceID int64, label string) error {
 }
 
 // addDevice: Geräte-Code einlösen (in der Register-Transaktion).
-func addDevice(tx *sql.Tx, userID int64, pk []byte, label string) (*DBUser, error) {
+func addDevice(tx *sql.Tx, userID int64, pk []byte, kind, label string) (*DBUser, error) {
 	var n int
 	if err := tx.QueryRow("SELECT COUNT(*) FROM devices WHERE user_id = ?", userID).Scan(&n); err != nil {
 		return nil, err
@@ -218,8 +239,8 @@ func addDevice(tx *sql.Tx, userID int64, pk []byte, label string) (*DBUser, erro
 		return nil, ErrTooManyDevices
 	}
 	now := time.Now().Unix()
-	if _, err := tx.Exec("INSERT INTO devices(user_id, pubkey, label, created, last_seen) VALUES(?,?,?,?,?)",
-		userID, pk, label, now, now); err != nil {
+	if _, err := tx.Exec("INSERT INTO devices(user_id, pubkey, label, kind, created, last_seen) VALUES(?,?,?,?,?,?)",
+		userID, pk, label, kind, now, now); err != nil {
 		return nil, err
 	}
 	return scanUser(tx.QueryRow("SELECT "+userCols+" FROM users WHERE id = ?", userID))

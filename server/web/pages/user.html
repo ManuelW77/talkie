@@ -25,10 +25,11 @@
   <p class="muted">Mit einem Geräte-Code kann {{$u.Name}} denselben Namen auf einem weiteren Gerät nutzen
     (z. B. Laptop und iPhone). Gleichzeitig verbunden ist immer nur ein Gerät.</p>
   <table>
-    <thead><tr><th>Gerät</th><th>Angemeldet seit</th><th>Zuletzt da</th><th></th></tr></thead>
+    <thead><tr><th>Gerät</th><th>Name</th><th>Angemeldet seit</th><th>Zuletzt da</th><th></th></tr></thead>
     <tbody>
     {{range .D.Devices}}<tr>
-      <td>{{if .Label}}{{.Label}}{{else}}Gerät{{end}}</td><td>{{date .Created}}</td><td>{{dt .LastSeen}}</td>
+      <td>{{if .Kind}}{{.Kind}}{{else if .Label}}{{.Label}}{{else}}Gerät{{end}}</td>
+      <td>{{if and .Label (ne .Label .Kind)}}{{.Label}}{{else}}<span class="muted">–</span>{{end}}</td><td>{{date .Created}}</td><td>{{dt .LastSeen}}</td>
       <td>{{if gt (len $.D.Devices) 1}}<form method="post" action="/users/{{$u.ID}}/device_delete">
         <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="device" value="{{.ID}}">
         <button class="link bad" data-confirm="Dieses Gerät entfernen? Es braucht dann einen neuen Code.">Entfernen</button></form>{{end}}</td>

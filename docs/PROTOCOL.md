@@ -62,7 +62,7 @@ S → C  {"t":"info","reason":"Ben wurde rausgeworfen."}   Erfolgsmeldung
 S → C  {"t":"device_code","code":"ABCD-EFGH"}
 S → C  {"t":"devices","devices":[Device],"code":"ABCD-EFGH","expires":1731000000,"name":"Mein iPhone"}
        code/expires/name fehlen, wenn kein Code offen ist (name auch ohne Namen)
-       Device = {"id":4,"label":"iPhone/iPad","created":1731000000,"last_seen":1731000000,"this":true}
+       Device = {"id":4,"label":"Mein iPhone","kind":"iPhone/iPad","created":1731000000,"last_seen":1731000000,"this":true}
 S → C  {"t":"idle_warning","secs":300}   gleich wegen Inaktivität getrennt, noch so viele Sekunden
 S → C  {"t":"chat_cleared","room":3}   Chat wurde geleert (room fehlt = alle Räume)
 S → C  {"t":"avatar","id":7,"avatar":1731000000000,"data":"<base64 JPEG>"}  Antwort auf get_avatar
@@ -121,7 +121,7 @@ Räume wird nie in der Datenbank gespeichert.
 
 Ein Nutzer kann bis zu 5 Geräte haben, jedes mit eigenem Schlüssel. Ein neues Gerät registriert sich
 mit einem Geräte-Code statt einer Einladung: `register` mit `invite` = Geräte-Code, `name` leer, optional
-`device` (z. B. „iPhone/iPad“, nur zur Anzeige). Der Server antwortet mit dem vorhandenen Nutzer.
+`device` (z. B. „iPhone/iPad“, nur zur Anzeige; die App schickt es auch bei `auth`, der Server speichert es als Gerätetyp, getrennt vom Namen). Der Server antwortet mit dem vorhandenen Nutzer.
 Verbunden ist pro Nutzer immer nur ein Gerät; eine neue Anmeldung trennt die ältere (`kicked`).
 
 Geräte verwalten (eingeloggt): `devices` liefert die Geräte des Nutzers (`this` markiert das gerade

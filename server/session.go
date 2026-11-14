@@ -417,6 +417,9 @@ func (h *Hub) handshake(stream *quic.Stream) (*DBUser, error) {
 		}
 		existing.PubKey = pk // dieses Gerät (ein Nutzer kann mehrere haben)
 		h.store.TouchDevice(pk)
+		if kind := cleanLabel(resp.Device); kind != "" { // alte Apps schicken kein device
+			h.store.SetDeviceKind(pk, kind)
+		}
 		return existing, nil
 	case existing == nil && resp.T == "register":
 		// Leerer Name: Geräte-Code für einen vorhandenen Nutzer (der Server kennt den Namen)
@@ -427,7 +430,7 @@ func (h *Hub) handshake(stream *quic.Stream) (*DBUser, error) {
 				return nil, &hsError{"name_invalid", "Der Name muss 2 bis 20 Zeichen lang sein (Buchstaben, Zahlen, Leerzeichen, - _ .).", false}
 			}
 		}
-		u, err := h.store.RegisterDevice(resp.Invite, name, pk, cleanLabel(resp.Device))
+		u, err := h.store.RegisterDeviceKind(resp.Invite, name, pk, cleanLabel(resp.Device), cleanLabel(resp.Device))
 		switch {
 		case errors.Is(err, ErrNameMissing):
 			return nil, &hsError{"name_invalid", "Bitte gib deinen Namen ein.", false}

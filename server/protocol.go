@@ -31,7 +31,7 @@ type Envelope struct {
 	Sig    string `json:"sig,omitempty"`
 	Name   string `json:"name,omitempty"`
 	Invite string `json:"invite,omitempty"`
-	// register: Art des Geräts (z. B. „iOS“, „Windows“), nur zur Anzeige
+	// register und auth: Art des Geräts (z. B. „iOS“, „Windows“), nur zur Anzeige
 	Device string `json:"device,omitempty"`
 
 	// welcome / updates
@@ -87,6 +87,7 @@ type Envelope struct {
 type WireDevice struct {
 	ID       int64  `json:"id"`
 	Label    string `json:"label"`
+	Kind     string `json:"kind,omitempty"` // Gerätetyp
 	Created  int64  `json:"created"`
 	LastSeen int64  `json:"last_seen"`
 	This     bool   `json:"this"`
