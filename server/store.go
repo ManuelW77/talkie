@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -77,6 +78,10 @@ CREATE TABLE IF NOT EXISTS messages (
 	ts      INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS messages_room ON messages(room_id, id);
+CREATE TABLE IF NOT EXISTS settings (
+	key   TEXT PRIMARY KEY,
+	value TEXT NOT NULL
+);
 `
 
 func OpenStore(path string) (*Store, error) {
@@ -469,4 +474,44 @@ func (s *Store) History(room int64, n int) ([]DBMessage, error) {
 		out = append(out, m)
 	}
 	return out, rows.Err()
+}
+
+// --- Einstellungen (key/value) ---
+
+const (
+	settingIdleMinutes = "idle_minutes"
+	// DefaultIdleMinutes: so lange darf ein Nutzer ohne Aktion online bleiben.
+	DefaultIdleMinutes = 60
+	// MinIdleMinutes/MaxIdleMinutes: erlaubter Bereich (0 = aus).
+	MinIdleMinutes = 10
+	MaxIdleMinutes = 1440
+)
+
+var ErrIdleRange = errors.New("ungültige Inaktivitätszeit")
+
+// IdleMinutes liefert die Zeit bis zur Trennung wegen Inaktivität (0 = aus).
+func (s *Store) IdleMinutes() int {
+	var v string
+	if err := s.db.QueryRow(`SELECT value FROM settings WHERE key = ?`, settingIdleMinutes).Scan(&v); err != nil {
+		return DefaultIdleMinutes
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || !validIdleMinutes(n) {
+		return DefaultIdleMinutes
+	}
+	return n
+}
+
+func validIdleMinutes(n int) bool {
+	return n == 0 || (n >= MinIdleMinutes && n <= MaxIdleMinutes)
+}
+
+// SetIdleMinutes speichert die Zeit (0 oder 10–1440).
+func (s *Store) SetIdleMinutes(n int) error {
+	if !validIdleMinutes(n) {
+		return ErrIdleRange
+	}
+	_, err := s.db.Exec(`INSERT INTO settings(key, value) VALUES(?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, settingIdleMinutes, strconv.Itoa(n))
+	return err
 }

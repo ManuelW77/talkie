@@ -9,6 +9,7 @@ import '../src/rust/api/talkie.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/level_meter.dart';
+import '../widgets/idle_dialog.dart';
 import 'settings_dialog.dart';
 
 /// Unterhalb dieser Breite (Handy hochkant) wird das Layout einspaltig.
@@ -25,10 +26,30 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   StreamSubscription<String>? _notices;
+  BuildContext? _idleDialog;
+
+  /// Zeigt „Bist du noch da?“, solange der Server gewarnt hat, und schließt es danach.
+  void _onIdle() {
+    final secs = widget.controller.idleSecs.value;
+    if (secs != null && _idleDialog == null) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          _idleDialog = ctx;
+          return IdleDialog(secs: secs, onConfirm: widget.controller.stillHere);
+        },
+      ).whenComplete(() => _idleDialog = null);
+    } else if (secs == null && _idleDialog != null && _idleDialog!.mounted &&
+        ModalRoute.of(_idleDialog!)?.isCurrent == true) {
+      Navigator.of(_idleDialog!).pop();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    widget.controller.idleSecs.addListener(_onIdle);
     _notices = widget.controller.notices.listen((n) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -39,6 +60,7 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    widget.controller.idleSecs.removeListener(_onIdle);
     _notices?.cancel();
     super.dispose();
   }
