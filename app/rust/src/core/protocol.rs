@@ -21,6 +21,24 @@ pub struct WireUser {
     pub muted: bool,
     #[serde(default)]
     pub deaf: bool,
+    /// Version des Profilbilds (0 = kein Bild).
+    #[serde(default)]
+    pub avatar: i64,
+}
+
+/// Ein registrierter Nutzer in der Mitgliederliste (Antwort `members`).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct WireMember {
+    pub id: i64,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub avatar: i64,
+    #[serde(default)]
+    pub online: bool,
+    /// Unix-Sekunden, 0 = nie.
+    #[serde(default)]
+    pub last_seen: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -135,6 +153,16 @@ pub struct Envelope {
     #[serde(default, skip_serializing_if = "is_zero_i64")]
     pub expires: i64,
 
+    /// set_avatar / avatar: Bild als base64 (JPEG), leer = keins
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub data: String,
+    /// avatar: Version des Bilds
+    #[serde(default, skip_serializing_if = "is_zero_i64")]
+    pub avatar: i64,
+    /// members: alle registrierten Nutzer
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<WireMember>,
+
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub code: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -239,6 +267,30 @@ mod tests {
         r.name = "Mein Mac".into();
         assert_eq!(serde_json::to_string(&r).unwrap(), r#"{"t":"device_rename","name":"Mein Mac","id":4}"#);
         assert_eq!(serde_json::to_string(&Envelope::new("device_code_del")).unwrap(), r#"{"t":"device_code_del"}"#);
+    }
+
+    #[test]
+    fn avatar_and_members_messages() {
+        let mut e = Envelope::new("set_avatar");
+        e.data = "QUJD".into();
+        assert_eq!(serde_json::to_string(&e).unwrap(), r#"{"t":"set_avatar","data":"QUJD"}"#);
+        let mut g = Envelope::new("get_avatar");
+        g.id = 7;
+        assert_eq!(serde_json::to_string(&g).unwrap(), r#"{"t":"get_avatar","id":7}"#);
+        assert_eq!(serde_json::to_string(&Envelope::new("members")).unwrap(), r#"{"t":"members"}"#);
+        let a: Envelope = serde_json::from_str(r#"{"t":"avatar","id":7,"avatar":1731000000,"data":"QUJD"}"#).unwrap();
+        assert_eq!((a.id, a.avatar, a.data.as_str()), (7, 1731000000, "QUJD"));
+        let m: Envelope = serde_json::from_str(
+            r#"{"t":"members","members":[{"id":7,"name":"Ben","avatar":5,"online":true,"last_seen":0},{"id":8,"name":"Anna"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(m.members.len(), 2);
+        assert!(m.members[0].online && m.members[0].avatar == 5);
+        assert!(!m.members[1].online && m.members[1].last_seen == 0);
+        let w: Envelope = serde_json::from_str(r#"{"t":"user_update","user":{"id":1,"name":"A","avatar":9}}"#).unwrap();
+        assert_eq!(w.user.unwrap().avatar, 9);
+        let err: Envelope = serde_json::from_str(r#"{"t":"error","code":"bad_avatar","reason":"x"}"#).unwrap();
+        assert_eq!(err.code, "bad_avatar");
     }
 
     #[test]

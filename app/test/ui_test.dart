@@ -3,11 +3,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:talkie/avatar_image.dart';
 import 'package:talkie/controller.dart';
 import 'package:talkie/screens/main_screen.dart';
+import 'package:talkie/screens/members_dialog.dart';
 import 'package:talkie/screens/setup_screen.dart';
 import 'package:talkie/src/rust/api/talkie.dart';
 import 'package:talkie/theme.dart';
+import 'package:talkie/widgets/avatar.dart';
+import 'package:image/image.dart' as img;
 
 // UI-Tests ohne Rust: der Controller wird direkt mit einem Zustand befüllt.
 // Mit `flutter test --update-goldens` entstehen Bilder in test/goldens/ zum Anschauen.
@@ -64,10 +68,10 @@ TalkieController _mainController() {
         RoomDto(id: 12, name: 'Zocken 2', temp: false, locked: false),
       ],
       users: [
-        UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, talking: true, localMuted: false, volume: 1),
-        UserDto(id: 2, name: 'Lena', room: 10, muted: true, deaf: false, talking: false, localMuted: false, volume: 1),
-        UserDto(id: 3, name: 'Jonas', room: 11, muted: false, deaf: false, talking: true, localMuted: true, volume: 1),
-        UserDto(id: 4, name: 'Emil', room: 11, muted: false, deaf: true, talking: false, localMuted: false, volume: 1),
+        UserDto(id: 1, name: 'Max', room: 10, muted: false, deaf: false, avatar: 0, talking: true, localMuted: false, volume: 1),
+        UserDto(id: 2, name: 'Lena', room: 10, muted: true, deaf: false, avatar: 0, talking: false, localMuted: false, volume: 1),
+        UserDto(id: 3, name: 'Jonas', room: 11, muted: false, deaf: false, avatar: 0, talking: true, localMuted: true, volume: 1),
+        UserDto(id: 4, name: 'Emil', room: 11, muted: false, deaf: true, avatar: 0, talking: false, localMuted: false, volume: 1),
       ],
       muted: false,
       deaf: false,
@@ -85,6 +89,18 @@ TalkieController _mainController() {
   c.unread[11] = 2;
   c.levelNotifier.value = 0.62;
   return c;
+}
+
+/// Kleines Testbild (Farbverlauf), schon als 128×128-JPEG.
+Uint8List _testJpeg() {
+  final im = img.Image(width: 300, height: 200);
+  for (final p in im) {
+    p
+      ..r = p.x * 255 ~/ 300
+      ..g = p.y * 255 ~/ 200
+      ..b = 160;
+  }
+  return prepareAvatarSync(Uint8List.fromList(img.encodePng(im)))!;
 }
 
 void main() {
@@ -441,5 +457,90 @@ void main() {
     await tester.tap(find.text('Ich bin neu bei Talkie'));
     await tester.pump();
     expect(find.text('Dein Name'), findsOneWidget);
+  });
+
+  testWidgets('Avatar mit Bild: rundes Foto statt Buchstabe, grüner Rand bleibt', (tester) async {
+    tester.view.physicalSize = const Size(360, 160);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final jpg = _testJpeg();
+    await tester.pumpWidget(_wrap(Scaffold(
+      body: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Avatar(name: 'Lena', size: 96, image: jpg),
+            const SizedBox(width: 16),
+            Avatar(name: 'Lena', size: 48, image: jpg, talking: true),
+            const SizedBox(width: 16),
+            const Avatar(name: 'Max', size: 48),
+          ],
+        ),
+      ),
+    )));
+    await tester.runAsync(() async {
+      await precacheImage(MemoryImage(jpg), tester.element(find.byType(Row).first));
+    });
+    await tester.pump();
+    expect(find.byType(Image), findsNWidgets(2));
+    expect(find.text('M'), findsOneWidget);
+    await expectLater(find.byType(Scaffold), matchesGoldenFile('goldens/avatar_image.png'));
+  });
+
+  testWidgets('Mitgliederliste: online zuerst, dann zuletzt da, mit Bild', (tester) async {
+    tester.view.physicalSize = const Size(480, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    final jpg = _testJpeg();
+    c.debugSetAvatar(2, 5, jpg);
+    final now = DateTime(2026, 11, 14, 20, 0);
+    int ts(Duration ago) => now.subtract(ago).millisecondsSinceEpoch ~/ 1000;
+    c.members.value = [
+      MemberDto(id: 6, name: 'Mia', avatar: 0, online: false, lastSeen: 0),
+      MemberDto(id: 4, name: 'Emil', avatar: 0, online: false, lastSeen: ts(const Duration(days: 4))),
+      MemberDto(id: 2, name: 'Lena', avatar: 5, online: true, lastSeen: ts(const Duration(seconds: 3))),
+      MemberDto(id: 3, name: 'Jonas', avatar: 0, online: false, lastSeen: ts(const Duration(minutes: 5))),
+      MemberDto(id: 1, name: 'Max', avatar: 0, online: true, lastSeen: ts(const Duration(seconds: 1))),
+      MemberDto(id: 7, name: 'Ben', avatar: 0, online: false, lastSeen: ts(const Duration(hours: 3))),
+    ];
+    await tester.pumpWidget(_wrap(Builder(
+      builder: (ctx) => Scaffold(
+        body: Center(
+          child: FilledButton(
+            onPressed: () => showDialog<void>(context: ctx, builder: (_) => MembersDialog(controller: c, now: now)),
+            child: const Text('auf'),
+          ),
+        ),
+      ),
+    )));
+    await tester.tap(find.text('auf'));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await precacheImage(MemoryImage(jpg), tester.element(find.byType(AlertDialog)));
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Alle Mitglieder'), findsOneWidget);
+    expect(find.text('Online'), findsNWidgets(2));
+    expect(find.text('zuletzt da: vor 5 Minuten'), findsOneWidget);
+    expect(find.text('zuletzt da: vor 3 Stunden'), findsOneWidget);
+    expect(find.text('zuletzt da: vor 4 Tagen'), findsOneWidget);
+    expect(find.text('zuletzt da: noch nie'), findsOneWidget);
+    // Reihenfolge: Online (Lena, Max), danach Jonas (5 min), Ben (3 h), Emil (4 Tage), Mia (nie)
+    final order = ['Lena', 'Max (du)', 'Jonas', 'Ben', 'Emil', 'Mia'];
+    final ys = [for (final n in order) tester.getTopLeft(find.text(n)).dy];
+    expect(ys, [...ys]..sort());
+    await expectLater(find.byType(AlertDialog), matchesGoldenFile('goldens/members.png'));
+  });
+
+  testWidgets('Räume-Leiste hat den Knopf „Alle Mitglieder“', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _mainController();
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byTooltip('Alle Mitglieder'), findsOneWidget);
+    expect(find.byIcon(Icons.people_alt_rounded), findsOneWidget);
   });
 }
