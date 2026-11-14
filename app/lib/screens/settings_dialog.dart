@@ -423,7 +423,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: kDanger,
+              backgroundColor: kDangerFill,
               minimumSize: const Size(0, 40),
             ),
             onPressed: () => Navigator.pop(ctx, true),
@@ -521,7 +521,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: kDanger,
+              backgroundColor: kDangerFill,
               minimumSize: const Size(0, 40),
             ),
             onPressed: () => Navigator.pop(ctx, true),
@@ -761,13 +761,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
             FilledButton.icon(
               onPressed: _confirmLogout,
               style: FilledButton.styleFrom(
-                backgroundColor: kDanger,
+                backgroundColor: kDangerFill,
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(48),
               ),
               icon: const Icon(Icons.logout_rounded),
               label: const Text('Vom Server abmelden'),
             ),
+            // Luft nach unten, damit der Knopf nicht am Rand klebt
+            const SizedBox(height: 24),
           ],
         ),
       ),
