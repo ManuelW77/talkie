@@ -407,6 +407,7 @@ void main() {
     await tester.pumpWidget(_wrap(MainScreen(controller: c)));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Halten'), findsOneWidget);
+    expect(find.bySemanticsLabel('Sprechen'), findsOneWidget); // Screenreader
     expect(tester.takeException(), isNull); // passt ohne Überlauf aufs Handy
     await expectLater(find.byType(MainScreen), matchesGoldenFile('goldens/phone_ptt.png'));
   });
