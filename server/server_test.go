@@ -160,7 +160,7 @@ func newKey(t *testing.T) ed25519.PrivateKey {
 
 func TestRegisterChatVoice(t *testing.T) {
 	srv := startTestServer(t)
-	inv, err := srv.store.CreateInvite(2, time.Hour)
+	inv, err := srv.store.CreateInvite(2, time.Hour, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestRegisterChatVoice(t *testing.T) {
 
 func TestInviteRules(t *testing.T) {
 	srv := startTestServer(t)
-	inv, _ := srv.store.CreateInvite(1, time.Hour)
+	inv, _ := srv.store.CreateInvite(1, time.Hour, "")
 
 	_, e := login(t, srv.addr, newKey(t), "Max", "ZZZZ-ZZZZ")
 	if e.T != "error" || e.Code != "invite_invalid" {
@@ -260,7 +260,7 @@ func TestInviteRules(t *testing.T) {
 
 func TestBan(t *testing.T) {
 	srv := startTestServer(t)
-	inv, _ := srv.store.CreateInvite(1, time.Hour)
+	inv, _ := srv.store.CreateInvite(1, time.Hour, "")
 	k := newKey(t)
 	c, _ := login(t, srv.addr, k, "Lars", inv.Code)
 	u, err := srv.store.SetBanned("lars", true) // Groß/klein egal
@@ -321,7 +321,7 @@ func TestLimiterReserve(t *testing.T) {
 
 func TestHistoryFitsFrame(t *testing.T) {
 	srv := startTestServer(t)
-	inv, _ := srv.store.CreateInvite(1, time.Hour)
+	inv, _ := srv.store.CreateInvite(1, time.Hour, "")
 	rooms, _ := srv.store.Rooms()
 	big := strings.Repeat("😀", 500) // 500 Zeichen à 4 Byte
 	for i := 0; i < 60; i++ {
@@ -353,7 +353,7 @@ func recvVoice(t *testing.T, c *testClient, wait time.Duration) int64 {
 
 func TestIgnoreOnlyForSelf(t *testing.T) {
 	srv := startTestServer(t)
-	inv, err := srv.store.CreateInvite(3, time.Hour)
+	inv, err := srv.store.CreateInvite(3, time.Hour, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +390,7 @@ func TestIgnoreOnlyForSelf(t *testing.T) {
 
 func TestModerationFromApp(t *testing.T) {
 	srv := startTestServer(t)
-	inv, err := srv.store.CreateInvite(4, time.Hour)
+	inv, err := srv.store.CreateInvite(4, time.Hour, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +454,7 @@ func TestModerationFromApp(t *testing.T) {
 func TestClearChatFromApp(t *testing.T) {
 	srv := startTestServer(t)
 	srv.store.ChatKeep = 24 * time.Hour
-	inv, _ := srv.store.CreateInvite(2, time.Hour)
+	inv, _ := srv.store.CreateInvite(2, time.Hour, "")
 	kChef := newKey(t)
 	c0, wc := login(t, srv.addr, kChef, "Chef", inv.Code)
 	k, wk := login(t, srv.addr, newKey(t), "Kid", inv.Code)
@@ -491,7 +491,7 @@ func TestClearChatFromApp(t *testing.T) {
 
 func TestMultipleDevices(t *testing.T) {
 	srv := startTestServer(t)
-	inv, _ := srv.store.CreateInvite(1, time.Hour)
+	inv, _ := srv.store.CreateInvite(1, time.Hour, "")
 	kLaptop, kPhone := newKey(t), newKey(t)
 
 	laptop, w := login(t, srv.addr, kLaptop, "Anna", inv.Code)
@@ -499,7 +499,7 @@ func TestMultipleDevices(t *testing.T) {
 		t.Fatalf("%+v", w)
 	}
 	// Normale Einladung ohne Namen geht nicht
-	inv2, _ := srv.store.CreateInvite(1, time.Hour)
+	inv2, _ := srv.store.CreateInvite(1, time.Hour, "")
 	if _, e := login(t, srv.addr, newKey(t), "", inv2.Code); e.T != "error" || e.Code != "name_invalid" {
 		t.Fatalf("ohne Namen: %+v", e)
 	}
@@ -631,7 +631,7 @@ func TestDevicesMigration(t *testing.T) {
 
 func TestOnlineDetails(t *testing.T) {
 	srv := startTestServer(t)
-	inv, _ := srv.store.CreateInvite(1, time.Hour)
+	inv, _ := srv.store.CreateInvite(1, time.Hour, "")
 	conn, st, certHash := dial(t, srv.addr)
 	key := newKey(t)
 	pub := key.Public().(ed25519.PublicKey)

@@ -271,6 +271,11 @@ class TalkieController extends ChangeNotifier {
     }
   }
 
+  /// Fragt den zur Einladung hinterlegten Namen ab (leer = keiner). Wirft bei Fehlern.
+  /// Als Feld, damit Tests es ersetzen können.
+  Future<String> Function(String server, String invite) inviteNameLookup = (server, invite) =>
+      talkieInviteName(server: server, invite: invite, fingerprint: kServerFingerprint);
+
   void reconnect() {
     talkieConnect(server: config.server, name: config.name, invite: '', fingerprint: kServerFingerprint);
   }

@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 2041550588;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 743039969;
 
 // Section: executor
 
@@ -381,6 +381,49 @@ fn wire__crate__api__talkie__talkie_input_devices_impl(
                     let output_ok = Ok::<_, ()>(crate::api::talkie::talkie_input_devices())?;
                     std::result::Result::Ok(output_ok)
                 })())
+            }
+        },
+    )
+}
+fn wire__crate__api__talkie__talkie_invite_name_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "talkie_invite_name",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_server = <String>::sse_decode(&mut deserializer);
+            let api_invite = <String>::sse_decode(&mut deserializer);
+            let api_fingerprint = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let output_ok = crate::api::talkie::talkie_invite_name(
+                            api_server,
+                            api_invite,
+                            api_fingerprint,
+                        )
+                        .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
             }
         },
     )
@@ -1300,20 +1343,21 @@ fn pde_ffi_dispatcher_primary_impl(
         10 => {
             wire__crate__api__talkie__talkie_input_devices_impl(port, ptr, rust_vec_len, data_len)
         }
-        12 => wire__crate__api__talkie__talkie_logout_impl(port, ptr, rust_vec_len, data_len),
-        14 => {
+        11 => wire__crate__api__talkie__talkie_invite_name_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__talkie__talkie_logout_impl(port, ptr, rust_vec_len, data_len),
+        15 => {
             wire__crate__api__talkie__talkie_output_devices_impl(port, ptr, rust_vec_len, data_len)
         }
-        17 => wire__crate__api__talkie__talkie_ptt_request_access_impl(
+        18 => wire__crate__api__talkie__talkie_ptt_request_access_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        19 => {
+        20 => {
             wire__crate__api__talkie__talkie_restart_audio_impl(port, ptr, rust_vec_len, data_len)
         }
-        23 => wire__crate__api__talkie__talkie_set_settings_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__talkie__talkie_set_settings_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1332,19 +1376,19 @@ fn pde_ffi_dispatcher_sync_impl(
         5 => wire__crate__api__talkie__talkie_connect_impl(ptr, rust_vec_len, data_len),
         6 => wire__crate__api__talkie__talkie_create_room_impl(ptr, rust_vec_len, data_len),
         7 => wire__crate__api__talkie__talkie_disconnect_impl(ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__talkie__talkie_join_impl(ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__talkie__talkie_moderate_impl(ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__talkie__talkie_ptt_access_impl(ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__talkie__talkie_ptt_keys_impl(ptr, rust_vec_len, data_len),
-        18 => {
+        12 => wire__crate__api__talkie__talkie_join_impl(ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__talkie__talkie_moderate_impl(ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__talkie__talkie_ptt_access_impl(ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__talkie__talkie_ptt_keys_impl(ptr, rust_vec_len, data_len),
+        19 => {
             wire__crate__api__talkie__talkie_request_device_code_impl(ptr, rust_vec_len, data_len)
         }
-        20 => wire__crate__api__talkie__talkie_set_deaf_impl(ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__talkie__talkie_set_muted_impl(ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__talkie__talkie_set_ptt_pressed_impl(ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__talkie__talkie_set_user_muted_impl(ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__talkie__talkie_set_user_volume_impl(ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__talkie__talkie_still_here_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__talkie__talkie_set_deaf_impl(ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__talkie__talkie_set_muted_impl(ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__talkie__talkie_set_ptt_pressed_impl(ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__talkie__talkie_set_user_muted_impl(ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__talkie__talkie_set_user_volume_impl(ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__talkie__talkie_still_here_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

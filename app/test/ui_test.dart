@@ -411,4 +411,42 @@ void main() {
     await tester.pump();
     expect(find.text('Dein Name'), findsOneWidget);
   });
+
+  testWidgets('Einrichtung: Name aus der Einladung wird eingetragen', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _controller(registered: false);
+    final asked = <String>[];
+    c.inviteNameLookup = (server, invite) async {
+      asked.add('$server|$invite');
+      return 'Anna';
+    };
+    await tester.pumpWidget(_wrap(SetupScreen(controller: c)));
+    final nameField = find.byType(TextFormField).at(0);
+    await tester.enterText(nameField, '');
+    await tester.enterText(find.byType(TextFormField).at(1), 'abcd-efgh');
+    await tester.pump(const Duration(seconds: 1));
+    expect(asked, ['talkie.example.org|ABCDEFGH']);
+    expect(find.text('Anna'), findsOneWidget);
+    expect(find.text('Dein Name ist schon eingetragen. Du kannst ihn ändern.'), findsOneWidget);
+
+    // Ändern blendet den Hinweis aus
+    await tester.enterText(nameField, 'Anni');
+    await tester.pump();
+    expect(find.textContaining('schon eingetragen'), findsNothing);
+  });
+
+  testWidgets('Einrichtung: Fehler bei der Namensabfrage wird ignoriert', (tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final c = _controller(registered: false);
+    c.inviteNameLookup = (server, invite) async => throw Exception('offline');
+    await tester.pumpWidget(_wrap(SetupScreen(controller: c)));
+    await tester.enterText(find.byType(TextFormField).at(1), 'ABCD-EFGH');
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.textContaining('schon eingetragen'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -27,6 +27,19 @@ S → C  {"t":"error","code":"...","reason":"..."}  // danach wird die Verbindun
 Signiert wird `"talkie-auth-v1" || nonce || sha256(server-zertifikat)`.
 Damit ist die Anmeldung an genau diese Verbindung und diesen Server gebunden.
 
+Einladungen können einen vorgegebenen Namen haben (Verwaltungsseite/CLI, nur bei Einladung für
+1 Person). Die App fragt ihn vor dem Registrieren über eine eigene, kurze Verbindung ab:
+
+```
+C → S  {"t":"hello",…}   S → C  {"t":"challenge",…,"known":false}
+C → S  {"t":"invite_info","sig":"<base64>","invite":"ABCD-EFGH"}
+S → C  {"t":"invite_info","name":"Max"}   name fehlt = kein Name hinterlegt; danach schließt der Server
+```
+
+Ungültiger Code → `error` mit `invite_invalid` (zählt als Fehlversuch fürs Rate-Limit). Der Name ist nur
+ein Vorschlag: `register` schickt den (evtl. geänderten) Namen. Schickt ein Client bei `register`
+einen leeren Namen und hat die Einladung einen, übernimmt der Server den Einladungsnamen.
+
 Fehlercodes: `bad_request`, `version`, `invite_invalid`, `name_invalid`,
 `name_taken`, `banned`, `auth_failed`, `rate_limited`, `server_full`.
 

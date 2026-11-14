@@ -49,6 +49,15 @@ func (s *Store) initDevices() error {
 			return err
 		}
 	}
+	// Optionaler Name, der dem Eingeladenen vorgeschlagen wird
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('invites') WHERE name = 'name'").Scan(&has); err != nil {
+		return err
+	}
+	if has == 0 {
+		if _, err := s.db.Exec("ALTER TABLE invites ADD COLUMN name TEXT NOT NULL DEFAULT ''"); err != nil {
+			return err
+		}
+	}
 	// Nur Nutzer ohne jedes Gerät übernehmen (alte Datenbank). Sonst käme ein entferntes
 	// Erstgerät beim nächsten Start über users.pubkey wieder herein.
 	_, err := s.db.Exec(`INSERT OR IGNORE INTO devices(user_id, pubkey, label, created, last_seen)

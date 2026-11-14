@@ -33,6 +33,17 @@ void talkieConnect({
   fingerprint: fingerprint,
 );
 
+/// Namen abfragen, der zur Einladung hinterlegt ist (leer = keiner). Fehler bei ungültigem Code.
+Future<String> talkieInviteName({
+  required String server,
+  required String invite,
+  required String fingerprint,
+}) => RustLib.instance.api.crateApiTalkieTalkieInviteName(
+  server: server,
+  invite: invite,
+  fingerprint: fingerprint,
+);
+
 void talkieDisconnect() =>
     RustLib.instance.api.crateApiTalkieTalkieDisconnect();
 

@@ -223,7 +223,15 @@ func (w *webApp) invitesPage(rw http.ResponseWriter, r *http.Request) {
 		w.fail(rw, r, "/", err)
 		return
 	}
-	w.render(rw, r, "invites", "Einladungen", map[string]any{"Invites": invs, "New": r.URL.Query().Get("new")})
+	w.render(rw, r, "invites", "Einladungen", map[string]any{"Invites": invs, "New": r.URL.Query().Get("new"), "NewName": r.URL.Query().Get("name")})
+}
+
+// nameq hängt den Einladungsnamen als Query-Parameter an (für den Hinweiskasten).
+func nameq(name string) string {
+	if name == "" {
+		return ""
+	}
+	return "&name=" + urlq(name)
 }
 
 func formInt(r *http.Request, key string, def, min, max int) int {
@@ -248,7 +256,15 @@ func (w *webApp) createInvite(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	inv, err := w.store.CreateInvite(uses, time.Duration(days)*24*time.Hour)
+	inv, err := w.store.CreateInvite(uses, time.Duration(days)*24*time.Hour, r.PostFormValue("name"))
+	if errors.Is(err, ErrInviteName) {
+		w.done(rw, r, "/invites", "Der Name muss 2 bis 20 Zeichen lang sein (Buchstaben, Zahlen, Leerzeichen, - _ .).", true)
+		return
+	}
+	if errors.Is(err, ErrInviteNameUses) {
+		w.done(rw, r, "/invites", "Ein Name geht nur bei einer Einladung für 1 Person.", true)
+		return
+	}
 	if err != nil {
 		w.fail(rw, r, "/invites", err)
 		return
@@ -257,13 +273,13 @@ func (w *webApp) createInvite(rw http.ResponseWriter, r *http.Request) {
 	msg := "Einladung erstellt: " + inv.Code
 	if email != "" {
 		if err := w.cfg.Mailer.Send(email, "Einladung zu Talkie", w.inviteMail(inv, me(r).Name), w.inviteMailHTML(inv, me(r).Name)); err != nil {
-			w.done(rw, r, "/invites?new="+urlq(inv.Code), msg+" – die Mail konnte aber nicht verschickt werden.", true)
+			w.done(rw, r, "/invites?new="+urlq(inv.Code)+nameq(inv.Name), msg+" – die Mail konnte aber nicht verschickt werden.", true)
 			return
 		}
 		w.audit(r, "Einladung "+inv.Code+" per Mail an "+email+" geschickt")
 		msg += " und an " + email + " geschickt."
 	}
-	w.done(rw, r, "/invites?new="+urlq(inv.Code), msg, false)
+	w.done(rw, r, "/invites?new="+urlq(inv.Code)+nameq(inv.Name), msg, false)
 }
 
 //go:embed web/mail/invite.html web/mail/login.html
@@ -287,7 +303,7 @@ func (w *webApp) inviteMailHTML(inv *DBInvite, from string) string {
 	d := map[string]any{
 		"From": from, "Code": inv.Code, "Expires": inv.Expires.Local().Format("02.01.2006"),
 		"AppStoreURL": appStoreURL, "DownloadURL": w.cfg.DownloadURL, "ServerAddr": w.cfg.ServerAddr,
-		"StepStart": step,
+		"StepStart": step, "Name": inv.Name,
 	}
 	step++
 	if w.cfg.ServerAddr != "" {
@@ -304,6 +320,9 @@ const appStoreURL = "https://apps.apple.com/de/app/talkie/id6832222100"
 func (w *webApp) inviteMail(inv *DBInvite, from string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Hallo!\n\n%s lädt dich zu Talkie ein, unserem Sprach-Chat zum Zocken.\n\n", from)
+	if inv.Name != "" {
+		fmt.Fprintf(&b, "Dein Name ist schon eingetragen: %s (du kannst ihn ändern).\n\n", inv.Name)
+	}
 	step := 1
 	fmt.Fprintf(&b, "%d. App installieren:\n\n", step)
 	fmt.Fprintf(&b, "   iPhone und iPad: Talkie im App Store laden\n   %s\n\n", appStoreURL)

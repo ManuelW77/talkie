@@ -34,7 +34,7 @@ func idleServer(t *testing.T, minutes int) (*testServer, *fakeClock) {
 
 func idleLogin(t *testing.T, srv *testServer, name string) *testClient {
 	t.Helper()
-	inv, err := srv.store.CreateInvite(1, time.Hour)
+	inv, err := srv.store.CreateInvite(1, time.Hour, "")
 	if err != nil {
 		t.Fatal(err)
 	}

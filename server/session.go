@@ -288,6 +288,16 @@ func (h *Hub) HandleConn(conn *quic.Conn) {
 	if !(errors.As(err, &he) && he.countFail) {
 		h.limiter.Refund(ip) // nur echte Fehlversuche bleiben gezählt
 	}
+	var info *hsInviteInfo
+	if errors.As(err, &info) {
+		// nur Namensabfrage: antworten und sauber beenden, kein Nutzer-Login
+		if f, err := EncodeFrame(&Envelope{T: "invite_info", Name: info.name}); err == nil {
+			_ = stream.SetWriteDeadline(time.Now().Add(2 * time.Second))
+			_, _ = stream.Write(f)
+		}
+		closeLater()
+		return
+	}
 	if err != nil {
 		if he != nil {
 			log.Printf("anmeldung von %s abgelehnt: %s", ip, he.code)
@@ -338,6 +348,12 @@ type hsError struct {
 }
 
 func (e *hsError) Error() string { return e.code }
+
+// hsInviteInfo ist kein Fehler: Das Gerät hat nur den Namen zu einer Einladung erfragt.
+// HandleConn antwortet mit invite_info und beendet die Verbindung, ohne einen Nutzer anzumelden.
+type hsInviteInfo struct{ name string }
+
+func (e *hsInviteInfo) Error() string { return "invite_info" }
 
 func (h *Hub) handshake(stream *quic.Stream) (*DBUser, error) {
 	_ = stream.SetDeadline(time.Now().Add(handshakeTimeout))
@@ -417,6 +433,15 @@ func (h *Hub) handshake(stream *quic.Stream) (*DBUser, error) {
 		log.Printf("gerät registriert für %s (%d)", u.Name, u.ID)
 		u.PubKey = pk
 		return u, nil
+	case existing == nil && resp.T == "invite_info":
+		name, err := h.store.InviteName(resp.Invite)
+		if errors.Is(err, ErrInviteInvalid) {
+			return nil, &hsError{"invite_invalid", "Der Einladungscode stimmt nicht oder ist abgelaufen.", true}
+		}
+		if err != nil {
+			return nil, err
+		}
+		return nil, &hsInviteInfo{name}
 	case existing == nil && resp.T == "auth":
 		return nil, &hsError{"auth_failed", "Dieses Gerät ist nicht mehr registriert. Bitte melde dich neu mit einem Einladungscode an.", false}
 	default:

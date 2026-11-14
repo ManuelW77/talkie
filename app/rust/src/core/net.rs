@@ -159,6 +159,54 @@ async fn resolve(server: &str) -> Result<SocketAddr, ConnectError> {
         .ok_or_else(|| ConnectError::Temporary(anyhow!("Server „{host}“ nicht gefunden")))
 }
 
+/// Fragt den bei der Einladung hinterlegten Namen ab (eigene kurze Verbindung).
+/// Leerer Name = keiner hinterlegt oder Gerät schon bekannt.
+pub async fn invite_name(
+    server: &str,
+    key: &SigningKey,
+    pinned: Option<Vec<u8>>,
+    invite: &str,
+) -> Result<String, ConnectError> {
+    let (endpoint, conn, cert_hash) = dial(server, pinned).await?;
+    let q = async {
+        let (mut send, mut recv) = conn.open_bi().await.map_err(|e| anyhow!("{e}"))?;
+        let mut hello = Envelope::new("hello");
+        hello.v = PROTOCOL_VERSION;
+        hello.pubkey = B64.encode(key.verifying_key().as_bytes());
+        write_frame(&mut send, &hello).await?;
+        let ch = read_frame(&mut recv).await?;
+        if ch.t == "error" {
+            return Ok::<_, anyhow::Error>(Err(ConnectError::Fatal { code: ch.code, message: ch.reason }));
+        }
+        if ch.t != "challenge" {
+            return Err(anyhow!("unerwartete antwort {}", ch.t));
+        }
+        if ch.known.unwrap_or(false) {
+            return Ok(Ok(String::new()));
+        }
+        let nonce = B64.decode(&ch.nonce)?;
+        let sig = key.sign(&auth_message(&nonce, &cert_hash));
+        let mut req = Envelope::new("invite_info");
+        req.invite = invite.to_string();
+        req.sig = B64.encode(sig.to_bytes());
+        write_frame(&mut send, &req).await?;
+        let r = read_frame(&mut recv).await?;
+        match r.t.as_str() {
+            "invite_info" => Ok(Ok(r.name)),
+            "error" => Ok(Err(ConnectError::Fatal { code: r.code, message: r.reason })),
+            other => Err(anyhow!("unerwartete antwort {other}")),
+        }
+    };
+    let res = tokio::time::timeout(Duration::from_secs(5), q).await;
+    conn.close(0u32.into(), b"bye");
+    endpoint.wait_idle().await;
+    match res {
+        Err(_) => Err(ConnectError::Temporary(anyhow!("Server antwortet nicht"))),
+        Ok(Err(e)) => Err(ConnectError::Temporary(e)),
+        Ok(Ok(r)) => r,
+    }
+}
+
 #[cfg(test)]
 mod route_tests {
     use super::*;
@@ -187,14 +235,12 @@ pub fn parse_fingerprint(s: &str) -> Option<Vec<u8>> {
     (b.len() == 32).then_some(b)
 }
 
-/// Verbindet, prüft das Zertifikat und meldet an.
-/// `register = Some((name, invite))` registriert ein neues Gerät.
-pub async fn connect(
+/// Baut die QUIC-Verbindung auf und prüft das Zertifikat (Pinning/TOFU).
+/// Gemeinsame Grundlage für Anmeldung und Einladungs-Abfrage.
+async fn dial(
     server: &str,
-    key: &SigningKey,
     pinned: Option<Vec<u8>>,
-    register: Option<(String, String)>,
-) -> Result<Session, ConnectError> {
+) -> Result<(quinn::Endpoint, quinn::Connection, Vec<u8>), ConnectError> {
     let addr = resolve(server).await?;
     if !has_route(addr) {
         return Err(ConnectError::Offline);
@@ -241,6 +287,19 @@ pub async fn connect(
         Ok(Ok(c)) => c,
     };
     let cert_hash = verifier.seen.lock().clone().ok_or_else(|| anyhow!("kein zertifikat"))?;
+    Ok((endpoint, conn, cert_hash))
+
+}
+
+/// Verbindet, prüft das Zertifikat und meldet an.
+/// `register = Some((name, invite))` registriert ein neues Gerät.
+pub async fn connect(
+    server: &str,
+    key: &SigningKey,
+    pinned: Option<Vec<u8>>,
+    register: Option<(String, String)>,
+) -> Result<Session, ConnectError> {
+    let (endpoint, conn, cert_hash) = dial(server, pinned).await?;
 
     let hs = async {
         let (mut send, mut recv) = conn.open_bi().await.map_err(|e| anyhow!("{e}"))?;
