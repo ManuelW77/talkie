@@ -7,11 +7,13 @@
   <tbody>
   {{range .D.Users}}
   <tr>
-    <td>{{if .Online}}<span class="dot on"></span>{{else}}<span class="dot"></span>{{end}}{{.Name}}</td>
+    <td><span class="who">{{if .Online}}<span class="dot on"></span>{{else}}<span class="dot"></span>{{end}}{{if .Avatar}}<img class="avatar" src="/users/{{.ID}}/avatar?v={{.Avatar}}" alt="" width="28" height="28">{{else}}<span class="avatar ph" aria-hidden="true">{{initial .Name}}</span>{{end}}<span>{{.Name}}</span></span></td>
     <td>{{if .Banned}}<span class="tag bad">gesperrt</span>{{else if .Online}}<span class="tag ok">online</span>{{else}}offline{{end}}</td>
     <td>{{dt .LastSeen}}</td>
     <td>{{date .Created}}</td>
-    <td class="right">{{if or $.Can.users_edit $.Can.users_delete}}<a href="/users/{{.ID}}">Details</a>{{end}}</td>
+    <td class="right">{{if and .Avatar $.Can.users_edit}}<form method="post" action="/users/{{.ID}}/avatar_delete" class="inline">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      <button class="link bad" data-confirm="Das Profilbild von {{.Name}} entfernen?">Bild entfernen</button></form> {{end}}{{if or $.Can.users_edit $.Can.users_delete}}<a href="/users/{{.ID}}">Details</a>{{end}}</td>
   </tr>
   {{end}}
   </tbody>

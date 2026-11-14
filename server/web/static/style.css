@@ -115,3 +115,14 @@ dl.kv dd { margin: 0; word-break: break-all; }
 .heart { color: var(--bad); }
 .foot a { color: var(--muted); }
 .foot a:hover { text-decoration: underline; }
+
+/* Profilbilder: rund, auf einer Linie mit Punkt und Name */
+.who { display: inline-flex; align-items: center; gap: .55rem; }
+.who .dot { margin-right: 0; flex: none; }
+img.avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: none;
+  border: 1px solid var(--line); background: var(--surface); }
+img.avatar.big { width: 64px; height: 64px; }
+.avatar-row { display: flex; align-items: center; gap: 1rem; }
+span.avatar.ph { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; flex: none;
+  background: var(--surface2); background: color-mix(in srgb, var(--accent) 18%, var(--surface)); color: var(--accent);
+  font-weight: 700; font-size: .8rem; }

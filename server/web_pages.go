@@ -70,6 +70,7 @@ func (w *webApp) dashboard(rw http.ResponseWriter, r *http.Request) {
 type userRow struct {
 	DBUser
 	Online bool
+	Avatar int64 // Version des Profilbilds (0 = keins)
 }
 
 func (w *webApp) usersPage(rw http.ResponseWriter, r *http.Request) {
@@ -79,9 +80,10 @@ func (w *webApp) usersPage(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	online := w.hub.OnlineIDs()
+	avatars := w.store.AvatarVersions()
 	rows := make([]userRow, 0, len(users))
 	for _, u := range users {
-		rows = append(rows, userRow{u, online[u.ID]})
+		rows = append(rows, userRow{u, online[u.ID], avatars[u.ID]})
 	}
 	w.render(rw, r, "users", "Talkie-Nutzer", map[string]any{"Users": rows})
 }
@@ -108,8 +110,25 @@ func (w *webApp) userPage(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.render(rw, r, "user", u.Name, map[string]any{
-		"U": userRow{*u, w.hub.OnlineIDs()[u.ID]}, "Devices": devs, "Code": adminDeviceCode(me(r), w.store, u.ID), "MaxDevices": MaxDevices,
+		"U": userRow{*u, w.hub.OnlineIDs()[u.ID], w.store.AvatarVersion(u.ID)}, "Devices": devs, "Code": adminDeviceCode(me(r), w.store, u.ID), "MaxDevices": MaxDevices,
 	})
+}
+
+// userAvatar liefert das Profilbild eines Nutzers (für alle angemeldeten Verwaltungskonten).
+func (w *webApp) userAvatar(rw http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r)
+	if !ok {
+		http.NotFound(rw, r)
+		return
+	}
+	_, data := w.store.Avatar(id)
+	if len(data) == 0 {
+		http.NotFound(rw, r)
+		return
+	}
+	rw.Header().Set("Content-Type", "image/jpeg")
+	rw.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = rw.Write(data)
 }
 
 func (w *webApp) userAction(rw http.ResponseWriter, r *http.Request) {
@@ -149,6 +168,14 @@ func (w *webApp) userAction(rw http.ResponseWriter, r *http.Request) {
 		w.hub.Renamed(nu.ID, nu.Name)
 		w.audit(r, fmt.Sprintf("Talkie-Nutzer %s umbenannt in %s", u.Name, nu.Name))
 		w.done(rw, r, back, "Umbenannt in "+nu.Name+".", false)
+	case "avatar_delete":
+		if _, err := w.store.SetAvatar(u.ID, nil); err != nil {
+			w.fail(rw, r, back, err)
+			return
+		}
+		w.hub.AvatarChanged(u.ID, 0)
+		w.audit(r, "Profilbild von "+u.Name+" entfernt")
+		w.done(rw, r, back, "Das Profilbild von "+u.Name+" wurde entfernt.", false)
 	case "kick":
 		if !w.hub.Kick(u.ID, "Du wurdest vom Admin rausgeworfen.") {
 			w.done(rw, r, back, u.Name+" ist nicht online.", true)
@@ -178,7 +205,7 @@ func (w *webApp) userAction(rw http.ResponseWriter, r *http.Request) {
 			w.render(rw, r, "forbidden", "Kein Zugriff", nil)
 			return
 		}
-		inv, err := w.store.CreateDeviceCode(u.ID, 24*time.Hour)
+		inv, err := w.store.CreateDeviceCode(u.ID, 24*time.Hour, "")
 		if errors.Is(err, ErrTooManyDevices) {
 			w.done(rw, r, back, fmt.Sprintf("%s hat schon %d Geräte. Erst eins entfernen.", u.Name, MaxDevices), true)
 			return

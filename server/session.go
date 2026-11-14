@@ -50,6 +50,7 @@ type Session struct {
 	room       int64
 	muted      bool
 	deaf       bool
+	avatar     int64 // Version des Profilbilds (0 = keins)
 	// ignored: Nutzer, deren Sprache dieser Client nicht hören will (nur für ihn)
 	ignored map[int64]bool
 
@@ -62,7 +63,7 @@ type Session struct {
 func (s *Session) touch() { s.lastActive.Store(s.hub.now().UnixMilli()) }
 
 func (s *Session) wireLocked() WireUser {
-	return WireUser{ID: s.userID, Name: s.name, Room: s.room, Muted: s.muted, Deaf: s.deaf}
+	return WireUser{ID: s.userID, Name: s.name, Room: s.room, Muted: s.muted, Deaf: s.deaf, Avatar: s.avatar}
 }
 
 func (s *Session) send(e *Envelope) {
@@ -142,6 +143,8 @@ func (s *Session) voiceReader(ctx context.Context) {
 func (s *Session) controlLoop() {
 	chatLimit := NewTokenBucket(5, 1)
 	ctrlLimit := NewTokenBucket(20, 5)
+	avatarSetLimit := NewTokenBucket(1, 0.1) // 1 Bild pro 10 s
+	avatarGetLimit := NewTokenBucket(30, 3)  // 30 Abfragen pro 10 s
 	for {
 		_ = s.stream.SetReadDeadline(time.Time{})
 		e, err := ReadFrame(s.stream)
@@ -184,13 +187,37 @@ func (s *Session) controlLoop() {
 			}
 			s.hub.SetState(s, muted, deaf)
 		case "device_code":
-			s.hub.SendDeviceCode(s)
+			s.hub.SendDeviceCode(s, e.Name)
+		case "devices":
+			s.hub.SendDevices(s)
+		case "device_rename":
+			s.hub.RenameOwnDevice(s, e.ID, e.Name)
+		case "device_del":
+			s.hub.DeleteOwnDevice(s, e.ID)
+		case "device_code_del":
+			s.hub.DeleteOwnDeviceCode(s)
 		case "ignore":
 			s.hub.SetIgnored(s, e.IDs)
 		case "kick", "ban":
 			s.hub.Moderate(s, e.ID, e.T == "ban")
 		case "clear_chat":
 			s.hub.ClearChatFrom(s, e.Room)
+		case "set_avatar":
+			if !avatarSetLimit.Allow() {
+				s.send(&Envelope{T: "error", Code: "rate_limited", Reason: "Nicht so schnell! Warte kurz, bevor du das Bild nochmal änderst."})
+				continue
+			}
+			s.hub.SetOwnAvatar(s, e.Data)
+		case "get_avatar", "members":
+			if !avatarGetLimit.Allow() {
+				s.send(&Envelope{T: "error", Code: "rate_limited", Reason: "Nicht so schnell!"})
+				continue
+			}
+			if e.T == "members" {
+				s.hub.SendMembers(s)
+			} else {
+				s.hub.SendAvatar(s, e.ID)
+			}
 		case "still_here":
 			// nichts weiter: touch() oben hat die Aktivität schon zurückgesetzt
 		}
@@ -300,7 +327,7 @@ func (h *Hub) HandleConn(conn *quic.Conn) {
 	release()
 	s := &Session{
 		hub: h, conn: conn, stream: stream, ip: ip,
-		userID: user.ID, name: user.Name, pubkey: user.PubKey, device: h.deviceLabel(user.PubKey),
+		userID: user.ID, name: user.Name, avatar: h.store.AvatarVersion(user.ID), pubkey: user.PubKey, device: h.deviceLabel(user.PubKey),
 		out:  make(chan []byte, outQueueSize),
 		done: make(chan struct{}),
 	}
@@ -329,6 +356,7 @@ func (h *Hub) HandleConn(conn *quic.Conn) {
 	h.Remove(s)
 	s.close(0, "tschüss")
 	_ = h.store.TouchUser(user.ID)
+	h.store.TouchDevice(s.pubkey) // für „zuletzt online“ in der Mitgliederliste
 	log.Printf("%s (%d) getrennt", user.Name, user.ID)
 }
 
@@ -389,6 +417,9 @@ func (h *Hub) handshake(stream *quic.Stream) (*DBUser, error) {
 		}
 		existing.PubKey = pk // dieses Gerät (ein Nutzer kann mehrere haben)
 		h.store.TouchDevice(pk)
+		if kind := cleanLabel(resp.Device); kind != "" { // alte Apps schicken kein device
+			h.store.SetDeviceKind(pk, kind)
+		}
 		return existing, nil
 	case existing == nil && resp.T == "register":
 		// Leerer Name: Geräte-Code für einen vorhandenen Nutzer (der Server kennt den Namen)
@@ -399,12 +430,12 @@ func (h *Hub) handshake(stream *quic.Stream) (*DBUser, error) {
 				return nil, &hsError{"name_invalid", "Der Name muss 2 bis 20 Zeichen lang sein (Buchstaben, Zahlen, Leerzeichen, - _ .).", false}
 			}
 		}
-		u, err := h.store.RegisterDevice(resp.Invite, name, pk, cleanLabel(resp.Device))
+		u, err := h.store.RegisterDeviceKind(resp.Invite, name, pk, cleanLabel(resp.Device), cleanLabel(resp.Device))
 		switch {
 		case errors.Is(err, ErrNameMissing):
 			return nil, &hsError{"name_invalid", "Bitte gib deinen Namen ein.", false}
 		case errors.Is(err, ErrTooManyDevices):
-			return nil, &hsError{"too_many_devices", "Du hast schon 5 Geräte. Lass erst eins auf der Verwaltungsseite entfernen.", false}
+			return nil, &hsError{"too_many_devices", "Du hast schon 5 Geräte. Entferne erst eins auf einem deiner anderen Geräte (Einstellungen → „Deine Geräte“).", false}
 		case err == nil && u.Banned:
 			return nil, &hsError{"banned", "Du bist auf diesem Server gesperrt.", false}
 		case errors.Is(err, ErrInviteInvalid):

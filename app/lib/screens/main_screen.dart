@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -10,6 +11,8 @@ import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/level_meter.dart';
 import '../widgets/idle_dialog.dart';
+import 'members_dialog.dart';
+import 'profile_dialog.dart';
 import 'settings_dialog.dart';
 
 /// Unterhalb dieser Breite (Handy hochkant) wird das Layout einspaltig.
@@ -40,7 +43,9 @@ class _MainScreenState extends State<MainScreen> {
           return IdleDialog(secs: secs, onConfirm: widget.controller.stillHere);
         },
       ).whenComplete(() => _idleDialog = null);
-    } else if (secs == null && _idleDialog != null && _idleDialog!.mounted &&
+    } else if (secs == null &&
+        _idleDialog != null &&
+        _idleDialog!.mounted &&
         ModalRoute.of(_idleDialog!)?.isCurrent == true) {
       Navigator.of(_idleDialog!).pop();
     }
@@ -68,11 +73,9 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final c = widget.controller;
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyM, control: true): c.toggleMute,
-        const SingleActivator(LogicalKeyboardKey.keyM, meta: true): c.toggleMute,
-      },
+    final content = CallbackShortcuts(
+      // Auf dem Mac kommt das Kürzel (⇧⌘M) aus der Menüleiste; ⌘M wäre „Minimieren“
+      bindings: {if (!_isMac) const SingleActivator(LogicalKeyboardKey.keyM, control: true): c.toggleMute},
       child: Focus(
         autofocus: true,
         child: LayoutBuilder(
@@ -90,12 +93,15 @@ class _MainScreenState extends State<MainScreen> {
                     Expanded(
                       child: narrow
                           ? (c.phoneChat
-                              ? _ChatPanel(controller: c, compact: true, onShowRooms: () => c.showPhoneChat(false))
-                              : _RoomsPanel(controller: c))
+                                ? _ChatPanel(controller: c, compact: true, onShowRooms: () => c.showPhoneChat(false))
+                                : _RoomsPanel(controller: c))
                           : Row(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                SizedBox(width: box.maxWidth < 900 ? 240.0 : 280.0, child: _RoomsPanel(controller: c)),
+                                SizedBox(
+                                  width: box.maxWidth < 900 ? 240.0 : 280.0,
+                                  child: _RoomsPanel(controller: c),
+                                ),
                                 const VerticalDivider(width: 1),
                                 Expanded(child: _ChatPanel(controller: c)),
                               ],
@@ -111,7 +117,68 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
     );
+    if (!_isMac) return content;
+    return PlatformMenuBar(menus: _macMenus(context, c), child: content);
   }
+}
+
+/// Läuft Talkie auf dem Mac? (Menüleiste, ⇧⌘M)
+bool get _isMac => defaultTargetPlatform == TargetPlatform.macOS;
+
+/// Menüleiste oben am Bildschirm (nur macOS).
+List<PlatformMenuItem> _macMenus(BuildContext context, TalkieController c) {
+  PlatformProvidedMenuItem? provided(PlatformProvidedMenuItemType t) =>
+      PlatformProvidedMenuItem.hasMenu(t) ? PlatformProvidedMenuItem(type: t) : null;
+  List<PlatformMenuItem> only(Iterable<PlatformMenuItem?> items) => [for (final i in items) ?i];
+  return [
+    PlatformMenu(
+      label: 'Talkie',
+      menus: [
+        PlatformMenuItemGroup(members: only([provided(PlatformProvidedMenuItemType.about)])),
+        PlatformMenuItemGroup(
+          members: [
+            PlatformMenuItem(
+              label: 'Einstellungen …',
+              shortcut: const SingleActivator(LogicalKeyboardKey.comma, meta: true),
+              onSelected: () => showSettings(context, c),
+            ),
+          ],
+        ),
+        PlatformMenuItemGroup(
+          members: only([
+            provided(PlatformProvidedMenuItemType.servicesSubmenu),
+            provided(PlatformProvidedMenuItemType.hide),
+            provided(PlatformProvidedMenuItemType.hideOtherApplications),
+            provided(PlatformProvidedMenuItemType.showAllApplications),
+          ]),
+        ),
+        PlatformMenuItemGroup(members: only([provided(PlatformProvidedMenuItemType.quit)])),
+      ],
+    ),
+    PlatformMenu(
+      label: 'Sprechen',
+      menus: [
+        PlatformMenuItem(
+          label: 'Mikrofon an/aus',
+          shortcut: const SingleActivator(LogicalKeyboardKey.keyM, meta: true, shift: true),
+          onSelected: c.toggleMute,
+        ),
+        PlatformMenuItem(label: 'Hören an/aus', onSelected: c.toggleDeaf),
+        PlatformMenuItem(
+          label: 'Vom Server trennen',
+          onSelected: c.status == ConnStatus.connected ? c.disconnect : null,
+        ),
+      ],
+    ),
+    PlatformMenu(
+      label: 'Fenster',
+      menus: only([
+        provided(PlatformProvidedMenuItemType.minimizeWindow),
+        provided(PlatformProvidedMenuItemType.zoomWindow),
+        provided(PlatformProvidedMenuItemType.toggleFullScreen),
+      ]),
+    ),
+  ];
 }
 
 class _StatusBanner extends StatelessWidget {
@@ -125,12 +192,33 @@ class _StatusBanner extends StatelessWidget {
     final status = controller.status;
     if (status == ConnStatus.connected) return const SizedBox.shrink();
 
+    // Selbst getrennt: ruhiger Hinweis statt Fehlermeldung
+    if (status == ConnStatus.idle && controller.userDisconnected) {
+      return Material(
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              const Icon(Icons.link_off_rounded),
+              const SizedBox(width: 12),
+              const Expanded(child: Text('Du bist getrennt.')),
+              FilledButton(
+                onPressed: controller.reconnect,
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 36)),
+                child: const Text('Verbinden'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final failed = status == ConnStatus.failed || status == ConnStatus.idle;
     final offline = s?.errorCode == 'offline';
     final text = switch (status) {
       ConnStatus.connecting => 'Verbinde mit dem Server …',
-      ConnStatus.reconnecting =>
-        (s?.message.isNotEmpty ?? false) ? s!.message : 'Verbindung verloren, verbinde neu …',
+      ConnStatus.reconnecting => (s?.message.isNotEmpty ?? false) ? s!.message : 'Verbindung verloren, verbinde neu …',
       ConnStatus.failed => (s?.message.isNotEmpty ?? false) ? s!.message : 'Verbindung nicht möglich.',
       _ => 'Nicht verbunden.',
     };
@@ -179,10 +267,7 @@ class _UpdateBanner extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(child: Text('Neue Talkie-Version ${controller.updateVersion} ist da.')),
             if (controller.updateUrl.isNotEmpty)
-              TextButton(
-                onPressed: () => TalkiePlatform.openUrl(controller.updateUrl),
-                child: const Text('Laden'),
-              ),
+              TextButton(onPressed: () => TalkiePlatform.openUrl(controller.updateUrl), child: const Text('Laden')),
             IconButton(
               onPressed: controller.dismissUpdate,
               tooltip: 'Ausblenden',
@@ -239,10 +324,27 @@ class _RoomsPanel extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
-            child: Text('RÄUME',
-                style: theme.textTheme.labelMedium
-                    ?.copyWith(letterSpacing: 1.5, color: theme.colorScheme.onSurfaceVariant)),
+            padding: const EdgeInsets.fromLTRB(8, 0, 0, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'RÄUME',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      letterSpacing: 1.5,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                if (controller.status == ConnStatus.connected)
+                  IconButton(
+                    tooltip: 'Alle Mitglieder',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.people_alt_rounded, size: 22),
+                    onPressed: () => showMembersDialog(context, controller),
+                  ),
+              ],
+            ),
           ),
           for (final r in rooms) _RoomTile(controller: controller, room: r),
           Padding(
@@ -301,20 +403,29 @@ class _RoomTile extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.volume_up_rounded, size: 18, color: current ? kAccent : theme.colorScheme.onSurfaceVariant),
+                    Icon(
+                      Icons.volume_up_rounded,
+                      size: 20,
+                      color: current ? kAccent : theme.colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(room.name,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: current ? FontWeight.w700 : null)),
+                      child: Text(
+                        room.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: current ? FontWeight.w700 : null),
+                      ),
                     ),
                     if (room.temp)
                       Tooltip(
                         message: 'Verschwindet, wenn alle gegangen sind',
                         child: Padding(
                           padding: const EdgeInsets.only(left: 6),
-                          child: Icon(Icons.hourglass_bottom_rounded,
-                              size: 15, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
+                          child: Icon(
+                            Icons.hourglass_bottom_rounded,
+                            size: 15,
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                          ),
                         ),
                       ),
                     if (room.locked)
@@ -335,26 +446,32 @@ class _RoomTile extends StatelessWidget {
                 ),
                 for (final u in users)
                   Padding(
-                    padding: const EdgeInsets.only(left: 10, top: 8),
+                    padding: const EdgeInsets.only(left: 8, top: 10),
                     child: Row(
                       children: [
-                        Avatar(name: u.name, talking: u.talking, size: 26),
-                        const SizedBox(width: 10),
+                        Avatar(name: u.name, talking: u.talking, size: 34, image: controller.avatarOf(u.id)),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             u.id == controller.me ? '${u.name} (du)' : u.name,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: u.localMuted
-                                  ? theme.colorScheme.onSurfaceVariant
-                                  : (u.talking ? kTalking : null),
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: u.localMuted ? theme.colorScheme.onSurfaceVariant : (u.talking ? kTalking : null),
                             ),
                           ),
                         ),
-                        if (u.deaf)
-                          const Icon(Icons.headset_off_rounded, size: 16, color: kDanger)
-                        else if (u.muted)
-                          const Icon(Icons.mic_off_rounded, size: 16, color: kDanger),
+                        // Wer nichts hört, ist auch stumm: dann beide Zeichen zeigen
+                        if (u.muted || u.deaf)
+                          Icon(Icons.mic_off_rounded, size: 18, color: kDanger, semanticLabel: '${u.name} ist stumm'),
+                        if (u.deaf) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.headset_off_rounded,
+                            size: 18,
+                            color: kDanger,
+                            semanticLabel: '${u.name} hört nichts',
+                          ),
+                        ],
                         if (u.id != controller.me)
                           _UserMuteButton(controller: controller, user: u)
                         else
@@ -434,8 +551,7 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
               decoration: const InputDecoration(labelText: 'Passwort (kann leer bleiben)'),
             ),
             const SizedBox(height: 8),
-            Text('Der Raum verschwindet, wenn alle ihn verlassen haben.',
-                style: Theme.of(context).textTheme.bodySmall),
+            Text('Der Raum verschwindet, wenn alle ihn verlassen haben.', style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
       ),
@@ -516,13 +632,15 @@ Future<void> _confirmModerate(BuildContext context, TalkieController controller,
     context: context,
     builder: (context) => AlertDialog(
       title: Text(ban ? '${user.name} sperren?' : '${user.name} rauswerfen?'),
-      content: Text(ban
-          ? '${user.name} fliegt raus und kann erst wieder rein, wenn ein Admin auf der Verwaltungsseite entsperrt.'
-          : '${user.name} fliegt raus, kann sich aber gleich wieder verbinden.'),
+      content: Text(
+        ban
+            ? '${user.name} fliegt raus und kann erst wieder rein, wenn ein Admin auf der Verwaltungsseite entsperrt.'
+            : '${user.name} fliegt raus, kann sich aber gleich wieder verbinden.',
+      ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: kDanger, foregroundColor: Colors.white),
+          style: FilledButton.styleFrom(backgroundColor: kDangerFill, foregroundColor: Colors.white),
           onPressed: () => Navigator.pop(context, true),
           child: Text(ban ? 'Sperren' : 'Rauswerfen'),
         ),
@@ -592,7 +710,12 @@ class _UserDialogState extends State<_UserDialog> {
         return AlertDialog(
           title: Row(
             children: [
-              Avatar(name: u.name, talking: u.talking && !u.localMuted, size: 32),
+              Avatar(
+                name: u.name,
+                talking: u.talking && !u.localMuted,
+                size: 32,
+                image: widget.controller.avatarOf(u.id),
+              ),
               const SizedBox(width: 12),
               Expanded(child: Text(u.name, overflow: TextOverflow.ellipsis)),
             ],
@@ -604,8 +727,10 @@ class _UserDialogState extends State<_UserDialog> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text('Lautstärke für dich: ${(v * 100).round()} %', style: theme.textTheme.titleSmall),
-                Text('Nur bei dir. Die anderen hören ${u.name} wie immer.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Text(
+                  'Nur bei dir. Die anderen hören ${u.name} wie immer.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
                 Slider(
                   value: v.clamp(0.0, 3.0),
                   max: 3,
@@ -676,32 +801,70 @@ class _PhoneTabs extends StatelessWidget {
     final otherUnread = c.unread.values.any((n) => n > 0);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      child: SegmentedButton<bool>(
-        showSelectedIcon: false,
-        segments: [
-          ButtonSegment(
-            value: false,
-            label: const Text('Räume'),
-            icon: Badge(
-              isLabelVisible: otherUnread,
-              backgroundColor: kDanger,
-              smallSize: 8,
-              child: const Icon(Icons.groups_rounded),
-            ),
-          ),
-          ButtonSegment(
-            value: true,
-            label: const Text('Chat'),
-            icon: Badge(
-              isLabelVisible: c.unreadHere > 0,
-              label: Text('${c.unreadHere}'),
-              backgroundColor: kDanger,
-              child: const Icon(Icons.chat_bubble_rounded),
-            ),
-          ),
+      child: Row(
+        children: [
+          Expanded(child: _tabs(c, otherUnread)),
+          if (c.status == ConnStatus.connected) ...[
+            const SizedBox(width: 8),
+            _DisconnectButton(controller: c, compact: true),
+          ],
         ],
-        selected: {c.phoneChat},
-        onSelectionChanged: (s) => c.showPhoneChat(s.first),
+      ),
+    );
+  }
+
+  Widget _tabs(TalkieController c, bool otherUnread) {
+    return SegmentedButton<bool>(
+      showSelectedIcon: false,
+      segments: [
+        ButtonSegment(
+          value: false,
+          label: const Text('Räume'),
+          icon: Badge(
+            isLabelVisible: otherUnread,
+            backgroundColor: kDangerFill,
+            smallSize: 8,
+            child: const Icon(Icons.groups_rounded),
+          ),
+        ),
+        ButtonSegment(
+          value: true,
+          label: const Text('Chat'),
+          icon: Badge(
+            isLabelVisible: c.unreadHere > 0,
+            label: Text('${c.unreadHere}'),
+            backgroundColor: kDangerFill,
+            child: const Icon(Icons.chat_bubble_rounded),
+          ),
+        ),
+      ],
+      selected: {c.phoneChat},
+      onSelectionChanged: (s) => c.showPhoneChat(s.first),
+    );
+  }
+}
+
+/// Oben rechts: vom Server trennen (danach „Verbinden“ im Hinweisbalken).
+class _DisconnectButton extends StatelessWidget {
+  const _DisconnectButton({required this.controller, this.compact = false});
+
+  final TalkieController controller;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Vom Server trennen',
+      child: OutlinedButton.icon(
+        onPressed: controller.disconnect,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: kDanger,
+          side: BorderSide(color: kDanger.withValues(alpha: 0.6)),
+          minimumSize: Size(0, compact ? 40 : 36),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+        ),
+        icon: const Icon(Icons.call_end_rounded, size: 20),
+        label: const Text('Trennen'),
       ),
     );
   }
@@ -723,7 +886,7 @@ class _ClearChatMenu extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kDanger, foregroundColor: Colors.white),
+            style: FilledButton.styleFrom(backgroundColor: kDangerFill, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Leeren'),
           ),
@@ -751,8 +914,10 @@ class _ChatPanel extends StatefulWidget {
   const _ChatPanel({required this.controller, this.compact = false, this.onShowRooms});
 
   final TalkieController controller;
+
   /// Handy: schlanker Kopf mit den Leuten im Raum, Knopf zum Einklappen der Tastatur.
   final bool compact;
+
   /// Handy: Antippen der Leute oben zeigt die Räume.
   final VoidCallback? onShowRooms;
 
@@ -805,9 +970,7 @@ class _ChatPanelState extends State<_ChatPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: widget.compact
-              ? const EdgeInsets.fromLTRB(20, 4, 12, 4)
-              : const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          padding: widget.compact ? const EdgeInsets.fromLTRB(20, 4, 12, 4) : const EdgeInsets.fromLTRB(20, 16, 20, 8),
           child: Row(
             children: [
               const Icon(Icons.chat_bubble_rounded, size: 18, color: kAccent),
@@ -817,6 +980,11 @@ class _ChatPanelState extends State<_ChatPanel> {
               ),
               if (widget.onShowRooms != null) _RoomPeople(controller: widget.controller, onTap: widget.onShowRooms!),
               if (widget.controller.admin) _ClearChatMenu(controller: widget.controller, roomName: _roomName()),
+              // Handy hat den Knopf schon neben „Räume / Chat“
+              if (!widget.compact && connected) ...[
+                const SizedBox(width: 8),
+                _DisconnectButton(controller: widget.controller),
+              ],
             ],
           ),
         ),
@@ -827,22 +995,25 @@ class _ChatPanelState extends State<_ChatPanel> {
             behavior: HitTestBehavior.translucent,
             onTap: _focus.unfocus,
             child: msgs.isEmpty
-              ? Center(
-                  child: Text('Noch keine Nachrichten. Schreib was!',
-                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant)))
-              : ListView.builder(
-                  reverse: true,
-                  // Wischen durch den Verlauf klappt die Tastatur ein
-                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  itemCount: msgs.length,
-                  itemBuilder: (context, i) {
-                    final m = msgs[msgs.length - 1 - i];
-                    final prev = i + 1 < msgs.length ? msgs[msgs.length - 2 - i] : null;
-                    final grouped = prev != null && prev.from == m.from && (m.ts - prev.ts) < 120;
-                    return _ChatLine(msg: m, grouped: grouped);
-                  },
-                ),
+                ? Center(
+                    child: Text(
+                      'Noch keine Nachrichten. Schreib was!',
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  )
+                : ListView.builder(
+                    reverse: true,
+                    // Wischen durch den Verlauf klappt die Tastatur ein
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    itemCount: msgs.length,
+                    itemBuilder: (context, i) {
+                      final m = msgs[msgs.length - 1 - i];
+                      final prev = i + 1 < msgs.length ? msgs[msgs.length - 2 - i] : null;
+                      final grouped = prev != null && prev.from == m.from && (m.ts - prev.ts) < 120;
+                      return _ChatLine(msg: m, grouped: grouped, image: widget.controller.avatarOf(m.from.toInt()));
+                    },
+                  ),
           ),
         ),
         Padding(
@@ -911,7 +1082,12 @@ class _RoomPeople extends StatelessWidget {
             for (final u in shown)
               Padding(
                 padding: const EdgeInsets.only(left: 4),
-                child: Avatar(name: u.name, talking: u.talking && !u.localMuted, size: 28),
+                child: Avatar(
+                  name: u.name,
+                  talking: u.talking && !u.localMuted,
+                  size: 28,
+                  image: controller.avatarOf(u.id),
+                ),
               ),
             if (users.length > shown.length)
               Padding(
@@ -926,10 +1102,11 @@ class _RoomPeople extends StatelessWidget {
 }
 
 class _ChatLine extends StatelessWidget {
-  const _ChatLine({required this.msg, required this.grouped});
+  const _ChatLine({required this.msg, required this.grouped, this.image});
 
   final ChatDto msg;
   final bool grouped;
+  final Uint8List? image;
 
   @override
   Widget build(BuildContext context) {
@@ -943,7 +1120,7 @@ class _ChatLine extends StatelessWidget {
         children: [
           SizedBox(
             width: 40,
-            child: grouped ? null : Avatar(name: msg.name, size: 32),
+            child: grouped ? null : Avatar(name: msg.name, size: 32, image: image),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -953,7 +1130,10 @@ class _ChatLine extends StatelessWidget {
                 if (!grouped)
                   Row(
                     children: [
-                      Text(msg.name, style: TextStyle(fontWeight: FontWeight.w700, color: nameColor(msg.name))),
+                      Text(
+                        msg.name,
+                        style: TextStyle(fontWeight: FontWeight.w700, color: nameColor(msg.name)),
+                      ),
                       const SizedBox(width: 8),
                       Text(time, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                     ],
@@ -972,6 +1152,7 @@ class _ControlBar extends StatelessWidget {
   const _ControlBar({required this.controller, this.compact = false});
 
   final TalkieController controller;
+
   /// Handy: kürzere Beschriftung, Pegel passt sich der Breite an.
   final bool compact;
 
@@ -985,30 +1166,59 @@ class _ControlBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          Avatar(name: me?.name ?? c.config.name, talking: me?.talking ?? false, size: 40),
+          Tooltip(
+            message: 'Dein Profil',
+            child: InkWell(
+              key: const Key('own-avatar'),
+              customBorder: const CircleBorder(),
+              mouseCursor: SystemMouseCursors.click,
+              onTap: () => showDialog<void>(
+                context: context,
+                builder: (_) => ProfileDialog(controller: c),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Avatar(
+                    name: me?.name ?? c.config.name,
+                    talking: me?.talking ?? false,
+                    size: 40,
+                    image: c.avatarOf(c.me),
+                  ),
+                  Positioned(
+                    right: -3,
+                    bottom: -3,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: theme.colorScheme.surface, width: 1.5),
+                      ),
+                      child: Icon(Icons.edit_rounded, size: 10, color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(me?.name ?? c.config.name,
-                    overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
+                Text(me?.name ?? c.config.name, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
                 const SizedBox(height: 6),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 160),
                   child: ValueListenableBuilder<double>(
                     valueListenable: c.levelNotifier,
-                    builder: (_, v, _) => LevelMeter(
-                      level: c.muted ? 0 : v,
-                      threshold: (c.config.settings.vadThresholdDb + 60) / 60,
-                    ),
+                    builder: (_, v, _) =>
+                        LevelMeter(level: c.muted ? 0 : v, threshold: (c.config.settings.vadThresholdDb + 60) / 60),
                   ),
                 ),
-                if (c.config.settings.muteInBackground) ...[
-                  const SizedBox(height: 6),
-                  const _BackgroundMuteHint(),
-                ],
+                if (c.config.settings.muteInBackground) ...[const SizedBox(height: 6), const _BackgroundMuteHint()],
               ],
             ),
           ),
@@ -1022,7 +1232,10 @@ class _ControlBar extends StatelessWidget {
             label: c.muted ? 'Stumm' : 'Mikro an',
             active: c.muted,
             onTap: c.toggleMute,
-            tooltip: 'Mikrofon an/aus (Strg+M)',
+            toggled: c.muted,
+            tooltip: TalkiePlatform.isMobile
+                ? 'Mikrofon an/aus'
+                : (_isMac ? 'Mikrofon an/aus (⇧⌘M)' : 'Mikrofon an/aus (Strg+M)'),
           ),
           SizedBox(width: compact ? 6 : 10),
           _RoundButton(
@@ -1030,6 +1243,7 @@ class _ControlBar extends StatelessWidget {
             label: c.deaf ? 'Taub' : 'Hören',
             active: c.deaf,
             onTap: c.toggleDeaf,
+            toggled: c.deaf,
             tooltip: 'Niemanden hören (und selbst stumm)',
           ),
           SizedBox(width: compact ? 6 : 10),
@@ -1037,7 +1251,7 @@ class _ControlBar extends StatelessWidget {
             icon: Icons.settings_rounded,
             label: compact ? 'Mehr' : 'Einstellungen',
             active: false,
-            onTap: () => showDialog(context: context, builder: (_) => SettingsDialog(controller: c)),
+            onTap: () => showSettings(context, c),
             tooltip: 'Einstellungen',
           ),
         ],
@@ -1076,27 +1290,35 @@ class _PttButtonState extends State<_PttButton> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Tooltip(
-      message: 'Gedrückt halten zum Sprechen',
-      child: Listener(
-        onPointerDown: (_) => _set(true),
-        onPointerUp: (_) => _set(false),
-        onPointerCancel: (_) => _set(false),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 80),
-              padding: EdgeInsets.symmetric(horizontal: widget.compact ? 14 : 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: _down ? kTalking : theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(24),
+    return Semantics(
+      button: true,
+      toggled: _down,
+      label: 'Sprechen',
+      hint: 'Doppeltippen zum Ein- und Ausschalten',
+      onTap: () => _set(!_down),
+      excludeSemantics: true,
+      child: Tooltip(
+        message: 'Gedrückt halten zum Sprechen',
+        child: Listener(
+          onPointerDown: (_) => _set(true),
+          onPointerUp: (_) => _set(false),
+          onPointerCancel: (_) => _set(false),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 80),
+                padding: EdgeInsets.symmetric(horizontal: widget.compact ? 14 : 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _down ? kTalking : theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Icon(Icons.record_voice_over_rounded, size: 24, color: _down ? Colors.black : null),
               ),
-              child: Icon(Icons.record_voice_over_rounded, size: 24, color: _down ? Colors.black : null),
-            ),
-            const SizedBox(height: 4),
-            Text(_down ? 'Sprichst …' : 'Halten', style: theme.textTheme.labelSmall),
-          ],
+              const SizedBox(height: 4),
+              Text(_down ? 'Sprichst …' : 'Halten', style: theme.textTheme.labelSmall),
+            ],
+          ),
         ),
       ),
     );
@@ -1110,6 +1332,7 @@ class _RoundButton extends StatelessWidget {
     required this.active,
     required this.onTap,
     required this.tooltip,
+    this.toggled,
   });
 
   final IconData icon;
@@ -1117,27 +1340,35 @@ class _RoundButton extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
   final String tooltip;
+  final bool? toggled;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Tooltip(
-      message: tooltip,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Material(
-            color: active ? kDanger : theme.colorScheme.surfaceContainerHighest,
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onTap,
-              child: Padding(padding: const EdgeInsets.all(12), child: Icon(icon, size: 24)),
+    return Semantics(
+      button: true,
+      toggled: toggled,
+      label: tooltip,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: tooltip,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Material(
+              color: active ? kDangerFill : theme.colorScheme.surfaceContainerHighest,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onTap,
+                child: Padding(padding: const EdgeInsets.all(12), child: Icon(icon, size: 24)),
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(label, style: theme.textTheme.labelSmall),
-        ],
+            const SizedBox(height: 4),
+            Text(label, style: theme.textTheme.labelSmall),
+          ],
+        ),
       ),
     );
   }
@@ -1151,10 +1382,7 @@ class _BackgroundMuteHint extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: kAccent.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(10),
-      ),
+      decoration: BoxDecoration(color: kAccent.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(10)),
       // Schmales Handy: lieber etwas kleiner als abgeschnitten
       child: FittedBox(
         fit: BoxFit.scaleDown,

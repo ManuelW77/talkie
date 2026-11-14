@@ -310,6 +310,9 @@ func (h *Hub) OnlineDetails() []OnlineInfo {
 
 func (h *Hub) deviceLabel(pk []byte) string {
 	if d, err := h.store.DeviceByPubKey(pk); err == nil {
+		if d.Kind != "" {
+			return d.Kind
+		}
 		return d.Label
 	}
 	return ""
@@ -379,16 +382,98 @@ func (h *Hub) Moderate(s *Session, target int64, ban bool) {
 const deviceCodeValid = 15 * time.Minute
 
 // SendDeviceCode erzeugt einen Code, mit dem s ein weiteres Gerät anmelden kann.
-func (h *Hub) SendDeviceCode(s *Session) {
-	inv, err := h.store.CreateDeviceCode(s.userID, deviceCodeValid)
+func (h *Hub) SendDeviceCode(s *Session, name string) {
+	inv, err := h.store.CreateDeviceCode(s.userID, deviceCodeValid, name)
 	switch {
+	case errors.Is(err, ErrInviteName):
+		s.send(&Envelope{T: "error", Code: "bad_name", Reason: "Der Name ist zu lang (höchstens 40 Zeichen)."})
 	case errors.Is(err, ErrTooManyDevices):
-		s.send(&Envelope{T: "error", Code: "too_many_devices", Reason: "Du hast schon 5 Geräte. Lass erst eins auf der Verwaltungsseite entfernen."})
+		s.send(&Envelope{T: "error", Code: "too_many_devices", Reason: "Du hast schon 5 Geräte. Entferne erst eins in den Einstellungen unter „Deine Geräte“."})
 	case err != nil:
 		s.send(&Envelope{T: "error", Code: "internal", Reason: "Das hat nicht geklappt."})
 	default:
 		s.send(&Envelope{T: "device_code", Code: inv.Code})
+		h.SendDevices(s)
 	}
+}
+
+// SendDevices schickt s die eigenen Geräte und den offenen Geräte-Code.
+func (h *Hub) SendDevices(s *Session) {
+	devs, err := h.store.Devices(s.userID)
+	if err != nil {
+		s.send(&Envelope{T: "error", Code: "internal", Reason: "Das hat nicht geklappt."})
+		return
+	}
+	var thisID int64
+	if d, err := h.store.DeviceByPubKey(s.pubkey); err == nil {
+		thisID = d.ID
+	}
+	out := make([]WireDevice, 0, len(devs))
+	for _, d := range devs {
+		w := WireDevice{ID: d.ID, Label: d.Label, Kind: d.Kind, Created: d.Created.Unix(), This: d.ID == thisID}
+		if !d.LastSeen.IsZero() {
+			w.LastSeen = d.LastSeen.Unix()
+		}
+		out = append(out, w)
+	}
+	e := &Envelope{T: "devices", Devices: out}
+	if inv := h.store.DeviceCode(s.userID); inv != nil {
+		e.Code = inv.Code
+		e.Expires = inv.Expires.Unix()
+		e.Name = inv.Name
+	}
+	s.send(e)
+}
+
+// DeleteOwnDevice entfernt ein anderes Gerät des Nutzers (nicht das gerade verbundene).
+func (h *Hub) DeleteOwnDevice(s *Session, id int64) {
+	fail := func(code, msg string) { s.send(&Envelope{T: "error", Code: code, Reason: msg}) }
+	if d, err := h.store.DeviceByPubKey(s.pubkey); err == nil && d.ID == id {
+		fail("forbidden", "Das Gerät, mit dem du gerade online bist, kannst du nicht entfernen.")
+		return
+	}
+	pk, err := h.store.DevicePubKey(s.userID, id)
+	if err != nil {
+		fail("not_found", "Dieses Gerät gibt es nicht mehr.")
+		return
+	}
+	if err := h.store.DeleteDevice(s.userID, id); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			fail("not_found", "Dieses Gerät gibt es nicht mehr.")
+		} else {
+			fail("forbidden", err.Error())
+		}
+		return
+	}
+	h.KickDevice(s.userID, pk, "Dieses Gerät wurde entfernt.")
+	h.mu.RLock()
+	name := s.name
+	h.mu.RUnlock()
+	h.store.Audit(name+" (App)", "Gerät von "+name+" entfernt")
+	h.SendDevices(s)
+}
+
+// RenameOwnDevice gibt einem eigenen Gerät (auch dem aktuellen) einen Namen.
+func (h *Hub) RenameOwnDevice(s *Session, id int64, name string) {
+	switch err := h.store.RenameDevice(s.userID, id, name); {
+	case errors.Is(err, ErrInviteName):
+		s.send(&Envelope{T: "error", Code: "bad_name", Reason: "Der Name ist zu lang (höchstens 40 Zeichen)."})
+	case errors.Is(err, ErrNotFound):
+		s.send(&Envelope{T: "error", Code: "not_found", Reason: "Dieses Gerät gibt es nicht mehr."})
+	case err != nil:
+		s.send(&Envelope{T: "error", Code: "internal", Reason: "Das hat nicht geklappt."})
+	default:
+		h.SendDevices(s)
+	}
+}
+
+// DeleteOwnDeviceCode löscht den offenen Geräte-Code des Nutzers.
+func (h *Hub) DeleteOwnDeviceCode(s *Session) {
+	if err := h.store.DeleteDeviceCode(s.userID); err != nil {
+		s.send(&Envelope{T: "error", Code: "internal", Reason: "Das hat nicht geklappt."})
+		return
+	}
+	h.SendDevices(s)
 }
 
 // KickDevice trennt die Verbindung, falls sie von diesem Gerät kommt (Gerät wurde entfernt).

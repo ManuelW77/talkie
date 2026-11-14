@@ -4,6 +4,9 @@ platform :ios, '15.0'
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# Workspace heißt Talkie, damit Xcode ihn so anzeigt (Projekt und Schema bleiben Runner für Flutter)
+workspace 'Talkie'
+
 project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,

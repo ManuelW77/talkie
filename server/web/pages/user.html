@@ -2,6 +2,9 @@
 {{$u := .D.U}}
 <p><a href="/users">← Alle Nutzer</a></p>
 <h1>{{$u.Name}} {{if $u.Banned}}<span class="tag bad">gesperrt</span>{{else if $u.Online}}<span class="tag ok">online</span>{{end}}</h1>
+{{if $u.Avatar}}<p class="avatar-row"><img class="avatar big" src="/users/{{$u.ID}}/avatar?v={{$u.Avatar}}" alt="Profilbild" width="64" height="64">
+  {{if .Can.users_edit}}<form method="post" action="/users/{{$u.ID}}/avatar_delete" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}">
+  <button class="link bad" data-confirm="Das Profilbild von {{$u.Name}} entfernen?">Bild entfernen</button></form>{{end}}</p>{{end}}
 <dl class="kv">
   <dt>Dabei seit</dt><dd>{{date $u.Created}}</dd>
   <dt>Zuletzt da</dt><dd>{{dt $u.LastSeen}}</dd>
@@ -22,10 +25,11 @@
   <p class="muted">Mit einem Geräte-Code kann {{$u.Name}} denselben Namen auf einem weiteren Gerät nutzen
     (z. B. Laptop und iPhone). Gleichzeitig verbunden ist immer nur ein Gerät.</p>
   <table>
-    <thead><tr><th>Gerät</th><th>Angemeldet seit</th><th>Zuletzt da</th><th></th></tr></thead>
+    <thead><tr><th>Gerät</th><th>Name</th><th>Angemeldet seit</th><th>Zuletzt da</th><th></th></tr></thead>
     <tbody>
     {{range .D.Devices}}<tr>
-      <td>{{if .Label}}{{.Label}}{{else}}Gerät{{end}}</td><td>{{date .Created}}</td><td>{{dt .LastSeen}}</td>
+      <td>{{if .Kind}}{{.Kind}}{{else if .Label}}{{.Label}}{{else}}Gerät{{end}}</td>
+      <td>{{if and .Label (ne .Label .Kind)}}{{.Label}}{{else}}<span class="muted">–</span>{{end}}</td><td>{{date .Created}}</td><td>{{dt .LastSeen}}</td>
       <td>{{if gt (len $.D.Devices) 1}}<form method="post" action="/users/{{$u.ID}}/device_delete">
         <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="device" value="{{.ID}}">
         <button class="link bad" data-confirm="Dieses Gerät entfernen? Es braucht dann einen neuen Code.">Entfernen</button></form>{{end}}</td>

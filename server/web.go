@@ -100,6 +100,13 @@ var tplFuncs = template.FuncMap{
 	},
 	"date": func(t time.Time) string { return t.Local().Format("02.01.2006") },
 	"unix": func(ts int64) string { return time.Unix(ts, 0).Local().Format("02.01. 15:04") },
+	// initial: erster Buchstabe groß, für den Platzhalter ohne Profilbild
+	"initial": func(name string) string {
+		for _, r := range name {
+			return strings.ToUpper(string(r))
+		}
+		return "?"
+	},
 }
 
 func (w *webApp) loadTemplates() error {
@@ -350,6 +357,7 @@ func (w *webApp) handler() http.Handler {
 	mux.HandleFunc("GET /{$}", w.auth(0, w.dashboard))
 	mux.HandleFunc("GET /users", w.auth(0, w.usersPage))
 	mux.HandleFunc("GET /users/{id}", w.auth(0, w.userPage))
+	mux.HandleFunc("GET /users/{id}/avatar", w.auth(0, w.userAvatar))
 	mux.HandleFunc("POST /users/{id}/{action}", w.auth(0, w.userAction))
 	mux.HandleFunc("GET /invites", w.auth(PermInvite, w.invitesPage))
 	mux.HandleFunc("POST /invites", w.auth(PermInvite, w.createInvite))

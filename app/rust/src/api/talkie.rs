@@ -29,6 +29,8 @@ pub struct UserDto {
     pub room: i64,
     pub muted: bool,
     pub deaf: bool,
+    /// Version des Profilbilds (0 = keins).
+    pub avatar: i64,
     pub talking: bool,
     /// Nur für mich stumm geschaltet.
     pub local_muted: bool,
@@ -86,8 +88,16 @@ pub enum EventKind {
     Notice,
     /// Geräte-Code (steht in `notice`).
     DeviceCode,
+    /// Eigene Geräte und offener Geräte-Code (Felder `devices`, `device_code`, ...).
+    Devices,
     /// Gleich wegen Inaktivität getrennt (`idle_secs` Sekunden bleiben).
     IdleWarning,
+    /// Profilbild eines Nutzers (`avatar_id`, `avatar_version`, `avatar_bytes`; leer = keins).
+    Avatar,
+    /// Mitgliederliste (Feld `members`).
+    Members,
+    /// Der Server hat das eigene Profilbild abgelehnt.
+    AvatarRejected,
 }
 
 /// Ein Ereignis an die Oberfläche; welche Felder gefüllt sind, hängt von `kind` ab.
@@ -101,6 +111,36 @@ pub struct UiEvent {
     pub level: f32,
     pub notice: String,
     pub idle_secs: i64,
+    pub devices: Vec<DeviceDto>,
+    /// Offener Geräte-Code ("" = keiner), sein Name und Ablauf (Unix-Sekunden).
+    pub device_code: String,
+    pub device_code_name: String,
+    pub device_code_expires: i64,
+    pub avatar_id: i64,
+    pub avatar_version: i64,
+    pub avatar_bytes: Vec<u8>,
+    pub members: Vec<MemberDto>,
+}
+
+/// Ein registrierter Nutzer des Servers (Mitgliederliste).
+#[derive(Debug, Clone)]
+pub struct MemberDto {
+    pub id: i64,
+    pub name: String,
+    pub avatar: i64,
+    pub online: bool,
+    /// Unix-Sekunden, 0 = nie.
+    pub last_seen: i64,
+}
+
+/// Ein mit dem Konto verknüpftes Gerät.
+#[derive(Debug, Clone)]
+pub struct DeviceDto {
+    pub id: i64,
+    pub label: String,
+    pub created: i64,
+    pub last_seen: i64,
+    pub this_device: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -163,6 +203,7 @@ fn state_dto(s: Snapshot) -> StateDto {
                 room: u.room,
                 muted: u.muted,
                 deaf: u.deaf,
+                avatar: u.avatar,
                 talking: u.talking,
                 local_muted: u.local_muted,
                 volume: u.volume,
@@ -188,6 +229,14 @@ fn ui_event(e: CoreEvent) -> UiEvent {
         level: 0.0,
         notice: String::new(),
         idle_secs: 0,
+        devices: Vec::new(),
+        device_code: String::new(),
+        device_code_name: String::new(),
+        device_code_expires: 0,
+        avatar_id: 0,
+        avatar_version: 0,
+        avatar_bytes: Vec::new(),
+        members: Vec::new(),
     };
     match e {
         CoreEvent::State(s) => {
@@ -211,6 +260,34 @@ fn ui_event(e: CoreEvent) -> UiEvent {
         CoreEvent::DeviceCode(c) => {
             ev.kind = EventKind::DeviceCode;
             ev.notice = c;
+        }
+        CoreEvent::Devices(d) => {
+            ev.kind = EventKind::Devices;
+            ev.devices = d
+                .devices
+                .into_iter()
+                .map(|x| DeviceDto { id: x.id, label: x.label, created: x.created, last_seen: x.last_seen, this_device: x.this })
+                .collect();
+            ev.device_code = d.code;
+            ev.device_code_name = d.code_name;
+            ev.device_code_expires = d.expires;
+        }
+        CoreEvent::Avatar(a) => {
+            ev.kind = EventKind::Avatar;
+            ev.avatar_id = a.id;
+            ev.avatar_version = a.version;
+            ev.avatar_bytes = a.bytes;
+        }
+        CoreEvent::Members(m) => {
+            ev.kind = EventKind::Members;
+            ev.members = m
+                .into_iter()
+                .map(|x| MemberDto { id: x.id, name: x.name, avatar: x.avatar, online: x.online, last_seen: x.last_seen })
+                .collect();
+        }
+        CoreEvent::AvatarRejected(r) => {
+            ev.kind = EventKind::AvatarRejected;
+            ev.notice = r;
         }
         CoreEvent::IdleWarning(secs) => {
             ev.kind = EventKind::IdleWarning;
@@ -328,10 +405,60 @@ pub fn talkie_still_here() -> Result<()> {
     Ok(())
 }
 
-/// Code für ein weiteres Gerät anfordern; kommt als Ereignis DeviceCode zurück.
+/// Code für ein weiteres Gerät anfordern (`name` = Name des neuen Geräts, darf leer sein);
+/// kommt als Ereignis DeviceCode zurück.
 #[flutter_rust_bridge::frb(sync)]
-pub fn talkie_request_device_code() -> Result<()> {
-    engine()?.request_device_code();
+pub fn talkie_request_device_code(name: String) -> Result<()> {
+    engine()?.request_device_code(&name);
+    Ok(())
+}
+
+/// Eigene Geräte und offenen Geräte-Code abfragen; kommt als Ereignis Devices zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_request_devices() -> Result<()> {
+    engine()?.request_devices();
+    Ok(())
+}
+
+/// Eigenes Profilbild setzen (JPEG, 128×128, höchstens 24 KiB); leer = Bild entfernen.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_set_avatar(jpeg: Vec<u8>) -> Result<()> {
+    engine()?.set_avatar(&jpeg);
+    Ok(())
+}
+
+/// Profilbild eines Nutzers anfordern; kommt als Ereignis Avatar zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_get_avatar(id: i64) -> Result<()> {
+    engine()?.request_avatar(id);
+    Ok(())
+}
+
+/// Mitgliederliste anfordern; kommt als Ereignis Members zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_request_members() -> Result<()> {
+    engine()?.request_members();
+    Ok(())
+}
+
+/// Ein anderes eigenes Gerät entfernen.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_delete_device(id: i64) -> Result<()> {
+    engine()?.delete_device(id);
+    Ok(())
+}
+
+/// Eigenes Gerät umbenennen (leer = ohne Namen).
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_rename_device(id: i64, name: String) -> Result<()> {
+    engine()?.rename_device(id, &name);
+    Ok(())
+}
+
+/// Offenen Geräte-Code löschen.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_delete_device_code() -> Result<()> {
+    engine()?.delete_device_code();
     Ok(())
 }
 

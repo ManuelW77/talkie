@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `chat_dto`, `engine`, `settings_dto`, `state_dto`, `ui_event`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Startet die Engine (einmal pro Programmstart) und liefert die gespeicherte Konfiguration.
 /// `data_dir` leer = Standardordner des Systems.
@@ -74,9 +74,38 @@ void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
 /// „Ich bin noch da“ an den Server schicken (hält die Verbindung am Leben).
 void talkieStillHere() => RustLib.instance.api.crateApiTalkieTalkieStillHere();
 
-/// Code für ein weiteres Gerät anfordern; kommt als Ereignis DeviceCode zurück.
-void talkieRequestDeviceCode() =>
-    RustLib.instance.api.crateApiTalkieTalkieRequestDeviceCode();
+/// Code für ein weiteres Gerät anfordern (`name` = Name des neuen Geräts, darf leer sein);
+/// kommt als Ereignis DeviceCode zurück.
+void talkieRequestDeviceCode({required String name}) =>
+    RustLib.instance.api.crateApiTalkieTalkieRequestDeviceCode(name: name);
+
+/// Eigene Geräte und offenen Geräte-Code abfragen; kommt als Ereignis Devices zurück.
+void talkieRequestDevices() =>
+    RustLib.instance.api.crateApiTalkieTalkieRequestDevices();
+
+/// Eigenes Profilbild setzen (JPEG, 128×128, höchstens 24 KiB); leer = Bild entfernen.
+void talkieSetAvatar({required List<int> jpeg}) =>
+    RustLib.instance.api.crateApiTalkieTalkieSetAvatar(jpeg: jpeg);
+
+/// Profilbild eines Nutzers anfordern; kommt als Ereignis Avatar zurück.
+void talkieGetAvatar({required PlatformInt64 id}) =>
+    RustLib.instance.api.crateApiTalkieTalkieGetAvatar(id: id);
+
+/// Mitgliederliste anfordern; kommt als Ereignis Members zurück.
+void talkieRequestMembers() =>
+    RustLib.instance.api.crateApiTalkieTalkieRequestMembers();
+
+/// Ein anderes eigenes Gerät entfernen.
+void talkieDeleteDevice({required PlatformInt64 id}) =>
+    RustLib.instance.api.crateApiTalkieTalkieDeleteDevice(id: id);
+
+/// Eigenes Gerät umbenennen (leer = ohne Namen).
+void talkieRenameDevice({required PlatformInt64 id, required String name}) =>
+    RustLib.instance.api.crateApiTalkieTalkieRenameDevice(id: id, name: name);
+
+/// Offenen Geräte-Code löschen.
+void talkieDeleteDeviceCode() =>
+    RustLib.instance.api.crateApiTalkieTalkieDeleteDeviceCode();
 
 /// Push-to-Talk-Knopf in der App gedrückt halten / loslassen.
 void talkieSetPttPressed({required bool down}) =>
@@ -183,6 +212,42 @@ class ConfigDto {
 
 enum ConnStatus { idle, connecting, connected, reconnecting, failed }
 
+/// Ein mit dem Konto verknüpftes Gerät.
+class DeviceDto {
+  final PlatformInt64 id;
+  final String label;
+  final PlatformInt64 created;
+  final PlatformInt64 lastSeen;
+  final bool thisDevice;
+
+  const DeviceDto({
+    required this.id,
+    required this.label,
+    required this.created,
+    required this.lastSeen,
+    required this.thisDevice,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      label.hashCode ^
+      created.hashCode ^
+      lastSeen.hashCode ^
+      thisDevice.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DeviceDto &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          label == other.label &&
+          created == other.created &&
+          lastSeen == other.lastSeen &&
+          thisDevice == other.thisDevice;
+}
+
 enum EventKind {
   state,
   chat,
@@ -193,8 +258,58 @@ enum EventKind {
   /// Geräte-Code (steht in `notice`).
   deviceCode,
 
+  /// Eigene Geräte und offener Geräte-Code (Felder `devices`, `device_code`, ...).
+  devices,
+
   /// Gleich wegen Inaktivität getrennt (`idle_secs` Sekunden bleiben).
   idleWarning,
+
+  /// Profilbild eines Nutzers (`avatar_id`, `avatar_version`, `avatar_bytes`; leer = keins).
+  avatar,
+
+  /// Mitgliederliste (Feld `members`).
+  members,
+
+  /// Der Server hat das eigene Profilbild abgelehnt.
+  avatarRejected,
+}
+
+/// Ein registrierter Nutzer des Servers (Mitgliederliste).
+class MemberDto {
+  final PlatformInt64 id;
+  final String name;
+  final PlatformInt64 avatar;
+  final bool online;
+
+  /// Unix-Sekunden, 0 = nie.
+  final PlatformInt64 lastSeen;
+
+  const MemberDto({
+    required this.id,
+    required this.name,
+    required this.avatar,
+    required this.online,
+    required this.lastSeen,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      avatar.hashCode ^
+      online.hashCode ^
+      lastSeen.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MemberDto &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          avatar == other.avatar &&
+          online == other.online &&
+          lastSeen == other.lastSeen;
 }
 
 class PttKeyDto {
@@ -403,6 +518,16 @@ class UiEvent {
   final double level;
   final String notice;
   final PlatformInt64 idleSecs;
+  final List<DeviceDto> devices;
+
+  /// Offener Geräte-Code ("" = keiner), sein Name und Ablauf (Unix-Sekunden).
+  final String deviceCode;
+  final String deviceCodeName;
+  final PlatformInt64 deviceCodeExpires;
+  final PlatformInt64 avatarId;
+  final PlatformInt64 avatarVersion;
+  final Uint8List avatarBytes;
+  final List<MemberDto> members;
 
   const UiEvent({
     required this.kind,
@@ -413,6 +538,14 @@ class UiEvent {
     required this.level,
     required this.notice,
     required this.idleSecs,
+    required this.devices,
+    required this.deviceCode,
+    required this.deviceCodeName,
+    required this.deviceCodeExpires,
+    required this.avatarId,
+    required this.avatarVersion,
+    required this.avatarBytes,
+    required this.members,
   });
 
   @override
@@ -424,7 +557,15 @@ class UiEvent {
       history.hashCode ^
       level.hashCode ^
       notice.hashCode ^
-      idleSecs.hashCode;
+      idleSecs.hashCode ^
+      devices.hashCode ^
+      deviceCode.hashCode ^
+      deviceCodeName.hashCode ^
+      deviceCodeExpires.hashCode ^
+      avatarId.hashCode ^
+      avatarVersion.hashCode ^
+      avatarBytes.hashCode ^
+      members.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -438,7 +579,15 @@ class UiEvent {
           history == other.history &&
           level == other.level &&
           notice == other.notice &&
-          idleSecs == other.idleSecs;
+          idleSecs == other.idleSecs &&
+          devices == other.devices &&
+          deviceCode == other.deviceCode &&
+          deviceCodeName == other.deviceCodeName &&
+          deviceCodeExpires == other.deviceCodeExpires &&
+          avatarId == other.avatarId &&
+          avatarVersion == other.avatarVersion &&
+          avatarBytes == other.avatarBytes &&
+          members == other.members;
 }
 
 class UserDto {
@@ -447,6 +596,9 @@ class UserDto {
   final PlatformInt64 room;
   final bool muted;
   final bool deaf;
+
+  /// Version des Profilbilds (0 = keins).
+  final PlatformInt64 avatar;
   final bool talking;
 
   /// Nur für mich stumm geschaltet.
@@ -461,6 +613,7 @@ class UserDto {
     required this.room,
     required this.muted,
     required this.deaf,
+    required this.avatar,
     required this.talking,
     required this.localMuted,
     required this.volume,
@@ -473,6 +626,7 @@ class UserDto {
       room.hashCode ^
       muted.hashCode ^
       deaf.hashCode ^
+      avatar.hashCode ^
       talking.hashCode ^
       localMuted.hashCode ^
       volume.hashCode;
@@ -487,6 +641,7 @@ class UserDto {
           room == other.room &&
           muted == other.muted &&
           deaf == other.deaf &&
+          avatar == other.avatar &&
           talking == other.talking &&
           localMuted == other.localMuted &&
           volume == other.volume;

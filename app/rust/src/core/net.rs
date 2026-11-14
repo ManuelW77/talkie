@@ -266,7 +266,11 @@ pub async fn connect(
                 r.device = device_label().into();
                 r
             }
-            _ => Envelope::new("auth"),
+            _ => {
+                let mut r = Envelope::new("auth");
+                r.device = device_label().into(); // Gerätetyp, falls der Server ihn noch nicht kennt
+                r
+            }
         };
         resp.sig = B64.encode(sig.to_bytes());
         write_frame(&mut send, &resp).await?;

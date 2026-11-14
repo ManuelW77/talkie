@@ -31,7 +31,7 @@ type Envelope struct {
 	Sig    string `json:"sig,omitempty"`
 	Name   string `json:"name,omitempty"`
 	Invite string `json:"invite,omitempty"`
-	// register: Art des Geräts (z. B. „iOS“, „Windows“), nur zur Anzeige
+	// register und auth: Art des Geräts (z. B. „iOS“, „Windows“), nur zur Anzeige
 	Device string `json:"device,omitempty"`
 
 	// welcome / updates
@@ -68,9 +68,29 @@ type Envelope struct {
 	// idle_warning: so viele Sekunden bis zur Trennung wegen Inaktivität
 	Secs int `json:"secs,omitempty"`
 
+	// devices: eigene Geräte; zusammen mit code (offener Geräte-Code) und expires (Unix-Sekunden)
+	Devices []WireDevice `json:"devices,omitempty"`
+	Expires int64        `json:"expires,omitempty"`
+
+	// set_avatar: Bild als base64 (JPEG/PNG, 128×128; leer = entfernen). avatar: Antwort auf get_avatar
+	// (zusammen mit id und data), members: Antwort auf members
+	Data    string   `json:"data,omitempty"`
+	Avatar  int64    `json:"avatar,omitempty"`
+	Members []Member `json:"members,omitempty"`
+
 	// error / kicked
 	Code   string `json:"code,omitempty"`
 	Reason string `json:"reason,omitempty"`
+}
+
+// WireDevice ist ein Gerät des Nutzers in der Geräteliste der App.
+type WireDevice struct {
+	ID       int64  `json:"id"`
+	Label    string `json:"label"`
+	Kind     string `json:"kind,omitempty"` // Gerätetyp
+	Created  int64  `json:"created"`
+	LastSeen int64  `json:"last_seen"`
+	This     bool   `json:"this"`
 }
 
 type WireUser struct {
@@ -79,6 +99,8 @@ type WireUser struct {
 	Room  int64  `json:"room"`
 	Muted bool   `json:"muted"`
 	Deaf  bool   `json:"deaf"`
+	// Avatar: Version des Profilbilds (0 = keins)
+	Avatar int64 `json:"avatar,omitempty"`
 }
 
 var ErrFrameTooLarge = errors.New("nachricht zu groß")
