@@ -86,6 +86,8 @@ pub enum EventKind {
     Notice,
     /// Geräte-Code (steht in `notice`).
     DeviceCode,
+    /// Eigene Geräte und offener Geräte-Code (Felder `devices`, `device_code`, ...).
+    Devices,
     /// Gleich wegen Inaktivität getrennt (`idle_secs` Sekunden bleiben).
     IdleWarning,
 }
@@ -101,6 +103,21 @@ pub struct UiEvent {
     pub level: f32,
     pub notice: String,
     pub idle_secs: i64,
+    pub devices: Vec<DeviceDto>,
+    /// Offener Geräte-Code ("" = keiner), sein Name und Ablauf (Unix-Sekunden).
+    pub device_code: String,
+    pub device_code_name: String,
+    pub device_code_expires: i64,
+}
+
+/// Ein mit dem Konto verknüpftes Gerät.
+#[derive(Debug, Clone)]
+pub struct DeviceDto {
+    pub id: i64,
+    pub label: String,
+    pub created: i64,
+    pub last_seen: i64,
+    pub this_device: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -188,6 +205,10 @@ fn ui_event(e: CoreEvent) -> UiEvent {
         level: 0.0,
         notice: String::new(),
         idle_secs: 0,
+        devices: Vec::new(),
+        device_code: String::new(),
+        device_code_name: String::new(),
+        device_code_expires: 0,
     };
     match e {
         CoreEvent::State(s) => {
@@ -211,6 +232,17 @@ fn ui_event(e: CoreEvent) -> UiEvent {
         CoreEvent::DeviceCode(c) => {
             ev.kind = EventKind::DeviceCode;
             ev.notice = c;
+        }
+        CoreEvent::Devices(d) => {
+            ev.kind = EventKind::Devices;
+            ev.devices = d
+                .devices
+                .into_iter()
+                .map(|x| DeviceDto { id: x.id, label: x.label, created: x.created, last_seen: x.last_seen, this_device: x.this })
+                .collect();
+            ev.device_code = d.code;
+            ev.device_code_name = d.code_name;
+            ev.device_code_expires = d.expires;
         }
         CoreEvent::IdleWarning(secs) => {
             ev.kind = EventKind::IdleWarning;
@@ -328,10 +360,39 @@ pub fn talkie_still_here() -> Result<()> {
     Ok(())
 }
 
-/// Code für ein weiteres Gerät anfordern; kommt als Ereignis DeviceCode zurück.
+/// Code für ein weiteres Gerät anfordern (`name` = Name des neuen Geräts, darf leer sein);
+/// kommt als Ereignis DeviceCode zurück.
 #[flutter_rust_bridge::frb(sync)]
-pub fn talkie_request_device_code() -> Result<()> {
-    engine()?.request_device_code();
+pub fn talkie_request_device_code(name: String) -> Result<()> {
+    engine()?.request_device_code(&name);
+    Ok(())
+}
+
+/// Eigene Geräte und offenen Geräte-Code abfragen; kommt als Ereignis Devices zurück.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_request_devices() -> Result<()> {
+    engine()?.request_devices();
+    Ok(())
+}
+
+/// Ein anderes eigenes Gerät entfernen.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_delete_device(id: i64) -> Result<()> {
+    engine()?.delete_device(id);
+    Ok(())
+}
+
+/// Eigenes Gerät umbenennen (leer = ohne Namen).
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_rename_device(id: i64, name: String) -> Result<()> {
+    engine()?.rename_device(id, &name);
+    Ok(())
+}
+
+/// Offenen Geräte-Code löschen.
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_delete_device_code() -> Result<()> {
+    engine()?.delete_device_code();
     Ok(())
 }
 

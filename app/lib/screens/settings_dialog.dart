@@ -27,6 +27,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
   void initState() {
     super.initState();
     _loadDevices();
+    if (widget.controller.status == ConnStatus.connected) {
+      widget.controller.requestDevices();
+    }
   }
 
   @override
@@ -202,68 +205,281 @@ class _SettingsDialogState extends State<SettingsDialog> {
   }
 
   /// Code für ein weiteres Gerät (z. B. iPhone zum Laptop) anzeigen.
+  /// Erst fragt ein Feld nach dem Namen des Geräts, dann kommt der Code.
   Future<void> _showDeviceCode() async {
     final c = widget.controller;
-    c.requestDeviceCode();
+    final nameCtrl = TextEditingController();
+    var asked = false;
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Auf weiterem Gerät nutzen'),
-        content: SizedBox(
-          width: 380,
-          child: ValueListenableBuilder<String?>(
-            valueListenable: c.deviceCode,
-            builder: (ctx, code, _) => Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Öffne Talkie auf dem anderen Gerät, tippe auf „Ich nutze Talkie schon auf einem anderen Gerät“ '
-                  'und gib diesen Code ein:',
-                  textAlign: TextAlign.justify,
-                ),
-                const SizedBox(height: 16),
-                if (code == null)
-                  // Alte Server kennen Geräte-Codes nicht und antworten gar nicht
-                  FutureBuilder<void>(
-                    future: Future<void>.delayed(const Duration(seconds: 6)),
-                    builder: (ctx, snap) =>
-                        snap.connectionState == ConnectionState.done
-                        ? const Text(
-                            'Der Server antwortet nicht. Vermutlich läuft dort noch eine ältere Talkie-Version '
-                            'ohne Geräte-Codes – bitte den Server aktualisieren.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: kDanger),
-                          )
-                        : const Center(child: CircularProgressIndicator()),
-                  )
-                else
-                  SelectableText(
-                    code,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Auf weiterem Gerät nutzen'),
+          content: SizedBox(
+            width: 380,
+            child: asked ? _deviceCodeBody(ctx, c) : _deviceNameForm(nameCtrl),
+          ),
+          actions: [
+            if (!asked)
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Abbrechen'),
+              ),
+            FilledButton(
+              onPressed: asked
+                  ? () => Navigator.pop(ctx)
+                  : () {
+                      c.requestDeviceCode(nameCtrl.text.trim());
+                      setLocal(() => asked = true);
+                    },
+              child: Text(asked ? 'Fertig' : 'Code holen'),
+            ),
+          ],
+        ),
+      ),
+    );
+    nameCtrl.dispose();
+    c.requestDevices();
+  }
+
+  Widget _deviceNameForm(TextEditingController ctrl) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const Text(
+        'Gib dem neuen Gerät einen Namen, dann erkennst du es später in der Liste wieder.',
+        textAlign: TextAlign.justify,
+      ),
+      const SizedBox(height: 12),
+      TextField(
+        controller: ctrl,
+        maxLength: 40,
+        autofocus: true,
+        decoration: const InputDecoration(
+          labelText: 'Wie heißt das Gerät? (z. B. Mein iPhone)',
+          prefixIcon: Icon(Icons.edit_rounded),
+        ),
+      ),
+    ],
+  );
+
+  Widget _deviceCodeBody(
+    BuildContext ctx,
+    TalkieController c,
+  ) => ValueListenableBuilder<String?>(
+    valueListenable: c.deviceCode,
+    builder: (ctx, code, _) => Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Öffne Talkie auf dem anderen Gerät, tippe auf „Ich nutze Talkie schon auf einem anderen Gerät“ '
+          'und gib diesen Code ein:',
+          textAlign: TextAlign.justify,
+        ),
+        const SizedBox(height: 16),
+        if (code == null)
+          // Alte Server kennen Geräte-Codes nicht und antworten gar nicht
+          FutureBuilder<void>(
+            future: Future<void>.delayed(const Duration(seconds: 6)),
+            builder: (ctx, snap) => snap.connectionState == ConnectionState.done
+                ? const Text(
+                    'Der Server antwortet nicht. Vermutlich läuft dort noch eine ältere Talkie-Version '
+                    'ohne Geräte-Codes – bitte den Server aktualisieren.',
                     textAlign: TextAlign.center,
-                    style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(
-                      letterSpacing: 4,
-                      fontWeight: FontWeight.w700,
-                      color: kAccent,
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                Text(
-                  'Der Code gilt 15 Minuten und nur einmal. Verbunden ist immer nur ein Gerät gleichzeitig – '
-                  'meldest du dich auf dem neuen an, wird dieses getrennt.',
-                  style: Theme.of(ctx).textTheme.bodySmall,
-                ),
-              ],
+                    style: TextStyle(color: kDanger),
+                  )
+                : const Center(child: CircularProgressIndicator()),
+          )
+        else
+          SelectableText(
+            code,
+            textAlign: TextAlign.center,
+            style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(
+              letterSpacing: 4,
+              fontWeight: FontWeight.w700,
+              color: kAccent,
             ),
           ),
+        const SizedBox(height: 16),
+        Text(
+          'Der Code gilt 15 Minuten und nur einmal. Verbunden ist immer nur ein Gerät gleichzeitig – '
+          'meldest du dich auf dem neuen an, wird dieses getrennt.',
+          style: Theme.of(ctx).textTheme.bodySmall,
+        ),
+      ],
+    ),
+  );
+
+  static String _two(int n) => n.toString().padLeft(2, '0');
+
+  static String _clock(DateTime d) => '${_two(d.hour)}:${_two(d.minute)}';
+
+  static String _dateTime(DateTime d) =>
+      '${_two(d.day)}.${_two(d.month)}.${d.year}, ${_clock(d)} Uhr';
+
+  /// „heute, 19:50 Uhr“ oder „14.11.2026“; 0 = noch nie.
+  static String _lastSeen(int secs) {
+    if (secs <= 0) return 'noch nie';
+    final d = DateTime.fromMillisecondsSinceEpoch(secs * 1000);
+    final now = DateTime.now();
+    if (d.year == now.year && d.month == now.month && d.day == now.day) {
+      return 'heute, ${_clock(d)} Uhr';
+    }
+    return '${_two(d.day)}.${_two(d.month)}.${d.year}';
+  }
+
+  static IconData _deviceIcon(String label) {
+    final l = label.toLowerCase();
+    const phones = [
+      'iphone',
+      'ipad',
+      'ios',
+      'android',
+      'handy',
+      'tablet',
+      'phone',
+    ];
+    const computers = [
+      'mac',
+      'windows',
+      'linux',
+      'pc',
+      'laptop',
+      'rechner',
+      'computer',
+    ];
+    if (phones.any(l.contains)) return Icons.smartphone_rounded;
+    if (computers.any(l.contains)) return Icons.computer_rounded;
+    return Icons.devices_other_rounded;
+  }
+
+  Future<void> _renameDevice(DeviceDto d) async {
+    final ctrl = TextEditingController(text: d.label);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Gerät umbenennen'),
+        content: TextField(
+          controller: ctrl,
+          maxLength: 40,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Name (z. B. Mein Mac)'),
+          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Fertig'),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Speichern'),
           ),
         ],
       ),
+    );
+    ctrl.dispose();
+    if (name != null) widget.controller.renameDevice(d.id, name);
+  }
+
+  Future<void> _confirmDeleteDevice(DeviceDto d) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          '„${d.label.isEmpty ? 'Unbekanntes Gerät' : d.label}“ entfernen?',
+        ),
+        content: const Text(
+          'Dieses Gerät kann sich danach nicht mehr anmelden.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: kDanger,
+              minimumSize: const Size(0, 40),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Entfernen'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) widget.controller.deleteDevice(d.id);
+  }
+
+  /// Offener Code und Liste der Geräte (nichts, solange der Server nicht geantwortet hat).
+  Widget _devicesSection(ThemeData theme) {
+    final c = widget.controller;
+    return ValueListenableBuilder<DevicesInfo?>(
+      valueListenable: c.devices,
+      builder: (ctx, info, _) {
+        if (info == null || c.status != ConnStatus.connected) {
+          return const SizedBox.shrink();
+        }
+        final exp = DateTime.fromMillisecondsSinceEpoch(info.expires * 1000);
+        final soon = exp.difference(DateTime.now()) < const Duration(days: 1);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (info.code.isNotEmpty)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.vpn_key_rounded, color: kAccent),
+                title: Text('Offener Code ${info.code}'),
+                subtitle: Text(
+                  '${info.codeName.isEmpty ? '' : '${info.codeName} · '}'
+                  'gültig bis ${soon ? _clock(exp) : _dateTime(exp)}',
+                ),
+                trailing: IconButton(
+                  tooltip: 'Code löschen',
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: kDanger,
+                  ),
+                  onPressed: c.deleteDeviceCode,
+                ),
+              ),
+            if (info.devices.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Deine Geräte', style: theme.textTheme.titleSmall),
+              for (final d in info.devices)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(_deviceIcon(d.label)),
+                  title: Text(d.label.isEmpty ? 'Unbekanntes Gerät' : d.label),
+                  subtitle: Text(
+                    '${d.thisDevice ? 'Dieses Gerät · ' : ''}'
+                    'Zuletzt benutzt: ${d.thisDevice ? 'jetzt' : _lastSeen(d.lastSeen)}',
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Umbenennen',
+                        icon: const Icon(Icons.edit_rounded),
+                        onPressed: () => _renameDevice(d),
+                      ),
+                      if (!d.thisDevice)
+                        IconButton(
+                          tooltip: 'Gerät entfernen',
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: kDanger,
+                          ),
+                          onPressed: () => _confirmDeleteDevice(d),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+        );
+      },
     );
   }
 
@@ -501,6 +717,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   icon: const Icon(Icons.devices_rounded),
                   label: const Text('Code für weiteres Gerät holen'),
                 ),
+                const SizedBox(height: 8),
+                _devicesSection(theme),
                 const SizedBox(height: 16),
                 Text(
                   'Server: ${c.config.server}',

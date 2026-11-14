@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `chat_dto`, `engine`, `settings_dto`, `state_dto`, `ui_event`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Startet die Engine (einmal pro Programmstart) und liefert die gespeicherte Konfiguration.
 /// `data_dir` leer = Standardordner des Systems.
@@ -74,9 +74,26 @@ void talkieSetUserMuted({required PlatformInt64 user, required bool muted}) =>
 /// „Ich bin noch da“ an den Server schicken (hält die Verbindung am Leben).
 void talkieStillHere() => RustLib.instance.api.crateApiTalkieTalkieStillHere();
 
-/// Code für ein weiteres Gerät anfordern; kommt als Ereignis DeviceCode zurück.
-void talkieRequestDeviceCode() =>
-    RustLib.instance.api.crateApiTalkieTalkieRequestDeviceCode();
+/// Code für ein weiteres Gerät anfordern (`name` = Name des neuen Geräts, darf leer sein);
+/// kommt als Ereignis DeviceCode zurück.
+void talkieRequestDeviceCode({required String name}) =>
+    RustLib.instance.api.crateApiTalkieTalkieRequestDeviceCode(name: name);
+
+/// Eigene Geräte und offenen Geräte-Code abfragen; kommt als Ereignis Devices zurück.
+void talkieRequestDevices() =>
+    RustLib.instance.api.crateApiTalkieTalkieRequestDevices();
+
+/// Ein anderes eigenes Gerät entfernen.
+void talkieDeleteDevice({required PlatformInt64 id}) =>
+    RustLib.instance.api.crateApiTalkieTalkieDeleteDevice(id: id);
+
+/// Eigenes Gerät umbenennen (leer = ohne Namen).
+void talkieRenameDevice({required PlatformInt64 id, required String name}) =>
+    RustLib.instance.api.crateApiTalkieTalkieRenameDevice(id: id, name: name);
+
+/// Offenen Geräte-Code löschen.
+void talkieDeleteDeviceCode() =>
+    RustLib.instance.api.crateApiTalkieTalkieDeleteDeviceCode();
 
 /// Push-to-Talk-Knopf in der App gedrückt halten / loslassen.
 void talkieSetPttPressed({required bool down}) =>
@@ -183,6 +200,42 @@ class ConfigDto {
 
 enum ConnStatus { idle, connecting, connected, reconnecting, failed }
 
+/// Ein mit dem Konto verknüpftes Gerät.
+class DeviceDto {
+  final PlatformInt64 id;
+  final String label;
+  final PlatformInt64 created;
+  final PlatformInt64 lastSeen;
+  final bool thisDevice;
+
+  const DeviceDto({
+    required this.id,
+    required this.label,
+    required this.created,
+    required this.lastSeen,
+    required this.thisDevice,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      label.hashCode ^
+      created.hashCode ^
+      lastSeen.hashCode ^
+      thisDevice.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DeviceDto &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          label == other.label &&
+          created == other.created &&
+          lastSeen == other.lastSeen &&
+          thisDevice == other.thisDevice;
+}
+
 enum EventKind {
   state,
   chat,
@@ -192,6 +245,9 @@ enum EventKind {
 
   /// Geräte-Code (steht in `notice`).
   deviceCode,
+
+  /// Eigene Geräte und offener Geräte-Code (Felder `devices`, `device_code`, ...).
+  devices,
 
   /// Gleich wegen Inaktivität getrennt (`idle_secs` Sekunden bleiben).
   idleWarning,
@@ -403,6 +459,12 @@ class UiEvent {
   final double level;
   final String notice;
   final PlatformInt64 idleSecs;
+  final List<DeviceDto> devices;
+
+  /// Offener Geräte-Code ("" = keiner), sein Name und Ablauf (Unix-Sekunden).
+  final String deviceCode;
+  final String deviceCodeName;
+  final PlatformInt64 deviceCodeExpires;
 
   const UiEvent({
     required this.kind,
@@ -413,6 +475,10 @@ class UiEvent {
     required this.level,
     required this.notice,
     required this.idleSecs,
+    required this.devices,
+    required this.deviceCode,
+    required this.deviceCodeName,
+    required this.deviceCodeExpires,
   });
 
   @override
@@ -424,7 +490,11 @@ class UiEvent {
       history.hashCode ^
       level.hashCode ^
       notice.hashCode ^
-      idleSecs.hashCode;
+      idleSecs.hashCode ^
+      devices.hashCode ^
+      deviceCode.hashCode ^
+      deviceCodeName.hashCode ^
+      deviceCodeExpires.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -438,7 +508,11 @@ class UiEvent {
           history == other.history &&
           level == other.level &&
           notice == other.notice &&
-          idleSecs == other.idleSecs;
+          idleSecs == other.idleSecs &&
+          devices == other.devices &&
+          deviceCode == other.deviceCode &&
+          deviceCodeName == other.deviceCodeName &&
+          deviceCodeExpires == other.deviceCodeExpires;
 }
 
 class UserDto {

@@ -65,6 +65,15 @@ pub struct Snapshot {
     pub latest_url: String,
 }
 
+/// Antwort auf `devices`: Geräteliste und offener Geräte-Code (leer = keiner).
+#[derive(Debug, Clone, Default)]
+pub struct DevicesInfo {
+    pub devices: Vec<WireDevice>,
+    pub code: String,
+    pub code_name: String,
+    pub expires: i64,
+}
+
 #[derive(Debug, Clone)]
 pub enum CoreEvent {
     State(Snapshot),
@@ -74,6 +83,8 @@ pub enum CoreEvent {
     Notice(String),
     /// Geräte-Code für ein weiteres Gerät desselben Nutzers.
     DeviceCode(String),
+    /// Eigene Geräte samt offenem Geräte-Code.
+    Devices(DevicesInfo),
     /// Server: Gleich wegen Inaktivität getrennt, noch so viele Sekunden.
     IdleWarning(i64),
 }
@@ -570,9 +581,36 @@ impl Engine {
         self.inner.emit_state();
     }
 
-    /// Geräte-Code anfordern (kommt als CoreEvent::DeviceCode zurück).
-    pub fn request_device_code(&self) {
-        self.inner.send_cmd(Envelope::new("device_code"));
+    /// Geräte-Code anfordern (kommt als CoreEvent::DeviceCode zurück). `name` = Name des neuen Geräts (optional).
+    pub fn request_device_code(&self, name: &str) {
+        let mut e = Envelope::new("device_code");
+        e.name = name.to_string();
+        self.inner.send_cmd(e);
+    }
+
+    /// Eigene Geräte und offenen Geräte-Code abfragen (kommt als CoreEvent::Devices).
+    pub fn request_devices(&self) {
+        self.inner.send_cmd(Envelope::new("devices"));
+    }
+
+    /// Ein anderes eigenes Gerät entfernen.
+    pub fn delete_device(&self, id: i64) {
+        let mut e = Envelope::new("device_del");
+        e.id = id;
+        self.inner.send_cmd(e);
+    }
+
+    /// Eigenes Gerät umbenennen (leer = ohne Namen).
+    pub fn rename_device(&self, id: i64, name: &str) {
+        let mut e = Envelope::new("device_rename");
+        e.id = id;
+        e.name = name.to_string();
+        self.inner.send_cmd(e);
+    }
+
+    /// Offenen Geräte-Code löschen.
+    pub fn delete_device_code(&self) {
+        self.inner.send_cmd(Envelope::new("device_code_del"));
     }
 
     /// „Ich bin noch da“: setzt die Inaktivitäts-Uhr des Servers zurück.
@@ -1021,6 +1059,12 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
         }
         "error" | "info" => inner.emit(CoreEvent::Notice(e.reason)),
         "device_code" => inner.emit(CoreEvent::DeviceCode(e.code)),
+        "devices" => inner.emit(CoreEvent::Devices(DevicesInfo {
+            devices: e.devices,
+            code: e.code,
+            code_name: e.name,
+            expires: e.expires,
+        })),
         "idle_warning" => inner.emit(CoreEvent::IdleWarning(e.secs.max(0))),
         // Chat geleert: leerer Verlauf (Raum 0 = alle Räume)
         "chat_cleared" => inner.emit(CoreEvent::History(e.room, Vec::new())),

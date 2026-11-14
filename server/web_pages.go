@@ -178,7 +178,7 @@ func (w *webApp) userAction(rw http.ResponseWriter, r *http.Request) {
 			w.render(rw, r, "forbidden", "Kein Zugriff", nil)
 			return
 		}
-		inv, err := w.store.CreateDeviceCode(u.ID, 24*time.Hour)
+		inv, err := w.store.CreateDeviceCode(u.ID, 24*time.Hour, "")
 		if errors.Is(err, ErrTooManyDevices) {
 			w.done(rw, r, back, fmt.Sprintf("%s hat schon %d Geräte. Erst eins entfernen.", u.Name, MaxDevices), true)
 			return
