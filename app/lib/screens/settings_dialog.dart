@@ -337,7 +337,29 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   const SizedBox(height: 20),
                 ],
                 _pttSection(theme),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
+                // Gehört zum Sprechen: leicht orange hervorgehoben
+                Material(
+                  color: Colors.orange.withValues(alpha: 0.14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: Colors.orange.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    title: const Text('Talkie im Hintergrund stumm schalten'),
+                    subtitle: const Text(
+                      'Dein Mikro geht aus, solange Talkie nicht vorne ist.',
+                      textAlign: TextAlign.justify,
+                    ),
+                    value: _s.muteInBackground,
+                    onChanged: (v) => _update(_copy(muteInBackground: v)),
+                  ),
+                ),
+                const Divider(height: 32),
                 if (!_s.ptt) ...[
                   Text('Empfindlichkeit', style: theme.textTheme.titleSmall),
                   Text(
@@ -379,16 +401,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     value: _s.echoCancel,
                     onChanged: (v) => _update(_copy(echoCancel: v)),
                   ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Talkie im Hintergrund stumm schalten'),
-                  subtitle: const Text(
-                    'Dein Mikro geht aus, solange Talkie nicht vorne ist.',
-                    textAlign: TextAlign.justify,
-                  ),
-                  value: _s.muteInBackground,
-                  onChanged: (v) => _update(_copy(muteInBackground: v)),
-                ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Rauschfilter'),
