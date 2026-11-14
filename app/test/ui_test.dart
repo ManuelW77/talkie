@@ -405,7 +405,7 @@ void main() {
     await tester.pump();
     expect(find.text('Dein Name'), findsNothing);
     expect(find.text('Geräte-Code'), findsOneWidget);
-    expect(find.textContaining('Auf weiterem Gerät nutzen'), findsOneWidget);
+    expect(find.textContaining('Code für weiteres Gerät holen'), findsOneWidget);
     await expectLater(find.byType(SetupScreen), matchesGoldenFile('goldens/setup_device.png'));
     await tester.tap(find.text('Ich bin neu bei Talkie'));
     await tester.pump();

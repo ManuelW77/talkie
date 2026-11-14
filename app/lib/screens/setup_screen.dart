@@ -64,7 +64,7 @@ class _SetupScreenState extends State<SetupScreen> {
                   Text(
                     _existing
                         ? 'Gib den Geräte-Code ein. Du bekommst ihn in Talkie auf deinem anderen Gerät unter '
-                              '„Mehr“ bzw. „Einstellungen“ → „Auf weiterem Gerät nutzen“.'
+                              '„Mehr“ bzw. „Einstellungen“ → „Code für weiteres Gerät holen“.'
                         : 'Gib deinen Namen und den Einladungscode ein, den du bekommen hast.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
