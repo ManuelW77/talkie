@@ -111,6 +111,10 @@ pub struct Envelope {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub latest_url: String,
 
+    /// idle_warning: so viele Sekunden bis zur Trennung wegen Inaktivität
+    #[serde(default, skip_serializing_if = "is_zero_i64")]
+    pub secs: i64,
+
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub code: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -206,6 +210,13 @@ mod tests {
         let e: Envelope = serde_json::from_str(j).unwrap();
         assert_eq!(e.you.unwrap().name, "A");
         assert_eq!(e.rooms[0].name, "Lobby");
+    }
+
+    #[test]
+    fn idle_warning_and_still_here() {
+        let e: Envelope = serde_json::from_str(r#"{"t":"idle_warning","secs":300}"#).unwrap();
+        assert_eq!((e.t.as_str(), e.secs), ("idle_warning", 300));
+        assert_eq!(serde_json::to_string(&Envelope::new("still_here")).unwrap(), r#"{"t":"still_here"}"#);
     }
 
     #[test]

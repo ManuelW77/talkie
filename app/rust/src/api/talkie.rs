@@ -86,6 +86,8 @@ pub enum EventKind {
     Notice,
     /// Geräte-Code (steht in `notice`).
     DeviceCode,
+    /// Gleich wegen Inaktivität getrennt (`idle_secs` Sekunden bleiben).
+    IdleWarning,
 }
 
 /// Ein Ereignis an die Oberfläche; welche Felder gefüllt sind, hängt von `kind` ab.
@@ -98,6 +100,7 @@ pub struct UiEvent {
     pub history: Vec<ChatDto>,
     pub level: f32,
     pub notice: String,
+    pub idle_secs: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -184,6 +187,7 @@ fn ui_event(e: CoreEvent) -> UiEvent {
         history: Vec::new(),
         level: 0.0,
         notice: String::new(),
+        idle_secs: 0,
     };
     match e {
         CoreEvent::State(s) => {
@@ -207,6 +211,10 @@ fn ui_event(e: CoreEvent) -> UiEvent {
         CoreEvent::DeviceCode(c) => {
             ev.kind = EventKind::DeviceCode;
             ev.notice = c;
+        }
+        CoreEvent::IdleWarning(secs) => {
+            ev.kind = EventKind::IdleWarning;
+            ev.idle_secs = secs;
         }
     }
     ev
@@ -310,6 +318,13 @@ pub fn talkie_set_user_volume(user: i64, volume: f32) -> Result<()> {
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_set_user_muted(user: i64, muted: bool) -> Result<()> {
     engine()?.set_user_muted(user, muted);
+    Ok(())
+}
+
+/// „Ich bin noch da“ an den Server schicken (hält die Verbindung am Leben).
+#[flutter_rust_bridge::frb(sync)]
+pub fn talkie_still_here() -> Result<()> {
+    engine()?.still_here();
     Ok(())
 }
 

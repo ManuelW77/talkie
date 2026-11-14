@@ -25,6 +25,8 @@ const (
 	historySize      = 50
 	maxChatRunes     = 500
 	maxVoicePayload  = 1000
+	// maxSilencePayload: Opus-Pakete bis zu dieser Größe sind DTX/Komfortrauschen.
+	maxSilencePayload = 2
 )
 
 // Session ist eine angemeldete Client-Verbindung.
@@ -40,10 +42,14 @@ type Session struct {
 	device string // Art des Geräts (z. B. „iPhone/iPad“), für die Verwaltungsseite
 	// lastVoice: Unix-Millisekunden des letzten Sprachpakets (für „spricht gerade“)
 	lastVoice atomic.Int64
-	name      string
-	room      int64
-	muted     bool
-	deaf      bool
+	// lastActive: Unix-Millisekunden der letzten Aktion (für die Inaktivitäts-Trennung).
+	// warnedFor: Wert von lastActive, zu dem schon gewarnt wurde (0 = noch nicht).
+	lastActive atomic.Int64
+	warnedFor  atomic.Int64
+	name       string
+	room       int64
+	muted      bool
+	deaf       bool
 	// ignored: Nutzer, deren Sprache dieser Client nicht hören will (nur für ihn)
 	ignored map[int64]bool
 
@@ -51,6 +57,9 @@ type Session struct {
 	closeOnce sync.Once
 	done      chan struct{}
 }
+
+// touch merkt sich eine Aktion des Nutzers.
+func (s *Session) touch() { s.lastActive.Store(s.hub.now().UnixMilli()) }
 
 func (s *Session) wireLocked() WireUser {
 	return WireUser{ID: s.userID, Name: s.name, Room: s.room, Muted: s.muted, Deaf: s.deaf}
@@ -115,6 +124,13 @@ func (s *Session) voiceReader(ctx context.Context) {
 			continue
 		}
 		s.lastVoice.Store(time.Now().UnixMilli())
+		// Opus schickt bei DTX/Stille nur Pakete mit höchstens 2 Byte (Der Client
+		// sendet solche gar nicht; Pakete > 2 Byte sind echte Sprache). Nur
+		// echte Sprache zählt als Aktion, damit ein offenes Mikro mit
+		// Rauschen oder Komfortrauschen niemanden „aktiv“ hält.
+		if len(d)-3 > maxSilencePayload {
+			s.touch()
+		}
 		pkt := make([]byte, 0, len(d)+4)
 		pkt = append(pkt, DatagramVoice)
 		pkt = binary.BigEndian.AppendUint32(pkt, uint32(s.userID))
@@ -135,6 +151,7 @@ func (s *Session) controlLoop() {
 		if !ctrlLimit.Allow() {
 			continue
 		}
+		s.touch() // jede (nicht gedrosselte) Steuernachricht ist eine Aktion
 		switch e.T {
 		case "join":
 			switch err := s.hub.Join(s, e.Room, e.Password); {
@@ -174,6 +191,8 @@ func (s *Session) controlLoop() {
 			s.hub.Moderate(s, e.ID, e.T == "ban")
 		case "clear_chat":
 			s.hub.ClearChatFrom(s, e.Room)
+		case "still_here":
+			// nichts weiter: touch() oben hat die Aktivität schon zurückgesetzt
 		}
 	}
 }
@@ -285,6 +304,7 @@ func (h *Hub) HandleConn(conn *quic.Conn) {
 		out:  make(chan []byte, outQueueSize),
 		done: make(chan struct{}),
 	}
+	s.touch()
 	go s.writer()
 	old, ok := h.Add(s)
 	if !ok {

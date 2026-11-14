@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 343425383;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 2041550588;
 
 // Section: executor
 
@@ -872,6 +872,37 @@ fn wire__crate__api__talkie__talkie_set_user_volume_impl(
         },
     )
 }
+fn wire__crate__api__talkie__talkie_still_here_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "talkie_still_here",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                (move || {
+                    let output_ok = crate::api::talkie::talkie_still_here()?;
+                    std::result::Result::Ok(output_ok)
+                })(),
+            )
+        },
+    )
+}
 
 // Section: dart2rust
 
@@ -968,6 +999,7 @@ impl SseDecode for crate::api::talkie::EventKind {
             3 => crate::api::talkie::EventKind::Level,
             4 => crate::api::talkie::EventKind::Notice,
             5 => crate::api::talkie::EventKind::DeviceCode,
+            6 => crate::api::talkie::EventKind::IdleWarning,
             _ => unreachable!("Invalid variant for EventKind: {}", inner),
         };
     }
@@ -1210,6 +1242,7 @@ impl SseDecode for crate::api::talkie::UiEvent {
         let mut var_history = <Vec<crate::api::talkie::ChatDto>>::sse_decode(deserializer);
         let mut var_level = <f32>::sse_decode(deserializer);
         let mut var_notice = <String>::sse_decode(deserializer);
+        let mut var_idleSecs = <i64>::sse_decode(deserializer);
         return crate::api::talkie::UiEvent {
             kind: var_kind,
             state: var_state,
@@ -1218,6 +1251,7 @@ impl SseDecode for crate::api::talkie::UiEvent {
             history: var_history,
             level: var_level,
             notice: var_notice,
+            idle_secs: var_idleSecs,
         };
     }
 }
@@ -1310,6 +1344,7 @@ fn pde_ffi_dispatcher_sync_impl(
         22 => wire__crate__api__talkie__talkie_set_ptt_pressed_impl(ptr, rust_vec_len, data_len),
         24 => wire__crate__api__talkie__talkie_set_user_muted_impl(ptr, rust_vec_len, data_len),
         25 => wire__crate__api__talkie__talkie_set_user_volume_impl(ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__talkie__talkie_still_here_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1391,6 +1426,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::talkie::EventKind {
             Self::Level => 3.into_dart(),
             Self::Notice => 4.into_dart(),
             Self::DeviceCode => 5.into_dart(),
+            Self::IdleWarning => 6.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -1512,6 +1548,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::talkie::UiEvent {
             self.history.into_into_dart().into_dart(),
             self.level.into_into_dart().into_dart(),
             self.notice.into_into_dart().into_dart(),
+            self.idle_secs.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1630,6 +1667,7 @@ impl SseEncode for crate::api::talkie::EventKind {
                 crate::api::talkie::EventKind::Level => 3,
                 crate::api::talkie::EventKind::Notice => 4,
                 crate::api::talkie::EventKind::DeviceCode => 5,
+                crate::api::talkie::EventKind::IdleWarning => 6,
                 _ => {
                     unimplemented!("");
                 }
@@ -1822,6 +1860,7 @@ impl SseEncode for crate::api::talkie::UiEvent {
         <Vec<crate::api::talkie::ChatDto>>::sse_encode(self.history, serializer);
         <f32>::sse_encode(self.level, serializer);
         <String>::sse_encode(self.notice, serializer);
+        <i64>::sse_encode(self.idle_secs, serializer);
     }
 }
 

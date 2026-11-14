@@ -66,7 +66,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 343425383;
+  int get rustContentHash => 2041550588;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -144,6 +144,8 @@ abstract class RustLibApi extends BaseApi {
     required PlatformInt64 user,
     required double volume,
   });
+
+  void crateApiTalkieTalkieStillHere();
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -818,6 +820,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         argNames: ["user", "volume"],
       );
 
+  @override
+  void crateApiTalkieTalkieStillHere() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiTalkieTalkieStillHereConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTalkieTalkieStillHereConstMeta =>
+      const TaskConstMeta(debugName: "talkie_still_here", argNames: []);
+
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -1054,8 +1078,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   UiEvent dco_decode_ui_event(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return UiEvent(
       kind: dco_decode_event_kind(arr[0]),
       state: dco_decode_opt_box_autoadd_state_dto(arr[1]),
@@ -1064,6 +1088,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       history: dco_decode_list_chat_dto(arr[4]),
       level: dco_decode_f_32(arr[5]),
       notice: dco_decode_String(arr[6]),
+      idleSecs: dco_decode_i_64(arr[7]),
     );
   }
 
@@ -1406,6 +1431,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_history = sse_decode_list_chat_dto(deserializer);
     var var_level = sse_decode_f_32(deserializer);
     var var_notice = sse_decode_String(deserializer);
+    var var_idleSecs = sse_decode_i_64(deserializer);
     return UiEvent(
       kind: var_kind,
       state: var_state,
@@ -1414,6 +1440,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       history: var_history,
       level: var_level,
       notice: var_notice,
+      idleSecs: var_idleSecs,
     );
   }
 
@@ -1717,6 +1744,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_list_chat_dto(self.history, serializer);
     sse_encode_f_32(self.level, serializer);
     sse_encode_String(self.notice, serializer);
+    sse_encode_i_64(self.idleSecs, serializer);
   }
 
   @protected

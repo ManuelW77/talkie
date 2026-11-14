@@ -56,6 +56,16 @@ class TalkieController extends ChangeNotifier {
     talkieRequestDeviceCode();
   }
 
+  /// Sekunden bis zur Trennung wegen Inaktivität, solange der Server gewarnt hat (sonst null).
+  /// Die Oberfläche zeigt dann „Bist du noch da?“.
+  final ValueNotifier<int?> idleSecs = ValueNotifier(null);
+
+  /// „Ich bin noch da“: schließt die Warnung und hält die Verbindung am Leben.
+  void stillHere() {
+    idleSecs.value = null;
+    talkieStillHere();
+  }
+
   /// Getrennt vom ChangeNotifier, damit der Pegel nicht alles neu zeichnet.
   final ValueNotifier<double> levelNotifier = ValueNotifier(0);
 
@@ -80,6 +90,7 @@ class TalkieController extends ChangeNotifier {
     _life?.dispose();
     _notices.close();
     levelNotifier.dispose();
+    idleSecs.dispose();
     super.dispose();
   }
 
@@ -170,6 +181,7 @@ class TalkieController extends ChangeNotifier {
           unread.remove(s.room);
           unreadHere = 0;
         }
+        if (s.status != ConnStatus.connected) idleSecs.value = null; // Verbindung weg: Frage schließen
         _updateBackground(s.status);
         notifyListeners();
       case EventKind.chat:
@@ -199,6 +211,8 @@ class TalkieController extends ChangeNotifier {
         if (e.notice.isNotEmpty) _notices.add(e.notice);
       case EventKind.deviceCode:
         deviceCode.value = e.notice;
+      case EventKind.idleWarning:
+        idleSecs.value = e.idleSecs;
     }
   }
 

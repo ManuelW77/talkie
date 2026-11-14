@@ -107,6 +107,27 @@ void main() {
     await expectLater(find.byType(SetupScreen), matchesGoldenFile('goldens/setup.png'));
   });
 
+  testWidgets('Warnung vom Server öffnet "Bist du noch da?" und schließt sich wieder', (tester) async {
+    tester.view.physicalSize = const Size(1000, 640);
+    tester.view.devicePixelRatio = 1;
+    final c = _mainController();
+    await tester.pumpWidget(_wrap(MainScreen(controller: c)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Bist du noch da?'), findsNothing);
+
+    c.idleSecs.value = 300;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Bist du noch da?'), findsOneWidget);
+    expect(find.text('Ich bin noch da'), findsOneWidget);
+
+    // Verbindung endet: Dialog geht von selbst zu
+    c.idleSecs.value = null;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Bist du noch da?'), findsNothing);
+  });
+
   testWidgets('Hauptfenster zeigt Räume, Sprecher und Chat', (tester) async {
     tester.view.physicalSize = const Size(1000, 640);
     tester.view.devicePixelRatio = 1;

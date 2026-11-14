@@ -74,6 +74,8 @@ pub enum CoreEvent {
     Notice(String),
     /// Geräte-Code für ein weiteres Gerät desselben Nutzers.
     DeviceCode(String),
+    /// Server: Gleich wegen Inaktivität getrennt, noch so viele Sekunden.
+    IdleWarning(i64),
 }
 
 pub type Emitter = Arc<dyn Fn(CoreEvent) + Send + Sync>;
@@ -573,6 +575,11 @@ impl Engine {
         self.inner.send_cmd(Envelope::new("device_code"));
     }
 
+    /// „Ich bin noch da“: setzt die Inaktivitäts-Uhr des Servers zurück.
+    pub fn still_here(&self) {
+        self.inner.send_cmd(Envelope::new("still_here"));
+    }
+
     /// Push-to-Talk-Knopf in der App gedrückt/losgelassen.
     pub fn set_ptt_pressed(&self, down: bool) {
         self.inner.ptt_ui.store(down, Ordering::Relaxed);
@@ -1014,6 +1021,7 @@ fn handle_message(inner: &Arc<Inner>, e: Envelope) -> Option<SessionEnd> {
         }
         "error" | "info" => inner.emit(CoreEvent::Notice(e.reason)),
         "device_code" => inner.emit(CoreEvent::DeviceCode(e.code)),
+        "idle_warning" => inner.emit(CoreEvent::IdleWarning(e.secs.max(0))),
         // Chat geleert: leerer Verlauf (Raum 0 = alle Räume)
         "chat_cleared" => inner.emit(CoreEvent::History(e.room, Vec::new())),
         _ => {}

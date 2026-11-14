@@ -61,4 +61,17 @@
   </form>
 </section>
 {{end}}
+
+{{if .Can.admin}}
+<section class="card">
+  <h2>Trennen bei Inaktivität</h2>
+  <form method="post" action="/settings/idle" class="row">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label for="idle-minutes">Trennen nach Inaktivität (Minuten, 0 = aus)</label>
+    <input id="idle-minutes" name="minutes" type="number" required min="0" max="{{.D.IdleMax}}" value="{{.D.IdleMinutes}}">
+    <button class="primary">Speichern</button>
+  </form>
+  <p class="muted">Wer so lange nichts macht (nicht spricht, schreibt oder etwas anklickt), wird getrennt, auch wenn andere im Raum sind. Fünf Minuten vorher fragt die App „Bist du noch da?“. Erlaubt sind {{.D.IdleMin}} bis {{.D.IdleMax}} Minuten, 0 schaltet es aus. Ältere Apps zeigen die Frage nicht und werden ohne Vorwarnung getrennt.</p>
+</section>
+{{end}}
 {{end}}

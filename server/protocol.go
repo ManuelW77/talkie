@@ -65,6 +65,9 @@ type Envelope struct {
 	Latest    string `json:"latest,omitempty"`
 	LatestURL string `json:"latest_url,omitempty"`
 
+	// idle_warning: so viele Sekunden bis zur Trennung wegen Inaktivität
+	Secs int `json:"secs,omitempty"`
+
 	// error / kicked
 	Code   string `json:"code,omitempty"`
 	Reason string `json:"reason,omitempty"`
