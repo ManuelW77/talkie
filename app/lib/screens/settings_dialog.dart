@@ -415,16 +415,29 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   onChangeEnd: (v) => _update(_copy(volume: v)),
                 ),
                 const Divider(height: 32),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: c.status == ConnStatus.connected
-                        ? _showDeviceCode
-                        : null,
-                    icon: const Icon(Icons.devices_rounded),
-                    label: const Text('Auf weiterem Gerät nutzen'),
-                  ),
+                Text('Weiteres Gerät', style: theme.textTheme.titleSmall),
+                const SizedBox(height: 4),
+                Text(
+                  c.status == ConnStatus.connected
+                      ? 'Du willst Talkie auch auf dem Handy, Tablet oder einem '
+                            'zweiten Rechner nutzen? Hol dir hier einen Code und gib '
+                            'ihn auf dem anderen Gerät ein. Dort bist du dann auch du.'
+                      : 'Du willst Talkie auch auf einem anderen Gerät nutzen? '
+                            'Das geht, sobald Talkie verbunden ist.',
+                  style: theme.textTheme.bodyMedium,
                 ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: c.status == ConnStatus.connected
+                      ? _showDeviceCode
+                      : null,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  icon: const Icon(Icons.devices_rounded),
+                  label: const Text('Code für weiteres Gerät holen'),
+                ),
+                const SizedBox(height: 16),
                 Text(
                   'Server: ${c.config.server}',
                   style: theme.textTheme.bodySmall,
