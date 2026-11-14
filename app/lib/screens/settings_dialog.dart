@@ -348,15 +348,47 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     ),
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    title: const Text('Talkie im Hintergrund stumm schalten'),
-                    subtitle: const Text(
-                      'Dein Mikro geht aus, solange Talkie nicht vorne ist.',
-                      textAlign: TextAlign.justify,
-                    ),
-                    value: _s.muteInBackground,
-                    onChanged: (v) => _update(_copy(muteInBackground: v)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                        ),
+                        title: const Text(
+                          'Talkie im Hintergrund stumm schalten',
+                        ),
+                        subtitle: const Text(
+                          'Dein Mikro geht aus, solange Talkie nicht vorne ist.',
+                          textAlign: TextAlign.justify,
+                        ),
+                        value: _s.muteInBackground,
+                        onChanged: (v) => _update(_copy(muteInBackground: v)),
+                      ),
+                      if (_s.muteInBackground)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.mic_off_rounded,
+                                color: kDanger,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Du wirst nicht gehört, wenn die App im Hintergrund ist.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: kDanger,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const Divider(height: 32),
