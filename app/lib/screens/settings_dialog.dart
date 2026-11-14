@@ -724,17 +724,16 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   'Server: ${c.config.server}',
                   style: theme.textTheme.bodySmall,
                 ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: _confirmLogout,
-                    icon: const Icon(Icons.logout_rounded, color: kDanger),
-                    label: const Text(
-                      'Gerät abmelden',
-                      style: TextStyle(color: kDanger),
-                    ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _confirmLogout,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kDanger,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
                   ),
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text('Vom Server abmelden'),
                 ),
               ],
             ),
