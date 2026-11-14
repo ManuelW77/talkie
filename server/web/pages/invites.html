@@ -4,7 +4,7 @@
 <div class="card highlight">
   <p>Neuer Einladungscode:</p>
   <p class="bigcode"><code id="newcode">{{.}}</code> <button type="button" data-copy="newcode">Kopieren</button></p>
-  <p class="muted">{{if $.D.NewName}}Gib den Code weiter. In der App ist der Name „{{$.D.NewName}}“ schon vorgeschlagen und kann noch geändert werden.{{else}}Gib den Code weiter. In der App: Name ausdenken, Code eingeben, fertig.{{end}}</p>
+  <p class="muted">{{if $.D.NewName}}Für {{$.D.NewName}}: {{end}}Gib den Code weiter. In der App: Name ausdenken, Code eingeben, fertig.</p>
 </div>
 {{end}}
 
@@ -18,9 +18,9 @@
     <label>Gültig (Tage)
       <input type="number" name="days" value="7" min="1" max="365">
     </label>
-    <label class="full">Name (optional)
-      <input type="text" name="name" maxlength="20" autocomplete="off">
-      <span class="muted">Nur bei Einladung für 1 Person. Kann beim Anmelden noch geändert werden.</span>
+    <label class="full">Für wen? (optional)
+      <input type="text" name="name" maxlength="40" autocomplete="off" placeholder="Max (Klasse 5b)">
+      <span class="muted">Nur für dich zur Übersicht, die App sieht das nicht.</span>
     </label>
     {{if .MailOn}}
     <label class="full">Per Mail schicken an (optional)
@@ -34,7 +34,7 @@
 <h2>Offene Einladungen</h2>
 {{if .D.Invites}}
 <table>
-  <thead><tr><th>Code</th><th>Noch für</th><th>Name</th><th>Gültig bis</th><th></th></tr></thead>
+  <thead><tr><th>Code</th><th>Noch für</th><th>Für</th><th>Gültig bis</th><th></th></tr></thead>
   <tbody>
   {{range .D.Invites}}
   <tr>

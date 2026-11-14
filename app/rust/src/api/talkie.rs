@@ -273,11 +273,6 @@ pub fn talkie_connect(server: String, name: String, invite: String, fingerprint:
     engine()?.connect(&server, &name, &invite, &fingerprint)
 }
 
-/// Namen abfragen, der zur Einladung hinterlegt ist (leer = keiner). Fehler bei ungültigem Code.
-pub async fn talkie_invite_name(server: String, invite: String, fingerprint: String) -> Result<String> {
-    engine()?.invite_name(&server, &invite, &fingerprint).await
-}
-
 #[flutter_rust_bridge::frb(sync)]
 pub fn talkie_disconnect() -> Result<()> {
     engine()?.disconnect();

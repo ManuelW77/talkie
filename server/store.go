@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	_ "modernc.org/sqlite"
 )
@@ -40,16 +42,15 @@ type DBInvite struct {
 	Code     string    `json:"code"`
 	UsesLeft int       `json:"uses_left"`
 	Expires  time.Time `json:"expires"`
-	Name     string    `json:"name,omitempty"` // optional: Name, den der Eingeladene vorgeschlagen bekommt
+	Name     string    `json:"name,omitempty"` // Notiz, für wen die Einladung ist (nur für die Verwaltung)
 }
 
 var (
-	ErrNotFound       = errors.New("nicht gefunden")
-	ErrNameTaken      = errors.New("name vergeben")
-	ErrInviteInvalid  = errors.New("einladung ungültig")
-	ErrNameMissing    = errors.New("name fehlt")
-	ErrInviteName     = errors.New("einladungsname ungültig")
-	ErrInviteNameUses = errors.New("name nur bei einer einladung für eine person")
+	ErrNotFound      = errors.New("nicht gefunden")
+	ErrNameTaken     = errors.New("name vergeben")
+	ErrInviteInvalid = errors.New("einladung ungültig")
+	ErrNameMissing   = errors.New("name fehlt")
+	ErrInviteName    = errors.New("einladungsnotiz ungültig")
 )
 
 const schema = `
@@ -208,12 +209,6 @@ func (s *Store) RegisterDevice(invite, name string, pk []byte, label string) (*D
 		return u, tx.Commit()
 	}
 	if name == "" {
-		// Rückfall für alte Apps: Name aus der Einladung
-		if err := tx.QueryRow("SELECT name FROM invites WHERE code = ?", invite).Scan(&name); err != nil {
-			return nil, err
-		}
-	}
-	if name == "" {
 		return nil, ErrNameMissing
 	}
 	var exists int
@@ -317,17 +312,10 @@ func newInviteCode() (string, error) {
 	return string(out), nil
 }
 
-func (s *Store) CreateInvite(uses int, valid time.Duration, name string) (*DBInvite, error) {
-	if strings.TrimSpace(name) != "" {
-		if uses != 1 {
-			return nil, ErrInviteNameUses
-		}
-		var ok bool
-		if name, ok = cleanName(name); !ok {
-			return nil, ErrInviteName
-		}
-	} else {
-		name = ""
+func (s *Store) CreateInvite(uses int, valid time.Duration, note string) (*DBInvite, error) {
+	name, ok := cleanInviteNote(note)
+	if !ok {
+		return nil, ErrInviteName
 	}
 	code, err := newInviteCode()
 	if err != nil {
@@ -342,23 +330,19 @@ func (s *Store) CreateInvite(uses int, valid time.Duration, name string) (*DBInv
 	return &DBInvite{Code: code, UsesLeft: uses, Expires: exp, Name: name}, nil
 }
 
-// InviteName liefert den Namen einer gültigen Einladung (leer, wenn keiner hinterlegt ist
-// oder es ein Geräte-Code ist).
-func (s *Store) InviteName(code string) (string, error) {
-	var name string
-	var owner sql.NullInt64
-	err := s.db.QueryRow("SELECT name, user_id FROM invites WHERE code = ? AND uses_left > 0 AND expires > ?",
-		NormalizeInvite(code), time.Now().Unix()).Scan(&name, &owner)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", ErrInviteInvalid
+// cleanInviteNote fasst Leerraum zusammen und prüft die Notiz zur Einladung:
+// höchstens 40 Zeichen, keine Steuerzeichen. Leer ist erlaubt.
+func cleanInviteNote(n string) (string, bool) {
+	n = strings.Join(strings.Fields(n), " ")
+	if utf8.RuneCountInString(n) > 40 {
+		return "", false
 	}
-	if err != nil {
-		return "", err
+	for _, r := range n {
+		if unicode.IsControl(r) {
+			return "", false
+		}
 	}
-	if owner.Valid {
-		return "", nil
-	}
-	return name, nil
+	return n, true
 }
 
 func (s *Store) Invites() ([]DBInvite, error) {

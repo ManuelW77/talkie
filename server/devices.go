@@ -49,7 +49,7 @@ func (s *Store) initDevices() error {
 			return err
 		}
 	}
-	// Optionaler Name, der dem Eingeladenen vorgeschlagen wird
+	// Notiz, für wen die Einladung ist (nur für die Verwaltung)
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('invites') WHERE name = 'name'").Scan(&has); err != nil {
 		return err
 	}

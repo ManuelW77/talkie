@@ -204,18 +204,6 @@ mod tests {
     }
 
     #[test]
-    fn parses_invite_info() {
-        let e: Envelope = serde_json::from_str(r#"{"t":"invite_info","name":"Max"}"#).unwrap();
-        assert_eq!((e.t.as_str(), e.name.as_str()), ("invite_info", "Max"));
-        let e: Envelope = serde_json::from_str(r#"{"t":"invite_info"}"#).unwrap();
-        assert!(e.name.is_empty());
-        let mut r = Envelope::new("invite_info");
-        r.sig = "AA".into();
-        r.invite = "ABCD-EFGH".into();
-        assert_eq!(serde_json::to_string(&r).unwrap(), r#"{"t":"invite_info","sig":"AA","invite":"ABCD-EFGH"}"#);
-    }
-
-    #[test]
     fn parses_server_welcome() {
         let j = r#"{"t":"welcome","you":{"id":1,"name":"A","room":2,"muted":false,"deaf":false},
             "rooms":[{"id":2,"name":"Lobby"}],"users":[{"id":1,"name":"A","room":2,"muted":false,"deaf":false}]}"#;
